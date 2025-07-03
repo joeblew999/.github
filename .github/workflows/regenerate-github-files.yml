@@ -1,0 +1,48 @@
+name: Regenerate GitHub Files
+on:
+  push:
+    paths: ['templates/**']
+    branches: [main]
+
+jobs:
+  regenerate:
+    # Skip if commit message contains [skip-regen] to prevent infinite loops
+    if: "!contains(github.event.head_commit.message, '[skip-regen]')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Install Task
+        run: |
+          sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+
+      - name: Clean and regenerate files
+        run: |
+          task clean
+          task setup
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add .github/
+          if git diff --staged --quiet; then
+            echo "changed=false" >> ${{ env.GITHUB_OUTPUT }}
+          else
+            echo "changed=true" >> ${{ env.GITHUB_OUTPUT }}
+          fi
+
+      - name: Commit and push changes
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git commit -m "chore: regenerate .github files from templates [skip-regen]"
+          git push
