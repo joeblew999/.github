@@ -174,6 +174,12 @@ tasks:
         echo "  task clean       # Remove generated files"
         echo "  task install-gh  # Install GitHub CLI"
         echo ""
+        echo "🚀 NATS Integration:"
+        echo "  task nats-monitor        # Monitor NATS-powered workflows"
+        echo "  task nats-deploy         # Deploy NATS infrastructure"
+        echo "  task nats-scale          # Scale NATS infrastructure"
+        echo "  task nats-controller     # Run NATS controller locally"
+        echo ""
         echo "📖 Documentation:"
         echo "  README.md        # Architecture and patterns"
         echo "  CONTRIBUTING.md  # Contribution guidelines"
@@ -183,39 +189,131 @@ tasks:
         echo "  Profile:    https://github.com/{{.GITHUB_ORG}}?preview=true"
         echo "  Workflows:  https://github.com/{{.GITHUB_ORG}}/.github/actions"
 
-  monitor:
-    desc: Monitor GitHub Actions workflow after template changes
-    deps: [install-gh]
-    cmds:
-      - ./monitor-workflow.sh
-
-  test-workflow:
-    desc: Test the full template → GitHub Actions → regeneration workflow
-    deps: [install-gh]
+  monitor-workflow:
+    desc: Monitor GitHub Actions workflow execution
     cmds:
       - |
-        echo "🧪 Testing Template → GitHub Actions → Regeneration Workflow"
-        echo "==========================================================="
+        echo "🔍 Monitoring GitHub Actions workflow for template changes..."
+        echo "This script monitors the full cycle: template change → GitHub Actions → file regeneration"
         echo ""
-        echo "This test will:"
-        echo "1. 📝 Add a timestamp to a template"
-        echo "2. 🚀 Commit and push the change"
-        echo "3. 👀 Monitor GitHub Actions execution"
-        echo "4. ✅ Verify files regenerate automatically"
+        ./monitor-workflow.sh
+
+  monitor-nats:
+    desc: Monitor workflow using NATS (requires NATS server)
+    cmds:
+      - |
+        echo "🚀 NATS-enhanced workflow monitoring"
+        echo "This demonstrates advanced patterns for workflow orchestration"
         echo ""
-        read -p "Continue with workflow test? (y/n): " -n 1 -r
-        echo
-        if [[ $$REPLY =~ ^[Yy]$$ ]]; then
-          echo "Adding test timestamp to PR template..."
-          echo "" >> templates/pull_request_template.md
-          echo "<!-- Test timestamp: $(date) -->" >> templates/pull_request_template.md
-          git add templates/pull_request_template.md
-          git commit -m "test: add timestamp to PR template - workflow test"
-          git push
-          echo ""
-          echo "🔄 Change pushed! Monitoring workflow..."
-          sleep 5
-          ./monitor-workflow.sh
+        ./nats-monitor.sh check
+
+  nats-demo:
+    desc: Show NATS enhanced workflow capabilities
+    cmds:
+      - |
+        echo "🌟 NATS Enhanced GitHub Workflow Demonstration"
+        echo "=============================================="
+        echo ""
+        ./nats-monitor.sh demo
+
+  nats-controller:
+    desc: Start the NATS-based workflow controller (requires NATS server)
+    cmds:
+      - |
+        echo "🎛️  Starting NATS workflow controller..."
+        go mod download
+        go run cmd/nats-controller/main.go
+
+  nats-monitor:
+    desc: Monitor NATS-powered GitHub workflows
+    cmds:
+      - |
+        echo "🔍 NATS Workflow Monitor for {{.GITHUB_ORG}}"
+        echo "==========================================="
+        
+        if [ -f "nats-monitor.sh" ]; then
+          chmod +x nats-monitor.sh
+          ./nats-monitor.sh
         else
-          echo "Test cancelled."
+          echo "❌ nats-monitor.sh not found"
+          echo "   This would connect to Synadia Cloud and monitor:"
+          echo "   • github.{{.GITHUB_ORG}}.template_changed"
+          echo "   • github.{{.GITHUB_ORG}}.workflow_status"
+          echo "   • github.{{.GITHUB_ORG}}.regeneration_requested"
+          echo ""
+          echo "   To enable NATS monitoring:"
+          echo "   1. Sign up for Synadia Cloud"
+          echo "   2. Configure credentials"
+          echo "   3. Run: task nats-deploy"
         fi
+
+  nats-deploy:
+    desc: Deploy NATS infrastructure using Terraform
+    cmds:
+      - |
+        echo "🚀 Deploying NATS Infrastructure"
+        echo "================================"
+        
+        if ! command -v terraform >/dev/null 2>&1; then
+          echo "❌ Terraform not installed"
+          echo "   Install from: https://www.terraform.io/downloads"
+          exit 1
+        fi
+        
+        cd terraform
+        
+        echo "📋 Initializing Terraform..."
+        terraform init
+        
+        echo "📋 Planning NATS infrastructure..."
+        terraform plan -var="github_org={{.GITHUB_ORG}}"
+        
+        echo ""
+        echo "To apply:"
+        echo "  cd terraform && terraform apply -var='github_org={{.GITHUB_ORG}}'"
+
+  nats-scale:
+    desc: Scale NATS infrastructure based on load
+    cmds:
+      - |
+        echo "📈 NATS Infrastructure Scaling"
+        echo "=============================="
+        
+        echo "This would:"
+        echo "1. Check current GitHub event load"
+        echo "2. Analyze NATS queue depths"
+        echo "3. Trigger Terraform for additional capacity"
+        echo "4. Auto-configure new NATS nodes"
+        echo ""
+        echo "Example scaling triggers:"
+        echo "• Queue depth > 1000 messages"
+        echo "• Processing latency > 30 seconds"
+        echo "• GitHub API rate limit approaching"
+        echo ""
+        echo "Self-similar pattern: NATS controllers deploy more NATS!"
+
+  nats-controller:
+    desc: Run NATS controller locally for development
+    cmds:
+      - |
+        echo "🤖 Starting Local NATS Controller"
+        echo "================================="
+        
+        if [ ! -f "cmd/nats-controller/main.go" ]; then
+          echo "❌ NATS controller not found"
+          exit 1
+        fi
+        
+        echo "📋 Environment:"
+        echo "  GITHUB_ORG: {{.GITHUB_ORG}}"
+        echo "  NATS_URL: ${NATS_URL:-nats://localhost:4222}"
+        echo ""
+        
+        if ! command -v nats >/dev/null 2>&1; then
+          echo "⚠️  NATS CLI not installed"
+          echo "   Install from: https://github.com/nats-io/natscli"
+          echo "   Or use Docker: docker run natsio/nats-server"
+        fi
+        
+        echo "🚀 Starting controller..."
+        go run cmd/nats-controller/main.go
