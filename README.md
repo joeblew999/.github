@@ -35,6 +35,25 @@ This repository has a unique architecture challenge:
 
 This gives us observability into the "snake" to ensure it doesn't eat its own tail!
 
+## Advanced Architecture Patterns
+
+**Terraform-style Idempotency:** This system follows infrastructure-as-code principles:
+- Declarative templates (desired state)
+- Idempotent operations (same result every time)
+- State reconciliation (templates → generated files)
+- Plan/Apply pattern (`check` then `setup`)
+
+**NATS Controller Pattern:** For complex self-modifying systems, message queues can help:
+- **Event-driven updates** - Template changes publish events
+- **Controller reconciliation** - Separate process handles updates
+- **Backpressure control** - Queue prevents rapid-fire changes
+- **Dead letter queues** - Handle failed regenerations
+- **Distributed coordination** - Multiple repos, one controller
+
+Both patterns solve the "snake problem" differently:
+- **Terraform approach:** Make operations idempotent (what we implemented)
+- **NATS approach:** Decouple triggers from actions (advanced solution)
+
 
 
 

@@ -14,13 +14,14 @@ tasks:
   setup:
     desc: Create .github structure from templates
     cmds:
+      - task: clean
       - mkdir -p .github profile
       - go run cmd/github-setup/main.go -org={{.GITHUB_ORG}}
 
   clean:
     desc: Remove generated .github files
     cmds:
-      - rm -rf .github/ISSUE_TEMPLATE .github/issue-templates .github/workflows .github/CODEOWNERS .github/dependabot.yml .github/pull_request_template.md
+      - rm -rf .github/ISSUE_TEMPLATE .github/issue-templates .github/workflows .github/CODEOWNERS .github/dependabot.yml .github/pull_request_template.md .github/PULL_REQUEST_TEMPLATE
 
   check:
     desc: Check if generated files are up to date with templates
@@ -105,3 +106,79 @@ tasks:
     cmds:
       - task: check
       - task: verify-github
+
+  status:
+    desc: Show current system status and health
+    cmds:
+      - |
+        echo "🏢 GitHub Organization: {{.GITHUB_ORG}}"
+        echo "📁 Repository: https://github.com/{{.GITHUB_ORG}}/.github"
+        echo ""
+        echo "📊 System Status:"
+        
+        # Check if files are generated
+        if [ -d ".github" ]; then
+          echo "✅ Generated files exist"
+        else
+          echo "❌ Generated files missing - run 'task setup'"
+        fi
+        
+        # Check if files are up to date (quick check)
+        if task check >/dev/null 2>&1; then
+          echo "✅ Generated files are up to date"
+        else
+          echo "⚠️  Generated files may be out of date - run 'task check' for details"
+        fi
+        
+        # Check Go module
+        if go mod verify >/dev/null 2>&1; then
+          echo "✅ Go module verified"
+        else
+          echo "❌ Go module issues - run 'go mod tidy'"
+        fi
+        
+        # Check GitHub CLI
+        if command -v gh >/dev/null 2>&1; then
+          echo "✅ GitHub CLI available: $(gh --version | head -1 | cut -d' ' -f3)"
+        else
+          echo "❌ GitHub CLI not installed - run 'task install-gh'"
+        fi
+
+  dev:
+    desc: Development workflow - clean, setup, and check
+    cmds:
+      - echo "🚀 Running development workflow..."
+      - task: clean
+      - task: setup
+      - task: check
+      - echo "✅ Development workflow complete"
+
+  help:
+    desc: Show detailed help and usage examples
+    cmds:
+      - |
+        echo "🛠️  GitHub Organization Setup Tool"
+        echo "=================================="
+        echo ""
+        echo "📋 Quick Start:"
+        echo "  task setup     # Generate all files"
+        echo "  task status    # Check system health"
+        echo "  task dev       # Development workflow"
+        echo ""
+        echo "🔍 Validation:"
+        echo "  task check           # Check local files vs templates"
+        echo "  task verify-github   # Check GitHub state"
+        echo "  task validate-all    # Run all checks"
+        echo ""
+        echo "🧹 Maintenance:"
+        echo "  task clean       # Remove generated files"
+        echo "  task install-gh  # Install GitHub CLI"
+        echo ""
+        echo "📖 Documentation:"
+        echo "  README.md        # Architecture and patterns"
+        echo "  CONTRIBUTING.md  # Contribution guidelines"
+        echo ""
+        echo "🌐 Links:"
+        echo "  Repository: https://github.com/{{.GITHUB_ORG}}/.github"
+        echo "  Profile:    https://github.com/{{.GITHUB_ORG}}?preview=true"
+        echo "  Workflows:  https://github.com/{{.GITHUB_ORG}}/.github/actions"

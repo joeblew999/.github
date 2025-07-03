@@ -9,6 +9,8 @@ import (
 	"text/template"
 )
 
+const version = "1.0.0"
+
 type Config struct {
 	GitHubOrg string
 }
@@ -17,7 +19,14 @@ func main() {
 	org := flag.String("org", "", "GitHub organization name")
 	templateDir := flag.String("templates", "templates", "Template directory")
 	outputDir := flag.String("output", ".github", "Output directory")
+	versionFlag := flag.Bool("version", false, "Show version and exit")
+	verbose := flag.Bool("verbose", false, "Verbose output")
 	flag.Parse()
+
+	if *versionFlag {
+		fmt.Printf("github-setup version %s\n", version)
+		os.Exit(0)
+	}
 
 	if *org == "" {
 		log.Fatal("GitHub organization name is required (-org flag)")
@@ -25,7 +34,13 @@ func main() {
 
 	config := Config{GitHubOrg: *org}
 
-	fmt.Printf("Processing templates for organization: %s\n", *org)
+	if *verbose {
+		fmt.Printf("Processing templates for organization: %s\n", *org)
+		fmt.Printf("Template directory: %s\n", *templateDir)
+		fmt.Printf("Output directory: %s\n", *outputDir)
+	} else {
+		fmt.Printf("Processing templates for organization: %s\n", *org)
+	}
 
 	err := filepath.Walk(*templateDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -38,7 +53,9 @@ func main() {
 		}
 
 		// Skip non-template files (optional: could filter by extension)
-		fmt.Printf("Processing: %s\n", path)
+		if *verbose {
+			fmt.Printf("Processing: %s\n", path)
+		}
 
 		// Parse template
 		tmpl, err := template.ParseFiles(path)
@@ -72,7 +89,9 @@ func main() {
 			return fmt.Errorf("failed to execute template %s: %w", path, err)
 		}
 
-		fmt.Printf("  → %s\n", outPath)
+		if *verbose {
+			fmt.Printf("  → %s\n", outPath)
+		}
 		return nil
 	})
 
