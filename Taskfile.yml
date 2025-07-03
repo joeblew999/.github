@@ -1,0 +1,9 @@
+version: '3'
+
+tasks:
+  setup:
+    desc: Create well-known .github folders
+    cmds:
+      - mkdir -p .github/ISSUE_TEMPLATE
+      - mkdir -p .github/workflows
+      - mkdir -p .github/PULL_REQUEST_TEMPLATE
