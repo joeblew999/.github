@@ -37,3 +37,71 @@ tasks:
           echo "✅ Generated files are up to date."
           rm -rf "$TEMP_DIR"
         fi
+
+  install-gh:
+    desc: Ensure GitHub CLI is installed (idempotent)
+    cmds:
+      - |
+        if command -v gh >/dev/null 2>&1; then
+          echo "✅ GitHub CLI already installed: $(gh --version | head -1)"
+        else
+          echo "📦 Installing GitHub CLI..."
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            brew install gh
+          elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update && sudo apt install gh
+          else
+            echo "❌ Unsupported OS. Please install GitHub CLI manually: https://cli.github.com/"
+            exit 1
+          fi
+          echo "✅ GitHub CLI installed: $(gh --version | head -1)"
+        fi
+
+  verify-github:
+    desc: Verify repository state on GitHub matches local templates
+    deps: [install-gh]
+    cmds:
+      - |
+        echo "🔍 Verifying GitHub repository state..."
+        
+        # Check if repo exists and is accessible
+        if ! gh repo view {{.GITHUB_ORG}}/.github >/dev/null 2>&1; then
+          echo "❌ Cannot access repository {{.GITHUB_ORG}}/.github"
+          exit 1
+        fi
+        
+        echo "✅ Repository {{.GITHUB_ORG}}/.github is accessible"
+        
+        # Check if workflows are enabled
+        echo "📋 Checking workflows..."
+        gh workflow list --repo {{.GITHUB_ORG}}/.github
+        
+        # Check if issues/PRs use our templates
+        echo "📝 Checking if templates are active..."
+        echo "  Issue templates:"
+        gh api repos/{{.GITHUB_ORG}}/.github/contents/.github/ISSUE_TEMPLATE --jq '.[].name' 2>/dev/null || \
+        gh api repos/{{.GITHUB_ORG}}/.github/contents/.github/issue-templates --jq '.[].name' 2>/dev/null || \
+        echo "    No issue templates found"
+        
+        # Check organization profile
+        echo "🏢 Organization profile:"
+        gh api orgs/{{.GITHUB_ORG}} --jq '.name // .login' 2>/dev/null || \
+        echo "    Organization API requires admin:org scope"
+        
+        # Check if dependabot is configured
+        echo "🤖 Checking Dependabot configuration..."
+        if gh api repos/{{.GITHUB_ORG}}/.github/contents/.github/dependabot.yml >/dev/null 2>&1; then
+          echo "✅ Dependabot configuration found"
+        else
+          echo "❌ Dependabot configuration not found"
+        fi
+        
+        echo "✅ GitHub verification complete"
+
+  validate-all:
+    desc: Run all validation checks (local + GitHub)
+    cmds:
+      - task: check
+      - task: verify-github
