@@ -65,4 +65,4 @@ Please provide a brief summary of the changes made in this PR.
 - [ ] Comments have been added where necessary
 - [ ] Tests have been added/updated as needed
 
-<!-- Template update test to verify CI workflow -->
+<!-- Template update test to verify CI workflow is now working -->
