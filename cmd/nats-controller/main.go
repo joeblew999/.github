@@ -180,10 +180,10 @@ func (c *Controller) Start(ctx context.Context) error {
 
 	// Create or get consumer
 	consumer, err := c.js.CreateOrUpdateConsumer(ctx, streamName, jetstream.ConsumerConfig{
-		Name:        consumerName,
-		Durable:     consumerName,
+		Name:          consumerName,
+		Durable:       consumerName,
 		FilterSubject: fmt.Sprintf("github.%s.>", c.org),
-		AckPolicy:   jetstream.AckExplicitPolicy,
+		AckPolicy:     jetstream.AckExplicitPolicy,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create consumer: %w", err)
@@ -226,7 +226,7 @@ func (c *Controller) Start(ctx context.Context) error {
 func (c *Controller) processMessage(msg jetstream.Msg) {
 	// Extract subject and route to appropriate handler
 	subject := msg.Subject()
-	
+
 	for pattern, handler := range c.subjects {
 		// Simple pattern matching - in production, use proper subject matching
 		if matchSubject(pattern, subject) {

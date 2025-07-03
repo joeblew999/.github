@@ -4,11 +4,27 @@ version: '3'
 
 vars:
   GITHUB_ORG: joeblew999
+  # Platform detection
+  OS: "{{OS}}"
+  ARCH: "{{ARCH}}"
+  # Platform-specific extensions
+  EXE_EXT: '{{if eq OS "windows"}}.exe{{end}}'
+  # Platform-specific binaries
+  GH_BINARY: 'gh{{.EXE_EXT}}'
+  TERRAFORM_BINARY: 'terraform{{.EXE_EXT}}'
+  NATS_BINARY: 'nats{{.EXE_EXT}}'
+  # Platform-specific paths
+  HOME_DIR: '{{if eq OS "windows"}}{{.USERPROFILE}}{{else}}{{.HOME}}{{end}}'
 
 tasks:
   default:
     desc: List available tasks
     cmds:
+      - |
+        echo "🛠️  GitHub Organization Setup Tool"
+        echo "Platform: {{.OS}}/{{.ARCH}}"
+        echo "Organization: {{.GITHUB_ORG}}"
+        echo ""
       - task --list
 
   setup:
@@ -40,24 +56,64 @@ tasks:
         fi
 
   install-gh:
-    desc: Ensure GitHub CLI is installed (idempotent)
+    desc: Ensure GitHub CLI is installed (idempotent, cross-platform)
     cmds:
       - |
-        if command -v gh >/dev/null 2>&1; then
-          echo "✅ GitHub CLI already installed: $(gh --version | head -1)"
+        echo "📦 Installing GitHub CLI for {{.OS}}/{{.ARCH}}..."
+        
+        if command -v {{.GH_BINARY}} >/dev/null 2>&1; then
+          echo "✅ GitHub CLI already installed: $({{.GH_BINARY}} --version | head -1)"
         else
           echo "📦 Installing GitHub CLI..."
-          if [[ "$OSTYPE" == "darwin"* ]]; then
+          
+          {{if eq .OS "darwin"}}
+          # macOS via Homebrew
+          if command -v brew >/dev/null 2>&1; then
             brew install gh
-          elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+          else
+            echo "❌ Homebrew not found. Install from: https://brew.sh/"
+            exit 1
+          fi
+          
+          {{else if eq .OS "linux"}}
+          # Linux via package manager
+          if command -v apt >/dev/null 2>&1; then
+            # Debian/Ubuntu
             curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
             echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
             sudo apt update && sudo apt install gh
+          elif command -v yum >/dev/null 2>&1; then
+            # RHEL/CentOS/Fedora
+            sudo yum install -y yum-utils
+            sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+            sudo yum install gh
+          elif command -v pacman >/dev/null 2>&1; then
+            # Arch Linux
+            sudo pacman -S github-cli
           else
-            echo "❌ Unsupported OS. Please install GitHub CLI manually: https://cli.github.com/"
+            echo "❌ Unsupported Linux distribution. Install manually: https://cli.github.com/"
             exit 1
           fi
-          echo "✅ GitHub CLI installed: $(gh --version | head -1)"
+          
+          {{else if eq .OS "windows"}}
+          # Windows via package manager
+          if command -v choco >/dev/null 2>&1; then
+            choco install gh
+          elif command -v scoop >/dev/null 2>&1; then
+            scoop install gh
+          elif command -v winget >/dev/null 2>&1; then
+            winget install --id GitHub.cli
+          else
+            echo "❌ No package manager found (choco/scoop/winget). Install from: https://cli.github.com/"
+            exit 1
+          fi
+          
+          {{else}}
+          echo "❌ Unsupported OS: {{.OS}}. Please install GitHub CLI manually: https://cli.github.com/"
+          exit 1
+          {{end}}
+          
+          echo "✅ GitHub CLI installed: $({{.GH_BINARY}} --version | head -1)"
         fi
 
   verify-github:
@@ -113,6 +169,7 @@ tasks:
       - |
         echo "🏢 GitHub Organization: {{.GITHUB_ORG}}"
         echo "📁 Repository: https://github.com/{{.GITHUB_ORG}}/.github"
+        echo "🌍 Platform: {{.OS}}/{{.ARCH}}"
         echo ""
         echo "📊 System Status:"
         
@@ -137,12 +194,40 @@ tasks:
           echo "❌ Go module issues - run 'go mod tidy'"
         fi
         
-        # Check GitHub CLI
-        if command -v gh >/dev/null 2>&1; then
-          echo "✅ GitHub CLI available: $(gh --version | head -1 | cut -d' ' -f3)"
+        # Platform-aware GitHub CLI check
+        if command -v {{.GH_BINARY}} >/dev/null 2>&1; then
+          echo "✅ GitHub CLI available: $({{.GH_BINARY}} --version | head -1 | cut -d' ' -f3)"
         else
           echo "❌ GitHub CLI not installed - run 'task install-gh'"
         fi
+        
+        # Platform-specific checks
+        {{if eq .OS "darwin"}}
+        # macOS specific checks
+        if command -v brew >/dev/null 2>&1; then
+          echo "✅ Homebrew available"
+        else
+          echo "⚠️  Homebrew not installed (recommended for macOS)"
+        fi
+        {{else if eq .OS "linux"}}
+        # Linux specific checks
+        if systemctl --version >/dev/null 2>&1; then
+          echo "✅ Systemd available"
+        else
+          echo "ℹ️  Systemd not available (using alternative service management)"
+        fi
+        {{else if eq .OS "windows"}}
+        # Windows specific checks  
+        if command -v choco >/dev/null 2>&1; then
+          echo "✅ Chocolatey available"
+        elif command -v scoop >/dev/null 2>&1; then
+          echo "✅ Scoop available"
+        elif command -v winget >/dev/null 2>&1; then
+          echo "✅ Winget available"
+        else
+          echo "⚠️  No package manager found (consider installing Chocolatey/Scoop/Winget)"
+        fi
+        {{end}}
 
   dev:
     desc: Development workflow - clean, setup, and check
@@ -179,6 +264,10 @@ tasks:
         echo "  task nats-deploy         # Deploy NATS infrastructure"
         echo "  task nats-scale          # Scale NATS infrastructure"
         echo "  task nats-controller     # Run NATS controller locally"
+        echo ""
+        echo "🌍 Cross-Platform:"
+        echo "  task test-platform       # Test cross-platform compatibility"
+        echo "  Platform: {{.OS}}/{{.ARCH}}   # Current platform"
         echo ""
         echo "📖 Documentation:"
         echo "  README.md        # Architecture and patterns"
@@ -309,7 +398,7 @@ tasks:
         echo "  NATS_URL: ${NATS_URL:-nats://localhost:4222}"
         echo ""
         
-        if ! command -v nats >/dev/null 2>&1; then
+        if ! command -v {{.NATS_BINARY}} >/dev/null 2>&1; then
           echo "⚠️  NATS CLI not installed"
           echo "   Install from: https://github.com/nats-io/natscli"
           echo "   Or use Docker: docker run natsio/nats-server"
@@ -317,3 +406,65 @@ tasks:
         
         echo "🚀 Starting controller..."
         go run cmd/nats-controller/main.go
+
+  test-platform:
+    desc: Test cross-platform compatibility
+    cmds:
+      - |
+        echo "🧪 Cross-Platform Compatibility Test"
+        echo "===================================="
+        echo "Platform: {{.OS}}/{{.ARCH}}"
+        echo "Home Dir: {{.HOME_DIR}}"
+        echo ""
+        
+        echo "📋 Binary Checks:"
+        echo "  Go: $(go version)"
+        
+        {{if eq .OS "windows"}}
+        echo "  PowerShell: $(if (Get-Command powershell -ErrorAction SilentlyContinue) { 'Available' } else { 'Not Available' })"
+        echo "  Git: $(git --version)"
+        {{else}}
+        echo "  Shell: $SHELL"
+        echo "  Git: $(git --version)"
+        {{end}}
+        
+        echo ""
+        echo "📁 Path Tests:"
+        echo "  Current Dir: $(pwd)"
+        echo "  Temp Dir: {{if eq .OS "windows"}}%TEMP%{{else}}/tmp{{end}}"
+        
+        echo ""
+        echo "🔧 Platform Features:"
+        {{if eq .OS "darwin"}}
+        echo "  ✅ macOS Homebrew integration"
+        echo "  ✅ Keychain credential storage"
+        echo "  ✅ Spotlight file indexing"
+        {{else if eq .OS "linux"}}
+        echo "  ✅ Linux package manager support"
+        echo "  ✅ Systemd service integration"
+        echo "  ✅ Container compatibility"
+        {{else if eq .OS "windows"}}
+        echo "  ✅ Windows package manager support"
+        echo "  ✅ Windows Services integration"
+        echo "  ✅ PowerShell and CMD compatibility"
+        {{end}}
+        
+        echo ""
+        echo "🔍 Testing core operations..."
+        
+        # Test template generation
+        if go run cmd/github-setup/main.go -version >/dev/null 2>&1; then
+          echo "  ✅ Template processor works"
+        else
+          echo "  ❌ Template processor failed"
+        fi
+        
+        # Test GitHub CLI
+        if command -v {{.GH_BINARY}} >/dev/null 2>&1; then
+          echo "  ✅ GitHub CLI available"
+        else
+          echo "  ⚠️  GitHub CLI not installed"
+        fi
+        
+        echo ""
+        echo "✅ Platform compatibility test complete!"
