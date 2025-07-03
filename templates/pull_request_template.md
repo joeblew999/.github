@@ -10,6 +10,7 @@ Brief description of changes made in this PR.
 - [ ] 📚 Documentation update
 - [ ] 🧹 Code cleanup/refactoring
 - [ ] ⚡ Performance improvement
+- [ ] 🔧 Template update (auto-generated from {{.GitHubOrg}}/.github)
 
 ## 🧪 How Has This Been Tested?
 

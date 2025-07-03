@@ -182,3 +182,40 @@ tasks:
         echo "  Repository: https://github.com/{{.GITHUB_ORG}}/.github"
         echo "  Profile:    https://github.com/{{.GITHUB_ORG}}?preview=true"
         echo "  Workflows:  https://github.com/{{.GITHUB_ORG}}/.github/actions"
+
+  monitor:
+    desc: Monitor GitHub Actions workflow after template changes
+    deps: [install-gh]
+    cmds:
+      - ./monitor-workflow.sh
+
+  test-workflow:
+    desc: Test the full template → GitHub Actions → regeneration workflow
+    deps: [install-gh]
+    cmds:
+      - |
+        echo "🧪 Testing Template → GitHub Actions → Regeneration Workflow"
+        echo "==========================================================="
+        echo ""
+        echo "This test will:"
+        echo "1. 📝 Add a timestamp to a template"
+        echo "2. 🚀 Commit and push the change"
+        echo "3. 👀 Monitor GitHub Actions execution"
+        echo "4. ✅ Verify files regenerate automatically"
+        echo ""
+        read -p "Continue with workflow test? (y/n): " -n 1 -r
+        echo
+        if [[ $$REPLY =~ ^[Yy]$$ ]]; then
+          echo "Adding test timestamp to PR template..."
+          echo "" >> templates/pull_request_template.md
+          echo "<!-- Test timestamp: $(date) -->" >> templates/pull_request_template.md
+          git add templates/pull_request_template.md
+          git commit -m "test: add timestamp to PR template - workflow test"
+          git push
+          echo ""
+          echo "🔄 Change pushed! Monitoring workflow..."
+          sleep 5
+          ./monitor-workflow.sh
+        else
+          echo "Test cancelled."
+        fi
