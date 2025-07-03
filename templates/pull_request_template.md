@@ -43,3 +43,26 @@ Closes #(issue number)
 ## 📋 Additional Notes
 
 Any additional information that reviewers should know.
+
+## Summary
+
+Please provide a brief summary of the changes made in this PR.
+
+## Changes
+
+- [ ] What changes were made?
+- [ ] Why were these changes necessary?
+
+## Testing
+
+- [ ] Have you tested these changes?
+- [ ] Are there any breaking changes?
+
+## Checklist
+
+- [ ] Code follows the project's style guidelines
+- [ ] Self-review of the code has been performed
+- [ ] Comments have been added where necessary
+- [ ] Tests have been added/updated as needed
+
+<!-- Template update test to verify CI workflow -->

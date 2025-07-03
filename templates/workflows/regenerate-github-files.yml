@@ -34,9 +34,9 @@ jobs:
         run: |
           git add .github/
           if git diff --staged --quiet; then
-            echo "changed=false" >> ${{`{{ env.GITHUB_OUTPUT }}`}}
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            echo "changed=true" >> ${{`{{ env.GITHUB_OUTPUT }}`}}
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Commit and push changes
