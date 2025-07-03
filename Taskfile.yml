@@ -1,9 +1,23 @@
 version: '3'
 
+# View organization profile at: https://github.com/joeblew999?preview=true
+
+vars:
+  GITHUB_ORG: joeblew999
+
 tasks:
-  setup:
-    desc: Create well-known .github folders
+  default:
+    desc: List available tasks
     cmds:
-      - mkdir -p .github/ISSUE_TEMPLATE
-      - mkdir -p .github/workflows
-      - mkdir -p .github/PULL_REQUEST_TEMPLATE
+      - task --list
+
+  setup:
+    desc: Create .github structure from templates
+    cmds:
+      - mkdir -p .github profile
+      - go run cmd/github-setup/main.go -org={{.GITHUB_ORG}}
+
+  clean:
+    desc: Remove generated .github files
+    cmds:
+      - rm -rf .github/ISSUE_TEMPLATE .github/workflows .github/CODEOWNERS .github/dependabot.yml .github/pull_request_template.md

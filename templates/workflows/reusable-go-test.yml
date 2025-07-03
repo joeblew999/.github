@@ -1,0 +1,22 @@
+name: Go Test (Reusable)
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        required: false
+        type: string
+        default: '1.21'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{`{{ inputs.go-version }}`}}
+      - name: Run tests
+        run: go test -v ./...
+      - name: Run race tests
+        run: go test -race -short ./...

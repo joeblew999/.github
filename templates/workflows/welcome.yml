@@ -1,0 +1,26 @@
+name: Welcome New Contributors
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened'
+    steps:
+      - uses: actions/first-interaction@v1
+        with:
+          repo-token: ${{`{{ secrets.GITHUB_TOKEN }}`}}
+          issue-message: |
+            🎉 Thanks for opening your first issue! 
+            
+            We appreciate your contribution to the project. A maintainer will review this soon.
+          pr-message: |
+            🚀 Thanks for your first contribution! 
+            
+            We appreciate your pull request. Please make sure:
+            - [ ] Tests pass
+            - [ ] Code follows our style guidelines
+            - [ ] Documentation is updated if needed

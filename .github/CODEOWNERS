@@ -1,0 +1,21 @@
+# Global code owners
+* @joeblew999
+
+# Go code
+*.go @joeblew999
+go.mod @joeblew999
+go.sum @joeblew999
+
+# Documentation
+*.md @joeblew999
+docs/ @joeblew999
+
+# CI/CD
+.github/ @joeblew999
+Taskfile.yml @joeblew999
+Dockerfile @joeblew999
+
+# Configuration files
+*.yml @joeblew999
+*.yaml @joeblew999
+*.json @joeblew999

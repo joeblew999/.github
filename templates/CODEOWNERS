@@ -1,0 +1,21 @@
+# Global code owners
+* @{{.GitHubOrg}}
+
+# Go code
+*.go @{{.GitHubOrg}}
+go.mod @{{.GitHubOrg}}
+go.sum @{{.GitHubOrg}}
+
+# Documentation
+*.md @{{.GitHubOrg}}
+docs/ @{{.GitHubOrg}}
+
+# CI/CD
+.github/ @{{.GitHubOrg}}
+Taskfile.yml @{{.GitHubOrg}}
+Dockerfile @{{.GitHubOrg}}
+
+# Configuration files
+*.yml @{{.GitHubOrg}}
+*.yaml @{{.GitHubOrg}}
+*.json @{{.GitHubOrg}}
