@@ -265,6 +265,13 @@ tasks:
         echo "  task nats-scale          # Scale NATS infrastructure"
         echo "  task nats-controller     # Run NATS controller locally"
         echo ""
+        echo "🐝 Bee Integration:"
+        echo "  task bee-install         # Install bee event system"
+        echo "  task bee-generate        # Generate handlers from protobuf"
+        echo "  task bee-run             # Run bee orchestrator"
+        echo "  task bee-validate        # Validate schemas and config"
+        echo "  task bee-demo            # Show bee capabilities"
+        echo ""
         echo "🌍 Cross-Platform:"
         echo "  task test-platform       # Test cross-platform compatibility"
         echo "  Platform: {{.OS}}/{{.ARCH}}   # Current platform"
@@ -407,64 +414,150 @@ tasks:
         echo "🚀 Starting controller..."
         go run cmd/nats-controller/main.go
 
-  test-platform:
-    desc: Test cross-platform compatibility
+  bee-install:
+    desc: Install bee for event-driven GitHub workflows
     cmds:
       - |
-        echo "🧪 Cross-Platform Compatibility Test"
-        echo "===================================="
-        echo "Platform: {{.OS}}/{{.ARCH}}"
-        echo "Home Dir: {{.HOME_DIR}}"
-        echo ""
+        echo "🐝 Installing bee for event-driven workflows"
+        echo "============================================"
         
-        echo "📋 Binary Checks:"
-        echo "  Go: $(go version)"
-        
-        {{if eq .OS "windows"}}
-        echo "  PowerShell: $(if (Get-Command powershell -ErrorAction SilentlyContinue) { 'Available' } else { 'Not Available' })"
-        echo "  Git: $(git --version)"
-        {{else}}
-        echo "  Shell: $SHELL"
-        echo "  Git: $(git --version)"
-        {{end}}
-        
-        echo ""
-        echo "📁 Path Tests:"
-        echo "  Current Dir: $(pwd)"
-        echo "  Temp Dir: {{if eq .OS "windows"}}%TEMP%{{else}}/tmp{{end}}"
-        
-        echo ""
-        echo "🔧 Platform Features:"
-        {{if eq .OS "darwin"}}
-        echo "  ✅ macOS Homebrew integration"
-        echo "  ✅ Keychain credential storage"
-        echo "  ✅ Spotlight file indexing"
-        {{else if eq .OS "linux"}}
-        echo "  ✅ Linux package manager support"
-        echo "  ✅ Systemd service integration"
-        echo "  ✅ Container compatibility"
-        {{else if eq .OS "windows"}}
-        echo "  ✅ Windows package manager support"
-        echo "  ✅ Windows Services integration"
-        echo "  ✅ PowerShell and CMD compatibility"
-        {{end}}
-        
-        echo ""
-        echo "🔍 Testing core operations..."
-        
-        # Test template generation
-        if go run cmd/github-setup/main.go -version >/dev/null 2>&1; then
-          echo "  ✅ Template processor works"
+        if command -v bee >/dev/null 2>&1; then
+          echo "✅ bee already installed: $(bee version)"
         else
-          echo "  ❌ Template processor failed"
+          echo "📦 Installing bee..."
+          go install github.com/blinkinglight/bee/cmd/bee@latest
+          
+          if command -v bee >/dev/null 2>&1; then
+            echo "✅ bee installed: $(bee version)"
+          else
+            echo "❌ bee installation failed"
+            echo "   Try manual installation: https://github.com/blinkinglight/bee"
+            exit 1
+          fi
+        fi
+
+  bee-generate:
+    desc: Generate bee handlers from protobuf schemas
+    deps: [bee-install]
+    cmds:
+      - |
+        echo "🔧 Generating bee handlers from protobuf schemas"
+        echo "==============================================="
+        
+        if [ ! -f "schemas/github_events.proto" ]; then
+          echo "❌ Protobuf schema not found: schemas/github_events.proto"
+          exit 1
         fi
         
-        # Test GitHub CLI
-        if command -v {{.GH_BINARY}} >/dev/null 2>&1; then
-          echo "  ✅ GitHub CLI available"
+        echo "📋 Generating Go code from protobuf..."
+        
+        # Create output directory
+        mkdir -p pkg/events/v1
+        
+        # Generate protobuf Go code
+        if command -v protoc >/dev/null 2>&1; then
+          protoc --go_out=pkg/events/v1 --go_opt=paths=source_relative schemas/github_events.proto
+          echo "✅ Protobuf Go code generated"
         else
-          echo "  ⚠️  GitHub CLI not installed"
+          echo "⚠️  protoc not installed, skipping protobuf generation"
+          echo "   Install from: https://protobuf.dev/downloads/"
         fi
         
+        echo "🐝 Generating bee handlers..."
+        bee generate --config bee.yaml
+        
+        echo "✅ bee handler generation complete"
+
+  bee-run:
+    desc: Run bee-powered GitHub workflow orchestrator
+    deps: [bee-generate]
+    cmds:
+      - |
+        echo "🐝 Starting bee GitHub Workflow Orchestrator"
+        echo "==========================================="
+        
+        if [ ! -f "bee.yaml" ]; then
+          echo "❌ bee configuration not found: bee.yaml"
+          exit 1
+        fi
+        
+        echo "📋 Configuration:"
+        echo "  GITHUB_ORG: {{.GITHUB_ORG}}"
+        echo "  NATS_URL: ${NATS_URL:-nats://localhost:4222}"
+        echo "  Config: bee.yaml"
         echo ""
-        echo "✅ Platform compatibility test complete!"
+        
+        echo "🚀 Starting bee orchestrator..."
+        bee run --config bee.yaml
+
+  bee-validate:
+    desc: Validate bee configuration and schemas
+    deps: [bee-install]
+    cmds:
+      - |
+        echo "🔍 Validating bee configuration and schemas"
+        echo "=========================================="
+        
+        if [ ! -f "bee.yaml" ]; then
+          echo "❌ bee configuration not found: bee.yaml"
+          exit 1
+        fi
+        
+        echo "📋 Validating bee.yaml configuration..."
+        bee validate --config bee.yaml
+        
+        if [ -f "schemas/github_events.proto" ]; then
+          echo "📋 Validating protobuf schema..."
+          if command -v protoc >/dev/null 2>&1; then
+            protoc --descriptor_set_out=/dev/null schemas/github_events.proto
+            echo "✅ Protobuf schema is valid"
+          else
+            echo "⚠️  protoc not installed, skipping schema validation"
+          fi
+        fi
+        
+        echo "✅ All validations passed"
+
+  bee-demo:
+    desc: Demonstrate bee integration capabilities
+    cmds:
+      - |
+        echo "🌟 Bee + NATS + GitHub Integration Demo"
+        echo "======================================"
+        echo ""
+        echo "🐝 Bee brings to our GitHub workflow orchestration:"
+        echo ""
+        echo "📋 Type-Safe Event Handling:"
+        echo "  • Protobuf schemas define all GitHub events"
+        echo "  • Generated Go handlers with compile-time safety"
+        echo "  • Schema evolution without breaking changes"
+        echo ""
+        echo "🔄 Event-Driven Architecture:"
+        echo "  • GitHub webhooks → Protobuf events → NATS → bee handlers"
+        echo "  • Terraform operations triggered by events"
+        echo "  • Self-healing infrastructure through event sourcing"
+        echo ""
+        echo "🚀 Advanced Features:"
+        echo "  • Built-in metrics and tracing"
+        echo "  • Event replay for debugging"
+        echo "  • Rate limiting and backpressure"
+        echo "  • Multi-language support (Go, Rust, Python)"
+        echo ""
+        echo "🔧 Self-Terraforming Pattern:"
+        echo "  • bee handlers detect infrastructure needs"
+        echo "  • Automatically trigger Terraform operations"
+        echo "  • NATS controllers deploy more NATS infrastructure"
+        echo "  • Self-similar scaling across regions"
+        echo ""
+        echo "📊 Observability:"
+        echo "  • Prometheus metrics for all events"
+        echo "  • Jaeger tracing for distributed debugging"
+        echo "  • Structured logging with correlation IDs"
+        echo ""
+        echo "🌐 Getting Started:"
+        echo "  task bee-install     # Install bee"
+        echo "  task bee-generate    # Generate handlers"
+        echo "  task bee-run         # Start orchestrator"
+        echo ""
+        echo "This represents the next evolution of GitHub workflow"
+        echo "orchestration - event-driven, type-safe, and infinitely scalable! 🐝🚀"

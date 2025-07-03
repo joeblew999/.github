@@ -1,0 +1,303 @@
+// github_events.proto - GitHub workflow events for bee code generation
+// This schema enables type-safe, evolvable event handling for GitHub workflows
+
+syntax = "proto3";
+package github.workflow.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+option go_package = "github.com/joeblew999/.github/pkg/events/v1;eventsv1";
+
+// Core GitHub Events
+// ===================
+
+// Triggered when templates in the .github repository change
+message TemplateChangedEvent {
+  // GitHub organization name
+  string org = 1;
+  
+  // Repository name (usually ".github")
+  string repo = 2;
+  
+  // Git commit SHA that triggered the change
+  string commit_sha = 3;
+  
+  // List of changed template files
+  repeated string changed_files = 4;
+  
+  // When the change occurred
+  google.protobuf.Timestamp timestamp = 5;
+  
+  // Type of change (added, modified, deleted)
+  ChangeType change_type = 6;
+  
+  // Impact assessment for scaling decisions
+  ImpactLevel impact_level = 7;
+  
+  // Optional: branch where change occurred
+  string branch = 8;
+  
+  // Optional: author information
+  Author author = 9;
+}
+
+// GitHub Actions workflow status updates
+message WorkflowStatusEvent {
+  string org = 1;
+  string repo = 2;
+  string workflow_name = 3;
+  WorkflowStatus status = 4;
+  string run_id = 5;
+  google.protobuf.Timestamp timestamp = 6;
+  
+  // Duration of the workflow run
+  google.protobuf.Duration duration = 7;
+  
+  // Conclusion (success, failure, cancelled, etc.)
+  WorkflowConclusion conclusion = 8;
+  
+  // URL to the workflow run
+  string html_url = 9;
+  
+  // Jobs within the workflow
+  repeated WorkflowJob jobs = 10;
+}
+
+// Request to regenerate files from templates
+message RegenerationRequestEvent {
+  string org = 1;
+  string repo = 2;
+  string triggered_by = 3;  // "webhook", "controller", "manual"
+  string reason = 4;
+  repeated string target_files = 5;
+  google.protobuf.Timestamp timestamp = 6;
+  
+  // Priority level for processing
+  Priority priority = 7;
+  
+  // Idempotency key to prevent duplicate processing
+  string idempotency_key = 8;
+}
+
+// NATS Infrastructure Events
+// ===========================
+
+// Triggered when NATS infrastructure needs scaling
+message InfrastructureScalingEvent {
+  string org = 1;
+  string region = 2;
+  ScalingDirection direction = 3;  // UP, DOWN
+  ScalingReason reason = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  
+  // Current and target capacity
+  int32 current_capacity = 6;
+  int32 target_capacity = 7;
+  
+  // Metrics that triggered scaling
+  repeated Metric triggering_metrics = 8;
+  
+  // Terraform configuration to apply
+  string terraform_config = 9;
+}
+
+// Result of a Terraform operation
+message TerraformOperationEvent {
+  string org = 1;
+  string operation_id = 2;
+  TerraformOperation operation = 3;
+  TerraformStatus status = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  
+  // Resources affected
+  repeated TerraformResource resources = 6;
+  
+  // Error details if operation failed
+  string error_message = 7;
+  
+  // Output values from successful apply
+  map<string, string> outputs = 8;
+}
+
+// Supporting Types
+// ================
+
+enum ChangeType {
+  CHANGE_TYPE_UNKNOWN = 0;
+  CHANGE_TYPE_ADDED = 1;
+  CHANGE_TYPE_MODIFIED = 2;
+  CHANGE_TYPE_DELETED = 3;
+}
+
+enum ImpactLevel {
+  IMPACT_LEVEL_UNKNOWN = 0;
+  IMPACT_LEVEL_LOW = 1;     // Documentation changes
+  IMPACT_LEVEL_MEDIUM = 2;  // Template updates
+  IMPACT_LEVEL_HIGH = 3;    // Workflow changes
+  IMPACT_LEVEL_CRITICAL = 4; // Security or infrastructure changes
+}
+
+enum WorkflowStatus {
+  WORKFLOW_STATUS_UNKNOWN = 0;
+  WORKFLOW_STATUS_QUEUED = 1;
+  WORKFLOW_STATUS_IN_PROGRESS = 2;
+  WORKFLOW_STATUS_COMPLETED = 3;
+  WORKFLOW_STATUS_FAILED = 4;
+  WORKFLOW_STATUS_CANCELLED = 5;
+}
+
+enum WorkflowConclusion {
+  WORKFLOW_CONCLUSION_UNKNOWN = 0;
+  WORKFLOW_CONCLUSION_SUCCESS = 1;
+  WORKFLOW_CONCLUSION_FAILURE = 2;
+  WORKFLOW_CONCLUSION_NEUTRAL = 3;
+  WORKFLOW_CONCLUSION_CANCELLED = 4;
+  WORKFLOW_CONCLUSION_SKIPPED = 5;
+  WORKFLOW_CONCLUSION_TIMED_OUT = 6;
+  WORKFLOW_CONCLUSION_ACTION_REQUIRED = 7;
+}
+
+enum Priority {
+  PRIORITY_UNKNOWN = 0;
+  PRIORITY_LOW = 1;
+  PRIORITY_NORMAL = 2;
+  PRIORITY_HIGH = 3;
+  PRIORITY_URGENT = 4;
+}
+
+enum ScalingDirection {
+  SCALING_DIRECTION_UNKNOWN = 0;
+  SCALING_DIRECTION_UP = 1;
+  SCALING_DIRECTION_DOWN = 2;
+}
+
+enum ScalingReason {
+  SCALING_REASON_UNKNOWN = 0;
+  SCALING_REASON_HIGH_LOAD = 1;
+  SCALING_REASON_LOW_LOAD = 2;
+  SCALING_REASON_QUEUE_DEPTH = 3;
+  SCALING_REASON_LATENCY = 4;
+  SCALING_REASON_ERROR_RATE = 5;
+  SCALING_REASON_SCHEDULED = 6;
+}
+
+enum TerraformOperation {
+  TERRAFORM_OPERATION_UNKNOWN = 0;
+  TERRAFORM_OPERATION_PLAN = 1;
+  TERRAFORM_OPERATION_APPLY = 2;
+  TERRAFORM_OPERATION_DESTROY = 3;
+  TERRAFORM_OPERATION_REFRESH = 4;
+}
+
+enum TerraformStatus {
+  TERRAFORM_STATUS_UNKNOWN = 0;
+  TERRAFORM_STATUS_RUNNING = 1;
+  TERRAFORM_STATUS_SUCCESS = 2;
+  TERRAFORM_STATUS_FAILED = 3;
+  TERRAFORM_STATUS_CANCELLED = 4;
+}
+
+// Complex Types
+// =============
+
+message Author {
+  string username = 1;
+  string email = 2;
+  string name = 3;
+  string avatar_url = 4;
+}
+
+message WorkflowJob {
+  string name = 1;
+  WorkflowStatus status = 2;
+  WorkflowConclusion conclusion = 3;
+  google.protobuf.Timestamp started_at = 4;
+  google.protobuf.Timestamp completed_at = 5;
+  string html_url = 6;
+  repeated WorkflowStep steps = 7;
+}
+
+message WorkflowStep {
+  string name = 1;
+  WorkflowStatus status = 2;
+  WorkflowConclusion conclusion = 3;
+  int32 number = 4;
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp completed_at = 6;
+}
+
+message Metric {
+  string name = 1;
+  double value = 2;
+  string unit = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  map<string, string> labels = 5;
+}
+
+message TerraformResource {
+  string type = 1;
+  string name = 2;
+  string provider = 3;
+  TerraformResourceAction action = 4;
+}
+
+enum TerraformResourceAction {
+  TERRAFORM_RESOURCE_ACTION_UNKNOWN = 0;
+  TERRAFORM_RESOURCE_ACTION_CREATE = 1;
+  TERRAFORM_RESOURCE_ACTION_UPDATE = 2;
+  TERRAFORM_RESOURCE_ACTION_DELETE = 3;
+  TERRAFORM_RESOURCE_ACTION_NO_CHANGE = 4;
+}
+
+// Event Aggregation Types
+// =======================
+
+// Aggregated stats for monitoring and alerting
+message SystemHealthEvent {
+  string org = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  
+  // Event processing statistics
+  EventProcessingStats event_stats = 3;
+  
+  // Infrastructure health
+  InfrastructureHealth infrastructure = 4;
+  
+  // GitHub API usage
+  GitHubAPIStats github_stats = 5;
+  
+  // Overall system status
+  SystemStatus status = 6;
+}
+
+message EventProcessingStats {
+  int64 events_processed_per_minute = 1;
+  int64 events_in_queue = 2;
+  double average_processing_time_ms = 3;
+  int64 failed_events = 4;
+  int64 retried_events = 5;
+}
+
+message InfrastructureHealth {
+  int32 active_nats_servers = 1;
+  int32 active_controllers = 2;
+  double cpu_usage_percent = 3;
+  double memory_usage_percent = 4;
+  int64 disk_usage_bytes = 5;
+}
+
+message GitHubAPIStats {
+  int64 api_calls_per_hour = 1;
+  int64 rate_limit_remaining = 2;
+  google.protobuf.Timestamp rate_limit_reset = 3;
+  double api_success_rate = 4;
+}
+
+enum SystemStatus {
+  SYSTEM_STATUS_UNKNOWN = 0;
+  SYSTEM_STATUS_HEALTHY = 1;
+  SYSTEM_STATUS_DEGRADED = 2;
+  SYSTEM_STATUS_UNHEALTHY = 3;
+  SYSTEM_STATUS_CRITICAL = 4;
+}

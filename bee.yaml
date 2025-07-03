@@ -1,0 +1,296 @@
+# bee.yaml - Bee configuration for GitHub workflow orchestration
+# This configures bee to handle GitHub events with NATS and Terraform integration
+
+name: github-workflow-orchestrator
+version: "1.0.0"
+description: "NATS-powered GitHub workflow orchestration with Terraform scaling"
+
+# Event configuration
+events:
+  # Core GitHub events
+  template_changed:
+    subject: "github.*.template_changed"
+    schema: "schemas/github_events.proto"
+    type: "github.workflow.v1.TemplateChangedEvent"
+    
+  workflow_status:
+    subject: "github.*.workflow_status"
+    schema: "schemas/github_events.proto"
+    type: "github.workflow.v1.WorkflowStatusEvent"
+    
+  regeneration_request:
+    subject: "github.*.regeneration_requested"
+    schema: "schemas/github_events.proto"
+    type: "github.workflow.v1.RegenerationRequestEvent"
+  
+  # Infrastructure events
+  infrastructure_scaling:
+    subject: "nats.*.infrastructure_scaling"
+    schema: "schemas/github_events.proto"
+    type: "github.workflow.v1.InfrastructureScalingEvent"
+    
+  terraform_operation:
+    subject: "terraform.*.operation"
+    schema: "schemas/github_events.proto"
+    type: "github.workflow.v1.TerraformOperationEvent"
+    
+  system_health:
+    subject: "system.*.health"
+    schema: "schemas/github_events.proto"
+    type: "github.workflow.v1.SystemHealthEvent"
+
+# Handler configuration
+handlers:
+  # Template change handler - regenerates files and possibly scales infrastructure
+  template_changed_handler:
+    event: template_changed
+    language: go
+    package: handlers
+    
+    # Terraform integration for infrastructure scaling
+    terraform:
+      enabled: true
+      configs:
+        - "terraform/nats-github-infrastructure.tf"
+        - "terraform/nats-regional.tf"
+      
+      # Scaling triggers
+      scaling_rules:
+        high_impact:
+          condition: "event.impact_level >= IMPACT_LEVEL_HIGH"
+          action: "apply"
+          config: "terraform/nats-regional.tf"
+          vars:
+            load_factor: 2.0
+        
+        critical_impact:
+          condition: "event.impact_level == IMPACT_LEVEL_CRITICAL"
+          action: "apply"
+          config: "terraform/nats-github-infrastructure.tf"
+          vars:
+            replicas: 5
+    
+    # Rate limiting to prevent GitHub API abuse
+    rate_limit:
+      requests_per_minute: 30
+      burst: 10
+    
+    # Retry configuration
+    retry:
+      max_attempts: 3
+      backoff: exponential
+      initial_delay: "1s"
+      max_delay: "30s"
+
+  # Workflow status handler - monitors GitHub Actions
+  workflow_status_handler:
+    event: workflow_status
+    language: go
+    package: handlers
+    
+    # Alert on failures
+    alerts:
+      workflow_failure:
+        condition: "event.conclusion == WORKFLOW_CONCLUSION_FAILURE"
+        action: "notify"
+        channels: ["slack", "pagerduty"]
+      
+      workflow_timeout:
+        condition: "event.conclusion == WORKFLOW_CONCLUSION_TIMED_OUT"
+        action: "retry"
+        max_retries: 2
+
+  # Infrastructure scaling handler - manages NATS capacity
+  infrastructure_scaling_handler:
+    event: infrastructure_scaling
+    language: go
+    package: handlers
+    
+    terraform:
+      enabled: true
+      auto_apply: true
+      
+      # Safety checks before scaling
+      safety_checks:
+        - "check_resource_limits"
+        - "validate_terraform_plan"
+        - "check_budget_constraints"
+    
+    # Monitoring
+    metrics:
+      - "scaling_events_total"
+      - "scaling_duration_seconds"
+      - "terraform_operations_total"
+
+  # System health aggregator
+  system_health_handler:
+    event: system_health
+    language: go
+    package: handlers
+    
+    # Aggregate metrics from multiple sources
+    aggregation:
+      window: "5m"
+      functions: ["avg", "max", "p95"]
+    
+    # Health check rules
+    health_checks:
+      event_processing:
+        condition: "event.event_stats.events_in_queue > 1000"
+        severity: "warning"
+        action: "scale_up"
+      
+      infrastructure:
+        condition: "event.infrastructure.cpu_usage_percent > 80"
+        severity: "critical"
+        action: "immediate_scale"
+      
+      github_api:
+        condition: "event.github_stats.rate_limit_remaining < 100"
+        severity: "warning"
+        action: "throttle"
+
+# NATS configuration
+nats:
+  url: "${NATS_URL:-nats://localhost:4222}"
+  
+  # JetStream configuration
+  jetstream:
+    enabled: true
+    stream: "GITHUB_EVENTS"
+    subjects: 
+      - "github.>"
+      - "nats.>"
+      - "terraform.>"
+      - "system.>"
+    
+    # Persistence settings
+    storage: file
+    retention: limits
+    max_age: "7d"
+    max_msgs: 1000000
+    max_bytes: "10GB"
+    
+    # Consumer configuration
+    consumer:
+      durable: "bee-github-orchestrator"
+      ack_policy: explicit
+      ack_wait: "30s"
+      max_deliver: 3
+      
+      # Rate limiting
+      rate_limit: 100  # messages per second
+
+# Terraform configuration
+terraform:
+  binary: "${TERRAFORM_BINARY:-terraform}"
+  working_dir: "terraform"
+  
+  # Default variables for all operations
+  default_vars:
+    github_org: "${GITHUB_ORG}"
+    region: "${AWS_REGION:-us-west-2}"
+  
+  # State management
+  state:
+    backend: "s3"
+    bucket: "${TERRAFORM_STATE_BUCKET}"
+    key: "github-orchestrator/${GITHUB_ORG}/terraform.tfstate"
+    region: "${AWS_REGION:-us-west-2}"
+  
+  # Safety settings
+  safety:
+    require_plan_approval: true
+    max_resources_per_apply: 50
+    protected_resources:
+      - "aws_s3_bucket.terraform_state"
+      - "nats_account.github_org"
+
+# Observability
+observability:
+  # Metrics
+  metrics:
+    prometheus:
+      enabled: true
+      port: 9090
+      path: "/metrics"
+    
+    custom_metrics:
+      - name: "github_events_processed_total"
+        type: "counter"
+        help: "Total number of GitHub events processed"
+        labels: ["org", "repo", "event_type"]
+      
+      - name: "terraform_operations_duration_seconds"
+        type: "histogram"
+        help: "Duration of Terraform operations"
+        labels: ["operation", "status"]
+  
+  # Tracing
+  tracing:
+    jaeger:
+      enabled: true
+      endpoint: "${JAEGER_ENDPOINT}"
+    
+    trace_events: true
+    sample_rate: 0.1
+  
+  # Logging
+  logging:
+    level: "info"
+    format: "json"
+    
+    # Log structured events
+    structured_events: true
+    
+    # Log destinations
+    destinations:
+      - type: "stdout"
+      - type: "file"
+        path: "/var/log/bee/github-orchestrator.log"
+        max_size: "100MB"
+        max_files: 10
+
+# Security
+security:
+  # GitHub token management
+  github:
+    token_source: "env"  # or "vault", "k8s_secret"
+    token_env: "GITHUB_TOKEN"
+    
+    # API rate limiting
+    rate_limit:
+      requests_per_hour: 5000
+      burst: 100
+  
+  # NATS security
+  nats:
+    credentials_file: "${NATS_CREDENTIALS}"
+    tls:
+      enabled: true
+      verify: true
+  
+  # Terraform security
+  terraform:
+    encrypt_state: true
+    require_mfa: false  # Set to true for production
+    
+    # Allowed operations
+    allowed_operations: ["plan", "apply", "refresh"]
+    forbidden_operations: ["destroy"]
+
+# Development settings
+development:
+  # Hot reload on schema changes
+  hot_reload: true
+  
+  # Mock external services for testing
+  mocks:
+    github_api: true
+    terraform: false  # Use real Terraform for infrastructure testing
+  
+  # Debug settings
+  debug:
+    log_all_events: true
+    enable_pprof: true
+    pprof_port: 6060
