@@ -1,0 +1,398 @@
+# Infrastructure Platform - Shared Components
+
+version: '3'
+
+# Shared variables that all repos can use
+vars:
+  GITHUB_ORG: joeblew999
+  # Platform detection
+  OS: "{{OS}}"
+  ARCH: "{{ARCH}}"
+  # Platform-specific extensions
+  EXE_EXT: '{{if eq OS "windows"}}.exe{{end}}'
+  # Platform-specific binaries
+  GH_BINARY: 'gh{{.EXE_EXT}}'
+  TERRAFORM_BINARY: 'terraform{{.EXE_EXT}}'
+  NATS_BINARY: 'nats{{.EXE_EXT}}'
+  WRANGLER_BINARY: 'wrangler{{.EXE_EXT}}'
+  # Platform-specific paths
+  HOME_DIR: '{{if eq OS "windows"}}{{.USERPROFILE}}{{else}}{{.HOME}}{{end}}'
+
+tasks:
+  # =============================================================================
+  # Secret Management (Shared across all repos)
+  # =============================================================================
+  
+  secrets:init:
+    desc: "Initialize secret management for this repo"
+    cmds:
+      - |
+        echo "🔐 Initializing secret management..."
+        if [ ! -f secret-sync.sh ]; then
+          echo "📂 Copying secret-sync.sh from infrastructure repo..."
+          cp ../.github/secret-sync.sh ./secret-sync.sh
+          chmod +x secret-sync.sh
+        fi
+        
+        if [ ! -f .env.example ]; then
+          echo "📝 Creating .env.example for this project..."
+          echo "# Inherited from organization" > .env.example
+          echo "GITHUB_ORG=joeblew999" >> .env.example
+          echo "GITHUB_TOKEN=ghp_your_github_token_here" >> .env.example
+          echo "" >> .env.example
+          echo "# Project-specific secrets" >> .env.example
+          echo "PROJECT_NAME=my-project" >> .env.example
+          echo "# Add your project-specific secrets here" >> .env.example
+          echo "" >> .env.example
+          echo "# Development" >> .env.example
+          echo "DEBUG=true" >> .env.example
+        fi
+        
+        echo "✅ Secret management initialized"
+        echo "💡 Next: cp .env.example .env (edit with real values)"
+
+  secrets:sync:
+    desc: "Sync secrets to GitHub (works from any repo)"
+    cmds:
+      - |
+        if [ -f secret-sync.sh ]; then
+          ./secret-sync.sh sync
+        else
+          echo "❌ secret-sync.sh not found - run 'task infra:secrets:init' first"
+        fi
+
+  secrets:test:
+    desc: "Test secret access across platforms"
+    cmds:
+      - |
+        if [ -f secret-sync.sh ]; then
+          ./secret-sync.sh test
+        else
+          echo "❌ secret-sync.sh not found - run 'task infra:secrets:init' first"
+        fi
+
+  # =============================================================================
+  # NATS Infrastructure (Shared)
+  # =============================================================================
+  
+  nats:health:
+    desc: "Check NATS health"
+    cmds:
+      - |
+        echo "🔍 Checking NATS connectivity..."
+        if command -v {{.NATS_BINARY}} >/dev/null 2>&1; then
+          {{.NATS_BINARY}} --server="${NATS_URL:-nats://localhost:4222}" server check
+        else
+          echo "⚠️ NATS CLI not installed"
+          echo "💡 Install: go install github.com/nats-io/natscli/nats@latest"
+        fi
+
+  nats:bootstrap:
+    desc: "Bootstrap NATS for development"
+    cmds:
+      - |
+        echo "🚀 Starting NATS bootstrap server..."
+        cd ../.github
+        go run cmd/nats-bootstrap/main.go &
+        NATS_PID=$!
+        echo "📋 NATS PID: $NATS_PID"
+        echo "$NATS_PID" > .nats-bootstrap.pid
+        sleep 2
+        echo "✅ NATS bootstrap server started"
+
+  nats:stop:
+    desc: "Stop NATS bootstrap server"
+    cmds:
+      - |
+        if [ -f ../.github/.nats-bootstrap.pid ]; then
+          PID=$(cat ../.github/.nats-bootstrap.pid)
+          echo "🛑 Stopping NATS server (PID: $PID)..."
+          kill $PID 2>/dev/null || echo "Process already stopped"
+          rm ../.github/.nats-bootstrap.pid
+          echo "✅ NATS server stopped"
+        else
+          echo "ℹ️ NATS server not running"
+        fi
+
+  # =============================================================================
+  # Cloudflare Integration (Shared)
+  # =============================================================================
+  
+  cloudflare:test:
+    desc: "Test Cloudflare connectivity"
+    cmds:
+      - |
+        echo "🧪 Testing Cloudflare access..."
+        if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+          if command -v {{.WRANGLER_BINARY}} >/dev/null 2>&1; then
+            export CLOUDFLARE_API_TOKEN
+            {{.WRANGLER_BINARY}} whoami
+            echo "✅ Cloudflare authentication successful"
+          else
+            echo "⚠️ Wrangler CLI not installed"
+            echo "💡 Install: npm install -g wrangler"
+          fi
+        else
+          echo "❌ CLOUDFLARE_API_TOKEN not set"
+          echo "💡 Set in .env or run 'task infra:secrets:setup'"
+        fi
+
+  cloudflare:setup:
+    desc: "Setup Cloudflare for this project"
+    cmds:
+      - task: cloudflare:test
+      - |
+        echo "🔧 Setting up Cloudflare for project..."
+        
+        if [ ! -f wrangler.toml ]; then
+          echo "📝 Creating wrangler.toml..."
+          cat > wrangler.toml << EOF
+name = "{{.PROJECT_NAME | default "my-project"}}"
+compatibility_date = "$(date +%Y-%m-%d)"
+
+[env.production]
+name = "{{.PROJECT_NAME | default "my-project"}}-prod"
+
+[env.staging]  
+name = "{{.PROJECT_NAME | default "my-project"}}-staging"
+EOF
+          echo "✅ wrangler.toml created"
+        else
+          echo "✅ wrangler.toml already exists"
+        fi
+
+  # =============================================================================
+  # Tool Installation (Cross-Platform)
+  # =============================================================================
+  
+  install:gh:
+    desc: "Install GitHub CLI (cross-platform)"
+    cmds:
+      - |
+        echo "📦 Installing GitHub CLI for {{.OS}}/{{.ARCH}}..."
+        
+        if command -v {{.GH_BINARY}} >/dev/null 2>&1; then
+          echo "✅ GitHub CLI already installed: $({{.GH_BINARY}} --version | head -1)"
+        else
+          echo "📦 Installing GitHub CLI..."
+          
+          {{if eq .OS "darwin"}}
+          # macOS via Homebrew
+          if command -v brew >/dev/null 2>&1; then
+            brew install gh
+          else
+            echo "❌ Homebrew not found. Install from: https://brew.sh/"
+            exit 1
+          fi
+          
+          {{else if eq .OS "linux"}}
+          # Linux via package manager
+          if command -v apt >/dev/null 2>&1; then
+            # Debian/Ubuntu
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update && sudo apt install gh
+          elif command -v yum >/dev/null 2>&1; then
+            # RHEL/CentOS/Fedora
+            sudo yum install -y yum-utils
+            sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+            sudo yum install gh
+          else
+            echo "❌ Unsupported Linux distribution"
+            exit 1
+          fi
+          
+          {{else if eq .OS "windows"}}
+          # Windows via package manager
+          if command -v choco >/dev/null 2>&1; then
+            choco install gh
+          elif command -v scoop >/dev/null 2>&1; then
+            scoop install gh
+          else
+            echo "❌ No package manager found (install Chocolatey or Scoop)"
+            exit 1
+          fi
+          {{end}}
+          
+          echo "✅ GitHub CLI installed successfully"
+        fi
+
+  install:nats:
+    desc: "Install NATS CLI (cross-platform)"
+    cmds:
+      - |
+        echo "📦 Installing NATS CLI..."
+        if command -v {{.NATS_BINARY}} >/dev/null 2>&1; then
+          echo "✅ NATS CLI already installed"
+        else
+          echo "🔧 Installing via Go..."
+          go install github.com/nats-io/natscli/nats@latest
+          echo "✅ NATS CLI installed"
+        fi
+
+  install:wrangler:
+    desc: "Install Wrangler CLI (cross-platform)"
+    cmds:
+      - |
+        echo "📦 Installing Wrangler CLI..."
+        if command -v {{.WRANGLER_BINARY}} >/dev/null 2>&1; then
+          echo "✅ Wrangler CLI already installed"
+        else
+          if command -v npm >/dev/null 2>&1; then
+            npm install -g wrangler
+            echo "✅ Wrangler CLI installed"
+          else
+            echo "❌ npm not found - install Node.js first"
+            exit 1
+          fi
+        fi
+
+  # =============================================================================
+  # Health Checks (Comprehensive)
+  # =============================================================================
+  
+  health:check:
+    desc: "Comprehensive health check for project infrastructure"
+    cmds:
+      - |
+        echo "🏥 Infrastructure Health Check"
+        echo "=============================="
+        echo ""
+        
+        # Check tools
+        echo "🔧 Tool Status:"
+        command -v {{.GH_BINARY}} >/dev/null 2>&1 && echo "✅ GitHub CLI" || echo "❌ GitHub CLI (run: task infra:install:gh)"
+        command -v {{.NATS_BINARY}} >/dev/null 2>&1 && echo "✅ NATS CLI" || echo "❌ NATS CLI (run: task infra:install:nats)"
+        command -v go >/dev/null 2>&1 && echo "✅ Go" || echo "❌ Go"
+        
+        echo ""
+        echo "🔐 Secret Status:"
+        if [ -f .env ]; then
+          echo "✅ .env file exists"
+        else
+          echo "❌ .env file missing (run: task infra:secrets:init)"
+        fi
+        
+        echo ""
+        echo "🌐 Network Status:"
+        if curl -s --max-time 5 https://api.github.com/user >/dev/null 2>&1; then
+          echo "✅ GitHub API accessible"
+        else
+          echo "❌ GitHub API not accessible"
+        fi
+        
+        if [ -n "$NATS_URL" ]; then
+          if {{.NATS_BINARY}} --server="$NATS_URL" server check >/dev/null 2>&1; then
+            echo "✅ NATS server accessible"
+          else
+            echo "⚠️ NATS server not accessible"
+          fi
+        fi
+
+  # =============================================================================
+  # Development Workflows
+  # =============================================================================
+  
+  dev:setup:
+    desc: "Complete development setup for any project"
+    cmds:
+      - echo "🚀 Setting up development environment..."
+      - task: install:gh
+      - task: install:nats
+      - task: secrets:init
+      - echo ""
+      - echo "✅ Development setup complete!"
+      - echo ""
+      - echo "💡 Next steps:"
+      - echo "   1. cp .env.example .env"
+      - echo "   2. Edit .env with your values"
+      - echo "   3. task infra:secrets:sync"
+      - echo "   4. task infra:health:check"
+
+  dev:clean:
+    desc: "Clean development environment"
+    cmds:
+      - |
+        echo "🧹 Cleaning development environment..."
+        rm -f .env secret-sync.sh
+        task: nats:stop
+        echo "✅ Development environment cleaned"
+
+  # =============================================================================
+  # Organization Management
+  # =============================================================================
+  
+  org:status:
+    desc: "Show organization-wide status"
+    cmds:
+      - |
+        echo "🏢 Organization Status: {{.GITHUB_ORG}}"
+        echo "========================================"
+        echo ""
+        echo "🌍 Platform: {{.OS}}/{{.ARCH}}"
+        echo "📂 Current repo: $(basename $(pwd))"
+        echo "🔗 Infrastructure repo: ../.github"
+        echo ""
+        
+        if [ -f ../.github/Taskfile.yml ]; then
+          echo "✅ Infrastructure platform available"
+        else
+          echo "❌ Infrastructure platform not found"
+        fi
+        
+        echo ""
+        echo "🔧 Available infrastructure tasks:"
+        echo "   task infra:secrets:*     # Secret management"  
+        echo "   task infra:nats:*        # NATS operations"
+        echo "   task infra:cloudflare:*  # Cloudflare integration"
+        echo "   task infra:install:*     # Tool installation"
+        echo "   task infra:dev:*         # Development workflows"
+
+# =============================================================================
+# Future: Advanced Features
+# =============================================================================
+
+# These tasks demonstrate future capabilities that could be added:
+
+  # Advanced NATS patterns
+  nats:publish:
+    desc: "Publish event to organization NATS"
+    cmds:
+      - |
+        SUBJECT="${SUBJECT:-org.{{.GITHUB_ORG}}.{{.PROJECT_NAME | default "unknown"}}.event}"
+        MESSAGE="${MESSAGE:-$(echo '{"type":"test","timestamp":"'$(date -Iseconds)'","repo":"'$(basename $(pwd))'"}')}"
+        echo "📡 Publishing to NATS: $SUBJECT"
+        {{.NATS_BINARY}} --server="${NATS_URL:-nats://localhost:4222}" pub "$SUBJECT" "$MESSAGE"
+
+  # Cross-repo coordination
+  deploy:notify:
+    desc: "Notify other repos of deployment"
+    cmds:
+      - |
+        echo "📢 Notifying organization of deployment..."
+        SUBJECT="org.{{.GITHUB_ORG}}.deployment"
+        MESSAGE='{"repo":"'$(basename $(pwd))'","status":"deployed","timestamp":"'$(date -Iseconds)'"}'
+        task: nats:publish SUBJECT="$SUBJECT" MESSAGE="$MESSAGE"
+
+  # Cost monitoring
+  costs:check:
+    desc: "Check infrastructure costs"
+    cmds:
+      - |
+        echo "💰 Infrastructure Cost Check"
+        echo "============================="
+        echo ""
+        echo "🔍 Checking Cloudflare usage..."
+        if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+          # Would integrate with Cloudflare Analytics API
+          echo "💡 Cloudflare integration available"
+        else
+          echo "⚠️ Cloudflare API token not configured"
+        fi
+        
+        echo ""
+        echo "💡 This would show:"
+        echo "   • R2 storage costs"
+        echo "   • Workers execution time"
+        echo "   • Container usage"
+        echo "   • Synadia Cloud usage"

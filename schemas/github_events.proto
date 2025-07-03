@@ -83,6 +83,47 @@ message RegenerationRequestEvent {
 // NATS Infrastructure Events
 // ===========================
 
+// NATS deployment configuration event
+message NATSDeploymentEvent {
+  string org = 1;
+  string deployment_id = 2;
+  NATSDeploymentType deployment_type = 3;
+  NATSDeploymentStatus status = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  
+  // Connection details
+  NATSConnectionConfig connection_config = 6;
+  
+  // Deployment metadata
+  NATSDeploymentMetadata metadata = 7;
+  
+  // Terraform state information (for self-hosted)
+  TerraformState terraform_state = 8;
+  
+  // Performance and capacity metrics
+  NATSCapacityMetrics capacity = 9;
+}
+
+// NATS connection health and monitoring
+message NATSHealthEvent {
+  string org = 1;
+  string deployment_id = 2;
+  NATSDeploymentType deployment_type = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  
+  // Connection status
+  NATSConnectionStatus connection_status = 5;
+  
+  // Performance metrics
+  NATSPerformanceMetrics performance = 6;
+  
+  // Cluster information (for JetStream)
+  NATSClusterInfo cluster_info = 7;
+  
+  // Error information if unhealthy
+  repeated NATSError errors = 8;
+}
+
 // Triggered when NATS infrastructure needs scaling
 message InfrastructureScalingEvent {
   string org = 1;
@@ -98,8 +139,82 @@ message InfrastructureScalingEvent {
   // Metrics that triggered scaling
   repeated Metric triggering_metrics = 8;
   
-  // Terraform configuration to apply
+  // Terraform configuration to apply (for self-hosted)
   string terraform_config = 9;
+  
+  // NATS deployment type and configuration
+  NATSDeploymentType deployment_type = 10;
+  NATSClusterConfig cluster_config = 11;
+  
+  // Synadia Cloud specific fields
+  SynadiaCloudConfig synadia_config = 12;
+  
+  // Self-hosted NATS specific fields
+  SelfHostedNATSConfig self_hosted_config = 13;
+}
+
+// Triggered when NATS infrastructure needs scaling
+message NATSScalingEvent {
+  string org = 1;
+  string deployment_id = 2;
+  NATSDeploymentType deployment_type = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  
+  // Scaling trigger
+  NATSScalingTrigger trigger = 5;
+  
+  // Current and target configuration
+  NATSScalingConfig current_config = 6;
+  NATSScalingConfig target_config = 7;
+  
+  // Scaling strategy
+  NATSScalingStrategy strategy = 8;
+  
+  // Metrics that triggered scaling
+  NATSCapacityMetrics trigger_metrics = 9;
+  
+  // Approval and automation
+  bool auto_scaling_enabled = 10;
+  string approved_by = 11;
+  google.protobuf.Timestamp scheduled_for = 12;
+}
+
+enum NATSScalingTrigger {
+  NATS_SCALING_TRIGGER_UNSPECIFIED = 0;
+  HIGH_CPU_USAGE = 1;
+  HIGH_MEMORY_USAGE = 2;
+  HIGH_CONNECTION_COUNT = 3;
+  HIGH_MESSAGE_RATE = 4;
+  JETSTREAM_STORAGE_FULL = 5;
+  LATENCY_THRESHOLD = 6;
+  MANUAL_REQUEST = 7;
+  SCHEDULED_MAINTENANCE = 8;
+  DISASTER_RECOVERY = 9;
+}
+
+message NATSScalingConfig {
+  int32 replicas = 1;
+  NATSResourceConfig resources = 2;
+  NATSClusterTopology topology = 3;
+}
+
+message NATSClusterTopology {
+  repeated string availability_zones = 1;
+  string cluster_mode = 2;           // single, cluster, super-cluster
+  int32 min_replicas = 3;
+  int32 max_replicas = 4;
+  bool cross_region = 5;
+}
+
+enum NATSScalingStrategy {
+  NATS_SCALING_STRATEGY_UNSPECIFIED = 0;
+  HORIZONTAL_SCALE_OUT = 1;          // Add more nodes
+  HORIZONTAL_SCALE_IN = 2;           // Remove nodes
+  VERTICAL_SCALE_UP = 3;             // Increase resources per node
+  VERTICAL_SCALE_DOWN = 4;           // Decrease resources per node
+  MIGRATE_TO_CLOUD = 5;              // Move to Synadia Cloud
+  MIGRATE_TO_SELF_HOSTED = 6;        // Move to self-hosted
+  HYBRID_DEPLOYMENT = 7;             // Mix of cloud and self-hosted
 }
 
 // Result of a Terraform operation
@@ -196,6 +311,40 @@ enum TerraformStatus {
   TERRAFORM_STATUS_SUCCESS = 2;
   TERRAFORM_STATUS_FAILED = 3;
   TERRAFORM_STATUS_CANCELLED = 4;
+}
+
+// NATS Infrastructure Support Types
+// ==================================
+
+enum NATSDeploymentType {
+  NATS_DEPLOYMENT_TYPE_UNSPECIFIED = 0;
+  SYNADIA_CLOUD = 1;          // Managed Synadia Cloud
+  SELF_HOSTED_SINGLE = 2;     // Single node self-hosted
+  SELF_HOSTED_CLUSTER = 3;    // Multi-node cluster
+  TERRAFORM_MANAGED = 4;      // Terraform-deployed infrastructure
+  HYBRID = 5;                 // Mix of cloud and self-hosted
+}
+
+enum NATSDeploymentStatus {
+  NATS_DEPLOYMENT_STATUS_UNSPECIFIED = 0;
+  PROVISIONING = 1;
+  ACTIVE = 2;
+  SCALING = 3;
+  UPDATING = 4;
+  DEGRADED = 5;
+  FAILED = 6;
+  DECOMMISSIONING = 7;
+}
+
+enum NATSConnectionStatus {
+  NATS_CONNECTION_STATUS_UNSPECIFIED = 0;
+  CONNECTED = 1;
+  CONNECTING = 2;
+  DISCONNECTED = 3;
+  RECONNECTING = 4;
+  CLOSED = 5;
+  DRAINING = 6;
+  ERROR = 7;
 }
 
 // Complex Types
@@ -300,4 +449,240 @@ enum SystemStatus {
   SYSTEM_STATUS_DEGRADED = 2;
   SYSTEM_STATUS_UNHEALTHY = 3;
   SYSTEM_STATUS_CRITICAL = 4;
+}
+
+// NATS Deployment and Connection Configuration
+// =============================================
+
+// NATS deployment type
+enum NATSDeploymentType {
+  NATS_DEPLOYMENT_TYPE_UNKNOWN = 0;
+  NATS_DEPLOYMENT_TYPE_CLOUD = 1;  // Synadia Cloud
+  NATS_DEPLOYMENT_TYPE_SELF_HOSTED = 2;  // Self-hosted NATS
+}
+
+// NATS deployment status
+enum NATSDeploymentStatus {
+  NATS_DEPLOYMENT_STATUS_UNKNOWN = 0;
+  NATS_DEPLOYMENT_STATUS_PENDING = 1;
+  NATS_DEPLOYMENT_STATUS_ACTIVE = 2;
+  NATS_DEPLOYMENT_STATUS_FAILED = 3;
+}
+
+// NATS connection status
+enum NATSConnectionStatus {
+  NATS_CONNECTION_STATUS_UNKNOWN = 0;
+  NATS_CONNECTION_STATUS_CONNECTED = 1;
+  NATS_CONNECTION_STATUS_DISCONNECTED = 2;
+  NATS_CONNECTION_STATUS_FAILED = 3;
+}
+
+// NATS connection configuration
+message NATSConnectionConfig {
+  repeated string servers = 1;        // NATS server URLs
+  string credentials_file = 2;        // Path to .creds file
+  string nkey_file = 3;              // Path to .nk file
+  string jwt = 4;                    // JWT token (for Synadia Cloud)
+  string nkey_seed = 5;              // NKey seed (encrypted)
+  
+  // TLS configuration
+  NATSTLSConfig tls = 6;
+  
+  // Connection options
+  int32 max_reconnect = 7;
+  int32 reconnect_wait_seconds = 8;
+  int32 timeout_seconds = 9;
+  
+  // JetStream configuration
+  bool jetstream_enabled = 10;
+  string jetstream_domain = 11;
+  
+  // Context information
+  string context_name = 12;          // NATS context name
+  string account = 13;               // Account name
+}
+
+message NATSTLSConfig {
+  bool enabled = 1;
+  string cert_file = 2;
+  string key_file = 3;
+  string ca_file = 4;
+  bool insecure_skip_verify = 5;
+}
+
+// NATS deployment metadata
+message NATSDeploymentMetadata {
+  string region = 1;                 // AWS/GCP/Azure region or datacenter
+  string cloud_provider = 2;         // aws, gcp, azure, on-premise
+  string version = 3;                // NATS server version
+  
+  // Synadia Cloud specific
+  SynadiaCloudMetadata synadia = 4;
+  
+  // Self-hosted specific
+  SelfHostedMetadata self_hosted = 5;
+  
+  // Resource allocation
+  NATSResourceConfig resources = 6;
+  
+  // Network configuration
+  NATSNetworkConfig network = 7;
+  
+  // Backup and disaster recovery
+  NATSBackupConfig backup = 8;
+}
+
+message SynadiaCloudMetadata {
+  string account_id = 1;
+  string system_account = 2;
+  string operator = 3;
+  repeated string teams = 4;
+  string billing_account = 5;
+  string support_tier = 6;
+}
+
+message SelfHostedMetadata {
+  string cluster_name = 1;
+  repeated string node_ids = 2;
+  string kubernetes_namespace = 3;
+  string helm_release = 4;
+  map<string, string> labels = 5;
+  map<string, string> annotations = 6;
+}
+
+message NATSResourceConfig {
+  string cpu_request = 1;
+  string cpu_limit = 2;
+  string memory_request = 3;
+  string memory_limit = 4;
+  string storage_class = 5;
+  string storage_size = 6;
+  int32 replicas = 7;
+}
+
+message NATSNetworkConfig {
+  repeated string client_ports = 1;
+  repeated string cluster_ports = 2;
+  repeated string monitoring_ports = 3;
+  string load_balancer_type = 4;
+  repeated string ingress_hosts = 5;
+  bool tls_required = 6;
+}
+
+message NATSBackupConfig {
+  bool enabled = 1;
+  string schedule = 2;               // Cron expression
+  int32 retention_days = 3;
+  string backup_location = 4;        // S3, GCS, etc.
+  bool cross_region_replication = 5;
+}
+
+// Terraform state information
+message TerraformState {
+  string workspace = 1;
+  string state_backend = 2;          // s3, gcs, remote, local
+  string state_location = 3;
+  string terraform_version = 4;
+  string last_applied = 5;
+  map<string, string> outputs = 6;   // Terraform outputs
+  repeated string resource_ids = 7;   // Created resource IDs
+  TerraformStatus status = 8;
+}
+
+enum TerraformStatus {
+  TERRAFORM_STATUS_UNSPECIFIED = 0;
+  PLANNED = 1;
+  APPLYING = 2;
+  APPLIED = 3;
+  DESTROYING = 4;
+  DESTROYED = 5;
+  ERRORED = 6;
+  DRIFT_DETECTED = 7;
+}
+
+// NATS capacity and performance metrics
+message NATSCapacityMetrics {
+  int64 max_connections = 1;
+  int64 current_connections = 2;
+  int64 max_subscriptions = 3;
+  int64 current_subscriptions = 4;
+  int64 max_payload_size = 5;
+  
+  // JetStream specific
+  JetStreamMetrics jetstream = 6;
+  
+  // Resource utilization
+  ResourceUtilization resources = 7;
+}
+
+message JetStreamMetrics {
+  int64 max_memory = 1;
+  int64 used_memory = 2;
+  int64 max_storage = 3;
+  int64 used_storage = 4;
+  int32 max_streams = 5;
+  int32 current_streams = 6;
+  int32 max_consumers = 7;
+  int32 current_consumers = 8;
+}
+
+message ResourceUtilization {
+  double cpu_usage_percent = 1;
+  double memory_usage_percent = 2;
+  double disk_usage_percent = 3;
+  double network_in_mbps = 4;
+  double network_out_mbps = 5;
+}
+
+message NATSPerformanceMetrics {
+  int64 messages_in = 1;
+  int64 messages_out = 2;
+  int64 bytes_in = 3;
+  int64 bytes_out = 4;
+  double avg_latency_ms = 5;
+  double p95_latency_ms = 6;
+  double p99_latency_ms = 7;
+  int64 slow_consumers = 8;
+}
+
+message NATSClusterInfo {
+  string cluster_name = 1;
+  repeated NATSNodeInfo nodes = 2;
+  string leader_node = 3;
+  NATSClusterHealth health = 4;
+}
+
+message NATSNodeInfo {
+  string node_id = 1;
+  string server_name = 2;
+  string host = 3;
+  int32 port = 4;
+  string version = 5;
+  bool is_leader = 6;
+  google.protobuf.Timestamp last_seen = 7;
+}
+
+enum NATSClusterHealth {
+  NATS_CLUSTER_HEALTH_UNSPECIFIED = 0;
+  HEALTHY = 1;
+  DEGRADED = 2;
+  UNHEALTHY = 3;
+  SPLIT_BRAIN = 4;
+}
+
+message NATSError {
+  string error_code = 1;
+  string error_message = 2;
+  string component = 3;               // server, jetstream, client, etc.
+  Severity severity = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  map<string, string> context = 6;
+}
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  INFO = 1;
+  WARNING = 2;
+  ERROR = 3;
+  CRITICAL = 4;
 }

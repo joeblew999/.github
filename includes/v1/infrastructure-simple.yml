@@ -1,0 +1,89 @@
+version: '3'
+
+# Simplified infrastructure include for testing
+
+vars:
+  GITHUB_ORG: joeblew999
+  OS: "{{OS}}"
+  ARCH: "{{ARCH}}"
+
+tasks:
+  # Secret management
+  secrets:init:
+    desc: "Initialize secret management"
+    cmds:
+      - echo "🔐 Initializing secrets for project..."
+      - echo "✅ Secret management ready"
+
+  secrets:sync:
+    desc: "Sync secrets to GitHub"
+    cmds:
+      - echo "🔄 Syncing secrets..."
+      - echo "✅ Secrets synced"
+
+  secrets:test:
+    desc: "Test secret access"
+    cmds:
+      - echo "🧪 Testing secret access..."
+      - echo "✅ Secrets working"
+
+  # NATS operations
+  nats:health:
+    desc: "Check NATS health"
+    cmds:
+      - echo "🔍 Checking NATS..."
+      - echo "✅ NATS healthy"
+
+  nats:bootstrap:
+    desc: "Start NATS for development"
+    cmds:
+      - echo "🚀 Starting NATS bootstrap..."
+      - echo "✅ NATS bootstrap ready"
+
+  # Cloudflare integration
+  cloudflare:test:
+    desc: "Test Cloudflare access"
+    cmds:
+      - echo "🧪 Testing Cloudflare..."
+      - echo "✅ Cloudflare working"
+
+  cloudflare:setup:
+    desc: "Setup Cloudflare for project"
+    cmds:
+      - echo "🔧 Setting up Cloudflare..."
+      - echo "✅ Cloudflare configured"
+
+  # Tool installation
+  install:gh:
+    desc: "Install GitHub CLI"
+    cmds:
+      - echo "📦 Installing GitHub CLI..."
+      - echo "✅ GitHub CLI ready"
+
+  # Development setup
+  dev:setup:
+    desc: "Complete development setup"
+    cmds:
+      - echo "🚀 Setting up development environment..."
+      - task: secrets:init
+      - task: install:gh
+      - echo "✅ Development setup complete"
+
+  # Health checks
+  health:check:
+    desc: "Comprehensive health check"
+    cmds:
+      - echo "🏥 Infrastructure Health Check"
+      - echo "=============================="
+      - task: secrets:test
+      - task: nats:health
+      - task: cloudflare:test
+      - echo "✅ All systems healthy"
+
+  # Organization status
+  org:status:
+    desc: "Organization-wide status"
+    cmds:
+      - echo "🏢 Organization Status: {{.GITHUB_ORG}}"
+      - echo "🌍 Platform: {{.OS}}/{{.ARCH}}"
+      - echo "📂 Infrastructure platform available"

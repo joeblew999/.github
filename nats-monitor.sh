@@ -215,6 +215,195 @@ nats_enhanced_workflow() {
     echo ""
 }
 
+# GitOps Bootstrap - handling the chicken-and-egg problem
+gitops_bootstrap() {
+    echo "🥾 GitOps Bootstrap Strategy"
+    echo "============================"
+    echo ""
+    echo "🐔🥚 The Bootstrap Problem:"
+    echo "   Day 1: No servers → GitHub CI must bootstrap everything"
+    echo "   Day N: Servers exist → NATS can orchestrate GitHub CI"
+    echo ""
+    
+    # Check what infrastructure exists
+    local nats_exists=false
+    local terraform_state_exists=false
+    
+    echo "🔍 Infrastructure Discovery:"
+    
+    # Check if NATS is available
+    if nats --server="$NATS_URL" server check >/dev/null 2>&1; then
+        nats_exists=true
+        echo "   ✅ NATS: Available"
+    else
+        echo "   ❌ NATS: Not available"
+    fi
+    
+    # Check if Terraform state exists
+    if [ -f "terraform/terraform.tfstate" ] || [ -n "$TF_BACKEND_CONFIG" ]; then
+        terraform_state_exists=true
+        echo "   ✅ Terraform State: Available"
+    else
+        echo "   ❌ Terraform State: Not available"
+    fi
+    
+    echo ""
+    echo "🎯 Bootstrap Strategy:"
+    
+    if [ "$nats_exists" = false ] && [ "$terraform_state_exists" = false ]; then
+        echo "   📋 Stage 1: GitHub CI Bootstrap (cold start)"
+        echo "      1. GitHub Actions creates Terraform backend"
+        echo "      2. GitHub Actions deploys minimal NATS"
+        echo "      3. GitHub Actions registers webhooks"
+        echo "      4. Transition to Stage 2"
+        
+    elif [ "$nats_exists" = false ] && [ "$terraform_state_exists" = true ]; then
+        echo "   📋 Stage 1.5: Terraform Recovery"
+        echo "      1. GitHub Actions uses existing state"
+        echo "      2. GitHub Actions deploys NATS infrastructure"
+        echo "      3. Transition to Stage 2"
+        
+    elif [ "$nats_exists" = true ]; then
+        echo "   📋 Stage 2: NATS Orchestration (steady state)"
+        echo "      1. NATS receives infrastructure events"
+        echo "      2. NATS triggers GitHub Actions via API"
+        echo "      3. GitHub Actions executes deployment"
+        echo "      4. NATS verifies completion"
+    fi
+    
+    echo ""
+    echo "🔄 Idempotency Checks:"
+    echo "   • State validation before any action"
+    echo "   • Distributed locking via NATS (when available)"
+    echo "   • GitHub Actions idempotency tokens"
+    echo "   • Terraform plan validation"
+    echo ""
+}
+
+# Simulate the bootstrap decision tree
+bootstrap_decision_tree() {
+    echo "🌳 Bootstrap Decision Tree"
+    echo "=========================="
+    
+    local stage="unknown"
+    
+    # Decision logic
+    if ! nats --server="$NATS_URL" server check >/dev/null 2>&1; then
+        if [ ! -f "terraform/terraform.tfstate" ]; then
+            stage="cold_start"
+        else
+            stage="terraform_recovery"
+        fi
+    else
+        stage="nats_orchestration"
+    fi
+    
+    echo "🎯 Current Stage: $stage"
+    echo ""
+    
+    case $stage in
+        "cold_start")
+            echo "❄️  Cold Start Bootstrap"
+            echo "   GitHub CI must create everything from scratch"
+            echo ""
+            echo "   GitHub Actions Workflow:"
+            echo "   1. 🏗️  terraform init (create backend)"
+            echo "   2. 🚀 terraform apply (deploy NATS)"
+            echo "   3. 🔗 setup webhooks"
+            echo "   4. ✅ verify bootstrap"
+            echo ""
+            echo "   Next: Transition to NATS orchestration"
+            ;;
+            
+        "terraform_recovery")
+            echo "🔄 Terraform Recovery"
+            echo "   State exists but NATS is down"
+            echo ""
+            echo "   GitHub Actions Workflow:"
+            echo "   1. 📋 terraform plan (verify state)"
+            echo "   2. 🚀 terraform apply (restore NATS)"
+            echo "   3. ✅ verify recovery"
+            echo ""
+            echo "   Next: Resume NATS orchestration"
+            ;;
+            
+        "nats_orchestration")
+            echo "🎛️  NATS Orchestration (Steady State)"
+            echo "   NATS coordinates all infrastructure"
+            echo ""
+            echo "   Event Flow:"
+            echo "   1. 📨 Event → NATS"
+            echo "   2. 🎯 NATS → GitHub API"
+            echo "   3. 🤖 GitHub Actions → Deploy"
+            echo "   4. ✅ Result → NATS"
+            echo ""
+            echo "   Benefits: Event-driven, reliable, observable"
+            ;;
+    esac
+    
+    echo ""
+}
+
+# Show GitHub CI integration patterns
+github_ci_integration() {
+    echo "🔗 GitHub CI Integration Patterns"
+    echo "=================================="
+    echo ""
+    echo "🥾 Bootstrap Phase (GitHub CI leads):"
+    echo "   .github/workflows/bootstrap.yml"
+    echo "   • Checks infrastructure state"
+    echo "   • Creates NATS if missing"
+    echo "   • Registers webhooks"
+    echo "   • Transitions control to NATS"
+    echo ""
+    echo "🎛️  Orchestration Phase (NATS leads):"
+    echo "   .github/workflows/deploy.yml"
+    echo "   • Triggered by NATS via GitHub API"
+    echo "   • Receives deployment payload"
+    echo "   • Executes Terraform/deployments"
+    echo "   • Reports back to NATS"
+    echo ""
+    echo "🔄 Idempotency Mechanisms:"
+    echo "   • NATS message IDs (deduplication)"
+    echo "   • GitHub Actions run IDs (tracking)"
+    echo "   • Terraform state locking"
+    echo "   • Deployment status verification"
+    echo ""
+    echo "💡 Key Insight:"
+    echo "   GitHub CI is both the bootstrap mechanism AND"
+    echo "   the execution environment - NATS just orchestrates it!"
+    echo ""
+}
+
+# Cost optimization with staged approach
+staged_cost_optimization() {
+    echo "💰 Staged Cost Optimization"
+    echo "==========================="
+    echo ""
+    echo "📊 Cost by Stage:"
+    echo ""
+    echo "🥾 Bootstrap Stage (Day 1):"
+    echo "   • GitHub Actions: \$0 (2000 free minutes)"
+    echo "   • NATS creation: ~\$5-10 one-time"
+    echo "   • Total: ~\$5-10"
+    echo ""
+    echo "🎛️  Orchestration Stage (Day 2+):"
+    echo "   • Synadia Cloud: ~\$29/month (basic)"
+    echo "   • GitHub Actions: \$0 (for coordination only)"
+    echo "   • Cloudflare: ~\$5-10/month (if using containers)"
+    echo "   • Total: ~\$30-40/month"
+    echo ""
+    echo "🎯 Optimization Strategy:"
+    echo "   • Use NATS for lightweight coordination only"
+    echo "   • Heavy lifting on free/cheap platforms"
+    echo "   • Pay for reliability, not compute"
+    echo ""
+    echo "💡 The Trick You Asked About:"
+    echo "   Use GitHub CI as the 'universal executor' but"
+    echo "   NATS as the 'intelligent coordinator'!"
+    echo ""
+}
+
 # Main menu
 main() {
     if ! check_nats_cli; then
@@ -230,6 +419,10 @@ main() {
     echo "6. actions      - Monitor GitHub Actions"
     echo "7. dashboard    - Real-time dashboard"
     echo "8. demo         - Show enhanced workflow"
+    echo "9. bootstrap    - Show GitOps bootstrap strategy"
+    echo "10. decision    - Show bootstrap decision tree"
+    echo "11. integration - Show GitHub CI integration"
+    echo "12. costs       - Show staged cost optimization"
     echo ""
     
     case "${1:-menu}" in
@@ -257,8 +450,20 @@ main() {
         "demo")
             nats_enhanced_workflow
             ;;
+        "bootstrap")
+            gitops_bootstrap
+            ;;
+        "decision")
+            bootstrap_decision_tree
+            ;;
+        "integration")
+            github_ci_integration
+            ;;
+        "costs")
+            staged_cost_optimization
+            ;;
         *)
-            read -p "Choose command (1-8): " choice
+            read -p "Choose command (1-12): " choice
             case $choice in
                 1) check_nats_connection ;;
                 2) check_nats_connection && setup_nats_streams ;;
@@ -268,6 +473,10 @@ main() {
                 6) check_nats_connection && monitor_github_actions ;;
                 7) check_nats_connection && dashboard ;;
                 8) nats_enhanced_workflow ;;
+                9) gitops_bootstrap ;;
+                10) bootstrap_decision_tree ;;
+                11) github_ci_integration ;;
+                12) staged_cost_optimization ;;
                 *) echo "Invalid choice" ;;
             esac
             ;;

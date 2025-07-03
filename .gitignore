@@ -19,6 +19,12 @@ go.work.sum
 coverage.out
 coverage.html
 
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+secrets-backup-*.tar.gz.gpg
+
 # IDE files
 .vscode/
 .idea/

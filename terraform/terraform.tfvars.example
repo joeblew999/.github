@@ -1,0 +1,155 @@
+# Terraform Variables Examples for NATS Deployment
+# Copy and customize these examples for your deployment
+
+# =============================================================================
+# Example 1: Synadia Cloud Deployment
+# =============================================================================
+
+# terraform.tfvars for Synadia Cloud
+# github_org = "joeblew999"
+# deployment_type = "synadia_cloud"
+# synadia_account = "your-synadia-account-id"
+# synadia_nkey = "your-synadia-nkey"
+# synadia_team = "github-automation"
+# jetstream_enabled = true
+# monitoring_enabled = true
+# backup_enabled = true
+
+# =============================================================================
+# Example 2: Self-Hosted Single Node
+# =============================================================================
+
+# terraform.tfvars for self-hosted single node
+# github_org = "joeblew999"
+# deployment_type = "self_hosted_single"
+# self_hosted_cluster_name = "github-nats"
+# kubernetes_namespace = "nats-system"
+# jetstream_enabled = true
+# jetstream_storage_size = "20Gi"
+# jetstream_storage_class = "gp3"
+# monitoring_enabled = true
+# backup_enabled = true
+# resource_requests = {
+#   cpu    = "200m"
+#   memory = "256Mi"
+# }
+# resource_limits = {
+#   cpu    = "1000m"
+#   memory = "1Gi"
+# }
+
+# =============================================================================
+# Example 3: Self-Hosted Cluster (High Availability)
+# =============================================================================
+
+# terraform.tfvars for self-hosted cluster
+# github_org = "joeblew999"
+# deployment_type = "self_hosted_cluster"
+# self_hosted_cluster_name = "github-nats-ha"
+# self_hosted_replicas = 3
+# kubernetes_namespace = "nats-system"
+# jetstream_enabled = true
+# jetstream_storage_size = "50Gi"
+# jetstream_storage_class = "gp3"
+# monitoring_enabled = true
+# grafana_enabled = true
+# backup_enabled = true
+# backup_schedule = "0 2 * * *"  # Daily at 2 AM
+# backup_retention_days = 30
+# resource_requests = {
+#   cpu    = "500m"
+#   memory = "512Mi"
+# }
+# resource_limits = {
+#   cpu    = "2000m"
+#   memory = "2Gi"
+# }
+
+# =============================================================================
+# Example 4: Hybrid Deployment (Synadia Cloud + Self-Hosted)
+# =============================================================================
+
+# terraform.tfvars for hybrid deployment
+# github_org = "joeblew999"
+# deployment_type = "hybrid"
+# 
+# # Synadia Cloud configuration
+# synadia_account = "your-synadia-account-id"
+# synadia_nkey = "your-synadia-nkey"
+# synadia_team = "github-automation"
+# 
+# # Self-hosted configuration
+# self_hosted_cluster_name = "github-nats-edge"
+# self_hosted_replicas = 2
+# kubernetes_namespace = "nats-edge"
+# 
+# # Common configuration
+# jetstream_enabled = true
+# jetstream_storage_size = "30Gi"
+# monitoring_enabled = true
+# backup_enabled = true
+
+# =============================================================================
+# Development/Testing Configuration
+# =============================================================================
+
+# terraform.tfvars for development
+# github_org = "joeblew999-dev"
+# deployment_type = "self_hosted_single"
+# self_hosted_cluster_name = "github-nats-dev"
+# kubernetes_namespace = "nats-dev"
+# jetstream_enabled = false  # Disable for lighter development setup
+# monitoring_enabled = false
+# backup_enabled = false
+# resource_requests = {
+#   cpu    = "50m"
+#   memory = "64Mi"
+# }
+# resource_limits = {
+#   cpu    = "200m"
+#   memory = "256Mi"
+# }
+
+# =============================================================================
+# Environment-Specific Variables
+# =============================================================================
+
+# AWS-specific configuration
+# region = "us-west-2"
+# jetstream_storage_class = "gp3"  # AWS EBS GP3
+
+# GCP-specific configuration
+# region = "us-central1"
+# jetstream_storage_class = "pd-ssd"  # Google Persistent Disk SSD
+
+# Azure-specific configuration
+# region = "East US"
+# jetstream_storage_class = "managed-premium"  # Azure Premium SSD
+
+# =============================================================================
+# Security and Authentication
+# =============================================================================
+
+# For production deployments, consider:
+# 1. Using Kubernetes secrets for sensitive values
+# 2. Enabling TLS for all connections
+# 3. Implementing proper NATS authentication (NKeys, JWT)
+# 4. Network policies and security groups
+# 5. Regular security updates and patches
+
+# Example secret management (not in this file - use Kubernetes secrets):
+# kubectl create secret generic nats-auth \
+#   --from-literal=synadia-nkey="YOUR_NKEY" \
+#   --from-literal=synadia-account="YOUR_ACCOUNT" \
+#   -n nats-system
+
+# =============================================================================
+# Scaling Considerations
+# =============================================================================
+
+# For large-scale deployments:
+# - Use self_hosted_cluster with 3+ replicas
+# - Enable monitoring and alerting
+# - Set up proper backup and disaster recovery
+# - Consider cross-region deployment for global organizations
+# - Implement proper capacity planning based on GitHub event volume

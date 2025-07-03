@@ -1,0 +1,31 @@
+version: '3'
+
+vars:
+  GITHUB_ORG: joeblew999
+
+tasks:
+  secrets:init:
+    desc: "Initialize secret management"
+    cmds:
+      - echo "🔐 Initializing secrets..."
+
+  secrets:sync:
+    desc: "Sync secrets to GitHub"
+    cmds:
+      - echo "🔄 Syncing secrets..."
+
+  nats:health:
+    desc: "Check NATS health"
+    cmds:
+      - echo "🔍 Checking NATS health..."
+
+  cloudflare:test:
+    desc: "Test Cloudflare access"
+    cmds:
+      - echo "🧪 Testing Cloudflare..."
+
+  dev:setup:
+    desc: "Complete development setup"
+    cmds:
+      - echo "🚀 Setting up development environment..."
+      - task: secrets:init

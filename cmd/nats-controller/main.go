@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -14,6 +16,26 @@ import (
 )
 
 const version = "1.0.0"
+
+// NATSConfig holds NATS connection configuration
+type NATSConfig struct {
+	URLs            []string `json:"urls"`
+	CredsFile       string   `json:"creds_file,omitempty"`
+	NKeyFile        string   `json:"nkey_file,omitempty"`
+	JWT             string   `json:"jwt,omitempty"`
+	NKeySeed        string   `json:"nkey_seed,omitempty"`
+	TLSEnabled      bool     `json:"tls_enabled"`
+	TLSInsecure     bool     `json:"tls_insecure"`
+	TLSCertFile     string   `json:"tls_cert_file,omitempty"`
+	TLSKeyFile      string   `json:"tls_key_file,omitempty"`
+	TLSCAFile       string   `json:"tls_ca_file,omitempty"`
+	MaxReconnect    int      `json:"max_reconnect"`
+	ReconnectWait   int      `json:"reconnect_wait_seconds"`
+	Timeout         int      `json:"timeout_seconds"`
+	JetStreamDomain string   `json:"jetstream_domain,omitempty"`
+	Context         string   `json:"context,omitempty"`
+	DeploymentType  string   `json:"deployment_type"` // synadia_cloud, self_hosted, hybrid
+}
 
 // GitHubEvent represents a GitHub-related event
 type GitHubEvent struct {
@@ -29,17 +51,72 @@ type Controller struct {
 	nc       *nats.Conn
 	js       jetstream.JetStream
 	org      string
+	config   *NATSConfig
 	subjects map[string]nats.MsgHandler
 }
 
-// NewController creates a new workflow controller
-func NewController(natsURL, org string) (*Controller, error) {
-	nc, err := nats.Connect(natsURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to NATS: %w", err)
+// NewController creates a new workflow controller with flexible NATS configuration
+func NewController(org string, config *NATSConfig) (*Controller, error) {
+	// Build NATS connection options
+	opts := []nats.Option{
+		nats.Name(fmt.Sprintf("github-controller-%s", org)),
+		nats.MaxReconnects(config.MaxReconnect),
+		nats.ReconnectWait(time.Duration(config.ReconnectWait) * time.Second),
+		nats.Timeout(time.Duration(config.Timeout) * time.Second),
+		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
+			log.Printf("NATS disconnected: %v", err)
+		}),
+		nats.ReconnectHandler(func(nc *nats.Conn) {
+			log.Printf("NATS reconnected to %s", nc.ConnectedUrl())
+		}),
+		nats.ClosedHandler(func(nc *nats.Conn) {
+			log.Printf("NATS connection closed")
+		}),
 	}
 
-	js, err := jetstream.New(nc)
+	// Configure authentication based on deployment type
+	switch config.DeploymentType {
+	case "synadia_cloud":
+		opts = append(opts, configureSynadiaAuth(config)...)
+	case "self_hosted", "self_hosted_single", "self_hosted_cluster":
+		opts = append(opts, configureSelfHostedAuth(config)...)
+	case "hybrid":
+		// For hybrid, try Synadia first, fallback to self-hosted
+		opts = append(opts, configureSynadiaAuth(config)...)
+		opts = append(opts, configureSelfHostedAuth(config)...)
+	}
+
+	// Configure TLS if enabled
+	if config.TLSEnabled {
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: config.TLSInsecure,
+		}
+
+		if config.TLSCertFile != "" && config.TLSKeyFile != "" {
+			cert, err := tls.LoadX509KeyPair(config.TLSCertFile, config.TLSKeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load TLS cert/key: %w", err)
+			}
+			tlsConfig.Certificates = []tls.Certificate{cert}
+		}
+
+		opts = append(opts, nats.Secure(tlsConfig))
+	}
+
+	// Connect to NATS
+	nc, err := nats.Connect(strings.Join(config.URLs, ","), opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to NATS (%s): %w", config.DeploymentType, err)
+	}
+
+	// Create JetStream context
+	jsOpts := []jetstream.JetStreamOpt{}
+	if config.JetStreamDomain != "" {
+		// Note: Domain support may require newer NATS version
+		log.Printf("JetStream domain requested: %s", config.JetStreamDomain)
+	}
+
+	js, err := jetstream.New(nc, jsOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JetStream context: %w", err)
 	}
@@ -48,6 +125,7 @@ func NewController(natsURL, org string) (*Controller, error) {
 		nc:       nc,
 		js:       js,
 		org:      org,
+		config:   config,
 		subjects: make(map[string]nats.MsgHandler),
 	}
 
@@ -259,10 +337,165 @@ func (c *Controller) StartMonitoringServer() {
 	log.Printf("📊 Monitoring server would start here (HTTP endpoints)")
 }
 
+// configureSynadiaAuth configures authentication for Synadia Cloud
+func configureSynadiaAuth(config *NATSConfig) []nats.Option {
+	var opts []nats.Option
+
+	// Use credentials file if provided
+	if config.CredsFile != "" {
+		opts = append(opts, nats.UserCredentials(config.CredsFile))
+	} else if config.JWT != "" && config.NKeySeed != "" {
+		// Use JWT and NKey seed
+		opts = append(opts, nats.UserJWTAndSeed(config.JWT, config.NKeySeed))
+	} else if config.NKeyFile != "" {
+		// Use NKey file
+		opts = append(opts, nats.UserCredentials(config.NKeyFile))
+	}
+
+	return opts
+}
+
+// configureSelfHostedAuth configures authentication for self-hosted NATS
+func configureSelfHostedAuth(config *NATSConfig) []nats.Option {
+	var opts []nats.Option
+
+	// For self-hosted, we might use basic auth, NKeys, or no auth in development
+	// In production, always use proper authentication
+
+	// Use credentials file if provided
+	if config.CredsFile != "" {
+		opts = append(opts, nats.UserCredentials(config.CredsFile))
+	} else if config.NKeyFile != "" {
+		opts = append(opts, nats.UserCredentials(config.NKeyFile))
+	}
+	// Note: For development/testing, we might connect without auth
+	// In production, always configure proper authentication
+
+	return opts
+}
+
+// loadNATSConfig loads NATS configuration from environment variables and files
+func loadNATSConfig() (*NATSConfig, error) {
+	config := &NATSConfig{
+		URLs:           []string{"nats://localhost:4222"}, // Default
+		MaxReconnect:   -1,                                // Infinite reconnects
+		ReconnectWait:  2,                                 // 2 seconds
+		Timeout:        10,                                // 10 seconds
+		DeploymentType: "self_hosted",                     // Default
+	}
+
+	// Load from environment variables
+	if urls := os.Getenv("NATS_URLS"); urls != "" {
+		config.URLs = strings.Split(urls, ",")
+	}
+
+	if credsFile := os.Getenv("NATS_CREDS_FILE"); credsFile != "" {
+		config.CredsFile = credsFile
+	}
+
+	if nkeyFile := os.Getenv("NATS_NKEY_FILE"); nkeyFile != "" {
+		config.NKeyFile = nkeyFile
+	}
+
+	if jwt := os.Getenv("NATS_JWT"); jwt != "" {
+		config.JWT = jwt
+	}
+
+	if nkeySeed := os.Getenv("NATS_NKEY_SEED"); nkeySeed != "" {
+		config.NKeySeed = nkeySeed
+	}
+
+	if deploymentType := os.Getenv("NATS_DEPLOYMENT_TYPE"); deploymentType != "" {
+		config.DeploymentType = deploymentType
+	}
+
+	if domain := os.Getenv("NATS_JETSTREAM_DOMAIN"); domain != "" {
+		config.JetStreamDomain = domain
+	}
+
+	if context := os.Getenv("NATS_CONTEXT"); context != "" {
+		config.Context = context
+	}
+
+	// TLS configuration
+	if os.Getenv("NATS_TLS_ENABLED") == "true" {
+		config.TLSEnabled = true
+	}
+
+	if os.Getenv("NATS_TLS_INSECURE") == "true" {
+		config.TLSInsecure = true
+	}
+
+	if certFile := os.Getenv("NATS_TLS_CERT_FILE"); certFile != "" {
+		config.TLSCertFile = certFile
+	}
+
+	if keyFile := os.Getenv("NATS_TLS_KEY_FILE"); keyFile != "" {
+		config.TLSKeyFile = keyFile
+	}
+
+	if caFile := os.Getenv("NATS_TLS_CA_FILE"); caFile != "" {
+		config.TLSCAFile = caFile
+	}
+
+	// Try to load from NATS context if specified
+	if config.Context != "" {
+		if err := loadNATSContext(config); err != nil {
+			log.Printf("Warning: failed to load NATS context '%s': %v", config.Context, err)
+		}
+	}
+
+	return config, nil
+}
+
+// loadNATSContext loads configuration from a NATS context (if nats CLI is available)
+func loadNATSContext(config *NATSConfig) error {
+	// This would integrate with the NATS CLI context system
+	// For now, we'll just log that context loading was requested
+	log.Printf("NATS context '%s' requested (context loading not implemented)", config.Context)
+	return nil
+}
+
+// getDefaultNATSURLs returns default NATS URLs based on deployment type
+func getDefaultNATSURLs(deploymentType string) []string {
+	switch deploymentType {
+	case "synadia_cloud":
+		return []string{"connect.ngs.global"}
+	case "self_hosted", "self_hosted_single":
+		return []string{"nats://localhost:4222"}
+	case "self_hosted_cluster":
+		return []string{
+			"nats://localhost:4222",
+			"nats://localhost:4223",
+			"nats://localhost:4224",
+		}
+	case "hybrid":
+		return []string{
+			"connect.ngs.global",
+			"nats://localhost:4222",
+		}
+	default:
+		return []string{"nats://localhost:4222"}
+	}
+}
+
 func main() {
-	natsURL := os.Getenv("NATS_URL")
-	if natsURL == "" {
-		natsURL = "nats://localhost:4222"
+	log.Printf("🤖 NATS GitHub Controller v%s", version)
+
+	// Load NATS configuration from environment and context
+	config, err := loadNATSConfig()
+	if err != nil {
+		log.Fatalf("Failed to load NATS configuration: %v", err)
+	}
+
+	// Override with legacy environment variable if set
+	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
+		config.URLs = []string{natsURL}
+	}
+
+	// If no URLs configured, use defaults based on deployment type
+	if len(config.URLs) == 0 {
+		config.URLs = getDefaultNATSURLs(config.DeploymentType)
 	}
 
 	org := os.Getenv("GITHUB_ORG")
@@ -270,8 +503,15 @@ func main() {
 		org = "joeblew999"
 	}
 
+	log.Printf("🔧 Configuration:")
+	log.Printf("   GitHub Org: %s", org)
+	log.Printf("   Deployment Type: %s", config.DeploymentType)
+	log.Printf("   NATS URLs: %v", config.URLs)
+	log.Printf("   JetStream Domain: %s", config.JetStreamDomain)
+	log.Printf("   TLS Enabled: %v", config.TLSEnabled)
+
 	// Create controller
-	controller, err := NewController(natsURL, org)
+	controller, err := NewController(org, config)
 	if err != nil {
 		log.Fatalf("Failed to create controller: %v", err)
 	}

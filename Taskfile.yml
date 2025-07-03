@@ -285,6 +285,68 @@ tasks:
         echo "  Profile:    https://github.com/{{.GITHUB_ORG}}?preview=true"
         echo "  Workflows:  https://github.com/{{.GITHUB_ORG}}/.github/actions"
 
+  # Bootstrap tasks
+  bootstrap:
+    desc: "Bootstrap GitHub organization for self-management (handles sequencing and race conditions)"
+    cmds:
+      - ./bootstrap.sh
+    deps: [check-prerequisites]
+
+  bootstrap-dev:
+    desc: "Bootstrap in development mode with embedded NATS"
+    env:
+      BOOTSTRAP_MODE: dev
+      NATS_DEPLOYMENT_TYPE: self_hosted
+    cmds:
+      - ./bootstrap.sh --mode dev
+
+  bootstrap-synadia:
+    desc: "Bootstrap with Synadia Cloud NATS"
+    env:
+      BOOTSTRAP_MODE: auto
+      NATS_DEPLOYMENT_TYPE: synadia_cloud
+    cmds:
+      - ./bootstrap.sh --nats-type synadia_cloud
+    preconditions:
+      - sh: '[ -n "${SYNADIA_CREDS_FILE:-}" ] || [ -n "${SYNADIA_JWT:-}" ]'
+        msg: "Synadia Cloud credentials required (SYNADIA_CREDS_FILE or SYNADIA_JWT)"
+
+  check-prerequisites:
+    desc: "Check system prerequisites for bootstrap"
+    cmds:
+      - |
+        echo "🔍 Checking prerequisites..."
+        missing_tools=()
+        
+        command -v git >/dev/null 2>&1 || missing_tools+=("git")
+        command -v go >/dev/null 2>&1 || missing_tools+=("go")
+        command -v docker >/dev/null 2>&1 || missing_tools+=("docker")
+        
+        if [ ${#missing_tools[@]} -ne 0 ]; then
+          echo "❌ Missing required tools: ${missing_tools[*]}"
+          exit 1
+        fi
+        
+        echo "✅ All prerequisites satisfied"
+    silent: true
+
+  nats-bootstrap:
+    desc: "Start embedded NATS server for development/bootstrap"
+    cmds:
+      - go run cmd/nats-bootstrap/main.go
+
+  nats-test-connection:
+    desc: "Test NATS connectivity"
+    cmds:
+      - |
+        if command -v nats >/dev/null 2>&1; then
+          echo "Testing NATS connectivity..."
+          nats --server="${NATS_URLS:-nats://localhost:4222}" pub test.connection "Test message $(date)"
+          echo "✅ NATS connectivity test passed"
+        else
+          echo "⚠️ NATS CLI not found - install with: go install github.com/nats-io/natscli/nats@latest"
+        fi
+
   monitor-workflow:
     desc: Monitor GitHub Actions workflow execution
     cmds:
@@ -561,3 +623,325 @@ tasks:
         echo ""
         echo "This represents the next evolution of GitHub workflow"
         echo "orchestration - event-driven, type-safe, and infinitely scalable! 🐝🚀"
+
+  # =============================================================================
+  # Cloudflare Integration Tasks
+  # =============================================================================
+
+  cloudflare:setup:
+    desc: "Setup Cloudflare integration (R2 + Containers)"
+    cmds:
+      - task: cloudflare:setup:r2
+      - task: cloudflare:setup:containers
+      - echo "✅ Cloudflare integration setup complete"
+
+  cloudflare:setup:r2:
+    desc: "Setup Cloudflare R2 backend for Terraform state"
+    cmds:
+      - |
+        echo "🏗️ Setting up Cloudflare R2 backend..."
+        if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+          echo "⚠️ CLOUDFLARE_ACCOUNT_ID not set - skipping R2 setup"
+          echo "💡 Set environment variables to enable R2 backend:"
+          echo "   export CLOUDFLARE_ACCOUNT_ID=your-account-id"
+          echo "   export CLOUDFLARE_R2_ACCESS_KEY=your-access-key"
+          echo "   export CLOUDFLARE_R2_SECRET_KEY=your-secret-key"
+        else
+          echo "✅ Cloudflare R2 configuration detected"
+          echo "📋 R2 Endpoint: https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com"
+          echo "💰 Expected savings: ~95% vs AWS S3 (zero egress fees)"
+        fi
+
+  cloudflare:setup:containers:
+    desc: "Setup Cloudflare Containers for NATS deployment"
+    cmds:
+      - |
+        echo "🐳 Setting up Cloudflare Containers..."
+        if command -v wrangler >/dev/null 2>&1; then
+          echo "✅ Wrangler CLI found"
+          wrangler --version
+        else
+          echo "📦 Installing Wrangler CLI..."
+          npm install -g wrangler
+        fi
+        
+        if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+          echo "⚠️ CLOUDFLARE_API_TOKEN not set"
+          echo "💡 Login to Cloudflare and set API token:"
+          echo "   wrangler login"
+          echo "   export CLOUDFLARE_API_TOKEN=your-api-token"
+        else
+          echo "✅ Cloudflare API token configured"
+        fi
+
+  cloudflare:deploy:
+    desc: "Deploy NATS containers to Cloudflare"
+    deps: [cloudflare:setup:containers]
+    cmds:
+      - |
+        echo "🚀 Deploying NATS orchestrator to Cloudflare..."
+        if [ ! -f "wrangler.toml" ]; then
+          echo "📝 Creating wrangler.toml from template..."
+          cp terraform/templates/wrangler.toml.tpl wrangler.toml
+          echo "✏️ Please edit wrangler.toml with your account details"
+        fi
+        
+        if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+          echo "🔄 Deploying worker..."
+          wrangler deploy
+          echo "✅ Deployment complete"
+          echo "🌐 Access your NATS orchestrator at:"
+          echo "   https://nats-orchestrator.<your-subdomain>.workers.dev"
+        else
+          echo "⚠️ CLOUDFLARE_API_TOKEN required for deployment"
+        fi
+
+  cloudflare:test:
+    desc: "Test Cloudflare NATS deployment"
+    cmds:
+      - |
+        echo "🧪 Testing Cloudflare NATS deployment..."
+        if [ -n "$CLOUDFLARE_WORKER_URL" ]; then
+          echo "📡 Testing health endpoint..."
+          curl -f "$CLOUDFLARE_WORKER_URL/health" || echo "❌ Health check failed"
+          
+          echo "📊 Testing API endpoints..."
+          curl -f "$CLOUDFLARE_WORKER_URL/api/containers" || echo "❌ API test failed"
+          
+          echo "✅ Cloudflare integration tests complete"
+        else
+          echo "⚠️ CLOUDFLARE_WORKER_URL not set"
+          echo "💡 Set your worker URL: export CLOUDFLARE_WORKER_URL=https://your-worker.workers.dev"
+        fi
+
+  cloudflare:migrate:state:
+    desc: "Migrate Terraform state to Cloudflare R2"
+    cmds:
+      - |
+        echo "📦 Migrating Terraform state to Cloudflare R2..."
+        echo "⚠️ This will modify your Terraform backend configuration"
+        read -p "Continue? (y/N) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+          echo "🔄 Updating backend configuration..."
+          cd terraform
+          
+          # Backup current state
+          cp terraform.tfstate terraform.tfstate.backup.$(date +%s) 2>/dev/null || true
+          
+          # Initialize with R2 backend
+          terraform init -migrate-state
+          
+          echo "✅ State migration complete"
+          echo "💾 Backup created: terraform.tfstate.backup.*"
+        else
+          echo "❌ Migration cancelled"
+        fi
+
+  cloudflare:cost:analysis:
+    desc: "Show Cloudflare cost analysis vs alternatives"
+    cmds:
+      - |
+        echo "💰 Cloudflare Integration Cost Analysis"
+        echo "========================================"
+        echo
+        echo "📊 R2 vs AWS S3 (monthly, 10GB storage + 1M reads + 100GB egress):"
+        echo "   Cloudflare R2: \$0.51 total"
+        echo "   AWS S3:        \$9.63 total"
+        echo "   💡 Savings:     \$9.12 (95% reduction)"
+        echo
+        echo "🐳 Containers vs Traditional VPS (basic instance, 50% utilization):"
+        echo "   Cloudflare:    \$5-10/month (global, auto-scale, zero-ops)"
+        echo "   AWS Fargate:   \$15-25/month (regional, manual scaling)"
+        echo "   DigitalOcean:  \$12/month (single region, manual management)"
+        echo
+        echo "🌍 Additional Benefits:"
+        echo "   ✅ Zero egress fees"
+        echo "   ✅ Global edge deployment"
+        echo "   ✅ Auto-scaling"
+        echo "   ✅ Built-in observability"
+        echo "   ✅ Zero cold start"
+        echo "   ✅ Integrated platform (Workers, KV, R2)"
+
+  cloudflare:docs:
+    desc: "Open Cloudflare integration documentation"
+    cmds:
+      - |
+        echo "📖 Opening Cloudflare integration documentation..."
+        if command -v open >/dev/null 2>&1; then
+          open CLOUDFLARE-INTEGRATION.md
+        elif command -v xdg-open >/dev/null 2>&1; then
+          xdg-open CLOUDFLARE-INTEGRATION.md
+        else
+          echo "📄 View documentation: CLOUDFLARE-INTEGRATION.md"
+        fi
+
+  # =============================================================================
+  # Secret Management
+  # =============================================================================
+
+  secrets:init:
+    desc: "Initialize secret management (.env.example)"
+    cmds:
+      - |
+        echo "🔐 Initializing secret management..."
+        chmod +x secret-sync.sh
+        ./secret-sync.sh init
+        echo ""
+        echo "💡 Next steps:"
+        echo "   1. cp .env.example .env"
+        echo "   2. Edit .env with your actual secrets"
+        echo "   3. task secrets:sync"
+
+  secrets:sync:
+    desc: "Sync .env secrets to GitHub (requires .env file)"
+    cmds:
+      - |
+        echo "🔄 Syncing secrets to GitHub..."
+        chmod +x secret-sync.sh
+        ./secret-sync.sh sync
+
+  secrets:test:
+    desc: "Test secret access across all platforms"
+    cmds:
+      - |
+        echo "🧪 Testing secret access..."
+        chmod +x secret-sync.sh
+        ./secret-sync.sh test
+
+  secrets:list:
+    desc: "List current GitHub secrets"
+    cmds:
+      - |
+        echo "📋 Listing GitHub secrets..."
+        chmod +x secret-sync.sh
+        ./secret-sync.sh list
+
+  secrets:generate:
+    desc: "Generate secure random secrets (webhooks, etc.)"
+    cmds:
+      - |
+        echo "🎲 Generating secure secrets..."
+        chmod +x secret-sync.sh
+        ./secret-sync.sh generate
+
+  secrets:security:
+    desc: "Run security checks on secret management"
+    cmds:
+      - |
+        echo "🛡️ Running security checks..."
+        chmod +x secret-sync.sh
+        ./secret-sync.sh security
+
+  secrets:setup:
+    desc: "Complete secret setup flow (init + guide)"
+    cmds:
+      - task: secrets:init
+      - |
+        echo ""
+        echo "🔐 Secret Setup Guide"
+        echo "====================="
+        echo ""
+        echo "1️⃣  GitHub Token:"
+        echo "   🌐 Go to: https://github.com/settings/tokens"
+        echo "   ⚙️  Create token with: repo, workflow, admin:org, admin:repo_hook"
+        echo "   📝 Copy token to .env as GITHUB_TOKEN"
+        echo ""
+        echo "2️⃣  Synadia Cloud (Optional):"
+        echo "   🌐 Go to: https://cloud.synadia.com/"
+        echo "   📝 Get token & account name"
+        echo "   💾 Download .nats/creds file"
+        echo ""
+        echo "3️⃣  Cloudflare (Optional):"
+        echo "   🌐 Go to: https://dash.cloudflare.com/profile/api-tokens"
+        echo "   🔑 Create token with Zone:Read, Account:Read permissions"
+        echo "   📝 Get Account ID from dashboard"
+        echo ""
+        echo "4️⃣  Complete setup:"
+        echo "   📝 Edit .env with your values"
+        echo "   🔄 task secrets:sync"
+        echo "   🧪 task secrets:test"
+
+  secrets:rotate:
+    desc: "Rotate secrets (interactive)"
+    cmds:
+      - |
+        echo "🔄 Secret Rotation Workflow"
+        echo "==========================="
+        echo ""
+        echo "⚠️  This will help you rotate secrets safely."
+        echo "📝 Make sure you have backup access to all platforms!"
+        echo ""
+        read -p "Continue with secret rotation? (y/N) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+          echo ""
+          echo "1️⃣  Generate new GitHub token:"
+          echo "   🌐 https://github.com/settings/tokens"
+          echo "   📝 Update GITHUB_TOKEN in .env"
+          echo ""
+          echo "2️⃣  Generate new Cloudflare token (if used):"
+          echo "   🌐 https://dash.cloudflare.com/profile/api-tokens"
+          echo "   📝 Update CLOUDFLARE_API_TOKEN in .env"
+          echo ""
+          echo "3️⃣  Update platform secrets:"
+          echo "   🔄 task secrets:sync"
+          echo ""
+          echo "4️⃣  Test access:"
+          echo "   🧪 task secrets:test"
+          echo ""
+          echo "5️⃣  Revoke old tokens from platform UIs"
+        else
+          echo "❌ Secret rotation cancelled"
+        fi
+
+  secrets:backup:
+    desc: "Create encrypted backup of secret configuration"
+    cmds:
+      - |
+        echo "💾 Creating encrypted secret backup..."
+        
+        if [ ! -f .env ]; then
+          echo "❌ .env file not found"
+          exit 1
+        fi
+        
+        BACKUP_FILE="secrets-backup-$(date +%Y%m%d-%H%M%S).tar.gz.gpg"
+        
+        echo "🗜️  Creating archive..."
+        tar -czf - .env .env.example secret-sync.sh | gpg --symmetric --cipher-algo AES256 --compress-algo 1 --output "$BACKUP_FILE"
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Encrypted backup created: $BACKUP_FILE"
+          echo "🔐 Use GPG passphrase to decrypt later"
+          echo ""
+          echo "💡 To restore:"
+          echo "   gpg --decrypt $BACKUP_FILE | tar -xzf -"
+        else
+          echo "❌ Backup failed"
+        fi
+
+  secrets:restore:
+    desc: "Restore from encrypted backup"
+    cmds:
+      - |
+        echo "📂 Available backup files:"
+        ls -la secrets-backup-*.tar.gz.gpg 2>/dev/null || echo "❌ No backup files found"
+        echo ""
+        read -p "Enter backup filename: " BACKUP_FILE
+        
+        if [ -f "$BACKUP_FILE" ]; then
+          echo "🔓 Decrypting and restoring..."
+          gpg --decrypt "$BACKUP_FILE" | tar -xzf -
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Secrets restored from backup"
+            echo "🧪 Run 'task secrets:test' to verify"
+          else
+            echo "❌ Restore failed"
+          fi
+        else
+          echo "❌ Backup file not found: $BACKUP_FILE"
+        fi
+
+  # =============================================================================

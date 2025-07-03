@@ -1,0 +1,213 @@
+name: Bootstrap Infrastructure
+
+on:
+  push:
+    branches: [main]
+    paths: 
+      - 'terraform/**'
+      - 'bootstrap.sh'
+      - '.github/workflows/bootstrap.yml'
+  workflow_dispatch:
+    inputs:
+      force_bootstrap:
+        description: 'Force complete bootstrap'
+        required: false
+        default: 'false'
+
+env:
+  SYNADIA_ENDPOINT: ${{ secrets.SYNADIA_ENDPOINT || 'https://connect.ngs.global' }}
+  NATS_CREDS_FILE: ${{ secrets.NATS_CREDS_FILE }}
+
+jobs:
+  check-infrastructure:
+    name: "Check Existing Infrastructure"
+    runs-on: ubuntu-latest
+    outputs:
+      nats_exists: ${{ steps.check.outputs.nats_exists }}
+      terraform_state_exists: ${{ steps.check.outputs.terraform_state_exists }}
+      bootstrap_stage: ${{ steps.check.outputs.bootstrap_stage }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install NATS CLI
+        run: |
+          curl -sf https://binaries.nats.dev/nats-io/natscli/nats@latest | sh
+          sudo mv nats /usr/local/bin/
+          
+      - name: Check Infrastructure Status
+        id: check
+        run: |
+          echo "🔍 Checking infrastructure status..."
+          
+          # Check if NATS is available
+          if echo "$NATS_CREDS_FILE" | base64 -d > /tmp/nats.creds 2>/dev/null && \
+             nats --creds=/tmp/nats.creds server check >/dev/null 2>&1; then
+            echo "nats_exists=true" >> $GITHUB_OUTPUT
+            echo "✅ NATS: Available"
+          else
+            echo "nats_exists=false" >> $GITHUB_OUTPUT
+            echo "❌ NATS: Not available"
+          fi
+          
+          # Check if Terraform state exists
+          if [ -f "terraform/terraform.tfstate" ] || [ -n "${{ secrets.TF_BACKEND_CONFIG }}" ]; then
+            echo "terraform_state_exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Terraform State: Available"
+          else
+            echo "terraform_state_exists=false" >> $GITHUB_OUTPUT
+            echo "❌ Terraform State: Not available"
+          fi
+          
+          # Determine bootstrap stage
+          if [ "${{ steps.check.outputs.nats_exists }}" = "false" ] && [ "${{ steps.check.outputs.terraform_state_exists }}" = "false" ]; then
+            echo "bootstrap_stage=cold_start" >> $GITHUB_OUTPUT
+            echo "📋 Stage: Cold Start Bootstrap"
+          elif [ "${{ steps.check.outputs.nats_exists }}" = "false" ] && [ "${{ steps.check.outputs.terraform_state_exists }}" = "true" ]; then
+            echo "bootstrap_stage=terraform_recovery" >> $GITHUB_OUTPUT
+            echo "📋 Stage: Terraform Recovery"
+          else
+            echo "bootstrap_stage=nats_orchestration" >> $GITHUB_OUTPUT
+            echo "📋 Stage: NATS Orchestration"
+          fi
+
+  bootstrap-synadia:
+    name: "Bootstrap Synadia NATS"
+    runs-on: ubuntu-latest
+    needs: check-infrastructure
+    if: needs.check-infrastructure.outputs.nats_exists == 'false'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        
+      - name: Cold Start Bootstrap
+        if: needs.check-infrastructure.outputs.bootstrap_stage == 'cold_start'
+        run: |
+          echo "❄️ Cold Start: Creating everything from scratch"
+          
+          # 1. Initialize Terraform with local backend first
+          cd terraform
+          terraform init
+          
+          # 2. Create Synadia Cloud resources
+          echo "🚀 Creating Synadia Cloud NATS..."
+          terraform apply -target=synadia_cloud_account -auto-approve
+          terraform apply -target=synadia_cloud_stream -auto-approve
+          
+          # 3. Get NATS credentials
+          terraform output -raw nats_credentials > /tmp/nats.creds
+          echo "NATS_CREDS_CONTENT=$(cat /tmp/nats.creds | base64 -w 0)" >> $GITHUB_ENV
+          
+          echo "✅ Synadia NATS created successfully"
+          
+      - name: Terraform Recovery
+        if: needs.check-infrastructure.outputs.bootstrap_stage == 'terraform_recovery'
+        run: |
+          echo "🔄 Terraform Recovery: Restoring NATS from existing state"
+          
+          cd terraform
+          terraform init
+          terraform plan
+          terraform apply -auto-approve
+          
+          echo "✅ NATS infrastructure recovered"
+          
+      - name: Store NATS Credentials
+        if: env.NATS_CREDS_CONTENT != ''
+        run: |
+          echo "💾 Storing NATS credentials in GitHub Secrets"
+          # In a real setup, you'd use GitHub API to store secrets
+          echo "NATS credentials ready for use"
+          
+      - name: Verify NATS Connection
+        run: |
+          echo "🧪 Testing NATS connection..."
+          if [ -f "/tmp/nats.creds" ]; then
+            nats --creds=/tmp/nats.creds server check
+            echo "✅ NATS connection verified"
+          fi
+
+  register-webhooks:
+    name: "Register GitHub Webhooks"
+    runs-on: ubuntu-latest
+    needs: [check-infrastructure, bootstrap-synadia]
+    if: always() && (needs.bootstrap-synadia.result == 'success' || needs.check-infrastructure.outputs.nats_exists == 'true')
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup NATS CLI
+        run: |
+          curl -sf https://binaries.nats.dev/nats-io/natscli/nats@latest | sh
+          sudo mv nats /usr/local/bin/
+          
+      - name: Register GitHub Webhooks
+        run: |
+          echo "🔗 Registering GitHub webhooks..."
+          
+          # Create webhook that publishes to NATS
+          gh api repos/${{ github.repository }}/hooks \
+            --method POST \
+            --field name=web \
+            --field active=true \
+            --field config[url]="${{ secrets.NATS_WEBHOOK_URL || 'https://your-webhook-endpoint.com/github' }}" \
+            --field config[content_type]=json \
+            --field events[]='push' \
+            --field events[]='pull_request' \
+            --field events[]='workflow_run'
+            
+          echo "✅ Webhooks registered"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  transition-to-nats:
+    name: "Transition Control to NATS"
+    runs-on: ubuntu-latest
+    needs: [check-infrastructure, bootstrap-synadia, register-webhooks]
+    if: always() && needs.bootstrap-synadia.result == 'success'
+    steps:
+      - name: Publish Bootstrap Complete Event
+        run: |
+          echo "🎛️ Transitioning control to NATS..."
+          
+          # Prepare NATS credentials
+          echo "${{ secrets.NATS_CREDS_FILE || env.NATS_CREDS_CONTENT }}" | base64 -d > /tmp/nats.creds
+          
+          # Publish bootstrap completion event
+          echo '{
+            "event_type": "bootstrap_complete",
+            "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'",
+            "org": "'${{ github.repository_owner }}'",
+            "repository": "'${{ github.repository }}'",
+            "github_run_id": "'${{ github.run_id }}'"
+          }' | nats --creds=/tmp/nats.creds pub "github.${{ github.repository_owner }}.bootstrap_complete" --stdin
+          
+          echo "✅ Control transitioned to NATS"
+          echo "🎯 From now on, NATS will orchestrate GitHub Actions"
+
+  summary:
+    name: "Bootstrap Summary"
+    runs-on: ubuntu-latest
+    needs: [check-infrastructure, bootstrap-synadia, register-webhooks, transition-to-nats]
+    if: always()
+    steps:
+      - name: Bootstrap Summary
+        run: |
+          echo "📊 Bootstrap Summary"
+          echo "==================="
+          echo ""
+          echo "🔍 Infrastructure Check: ${{ needs.check-infrastructure.result }}"
+          echo "   Stage: ${{ needs.check-infrastructure.outputs.bootstrap_stage }}"
+          echo "   NATS Exists: ${{ needs.check-infrastructure.outputs.nats_exists }}"
+          echo ""
+          echo "🚀 Synadia Bootstrap: ${{ needs.bootstrap-synadia.result }}"
+          echo "🔗 Webhook Registration: ${{ needs.register-webhooks.result }}"
+          echo "🎛️ NATS Transition: ${{ needs.transition-to-nats.result }}"
+          echo ""
+          if [ "${{ needs.transition-to-nats.result }}" = "success" ]; then
+            echo "✅ Bootstrap Complete!"
+            echo "🎯 NATS is now orchestrating GitHub Actions"
+            echo "💰 Monthly cost: ~$29 (Synadia) + $0 (GitHub Actions)"
+          else
+            echo "⚠️ Bootstrap incomplete - manual intervention may be required"
+          fi

@@ -1,0 +1,138 @@
+# NATS Server Configuration Template
+# This template is used by Terraform to generate NATS configuration
+# for self-hosted deployments
+
+# Server identity
+server_name: "${cluster_name}-$HOSTNAME"
+
+# Network configuration
+host: "0.0.0.0"
+port: 4222
+
+# Client connection limits
+max_connections: ${max_connections}
+max_payload: ${max_payload}
+
+# Clustering configuration
+%{ if cluster_mode }
+cluster {
+  name: "${cluster_name}"
+  host: "0.0.0.0"
+  port: 6222
+  
+  # Dynamic cluster discovery
+  routes = [
+    %{ for i in range(3) }
+    "nats://${cluster_name}-${i}.${cluster_name}-headless:6222"
+    %{ endfor }
+  ]
+  
+  # Cluster authentication (use NKeys in production)
+  # authorization {
+  #   user: "cluster_user"
+  #   password: "cluster_password"
+  # }
+}
+%{ endif }
+
+# JetStream configuration
+%{ if jetstream }
+jetstream {
+  # Storage directory
+  store_dir: "/data/jetstream"
+  
+  # Memory and storage limits
+  max_memory_store: 1GB
+  max_file_store: 10GB
+  
+  # Domain (for super-clusters)
+  # domain: "${cluster_name}"
+}
+%{ endif }
+
+# Monitoring configuration
+%{ if monitoring }
+http_port: 8222
+
+# Monitoring endpoints
+http: {
+  # Health check endpoint
+  "/healthz" = "OK"
+}
+%{ endif }
+
+# Logging configuration
+log_time: true
+log_file: "/dev/stdout"
+logtime: true
+debug: false
+trace: false
+
+# Security configuration
+# In production, use proper authentication
+# authorization {
+#   users = [
+#     {
+#       user: "github-automation"
+#       password: "secure-password"
+#       permissions: {
+#         publish: ["github.>", "workflows.>", "events.>"]
+#         subscribe: ["github.>", "workflows.>", "events.>", "_INBOX.>"]
+#       }
+#     }
+#   ]
+# }
+
+# Leafnode configuration for bridging
+# leafnodes {
+#   host: "0.0.0.0"
+#   port: 7422
+#   
+#   # Connect to Synadia Cloud (hybrid mode)
+#   remotes = [
+#     {
+#       url: "connect.ngs.global"
+#       credentials: "/etc/nats/synadia.creds"
+#     }
+#   ]
+# }
+
+# System account (for monitoring and management)
+# system_account: SYS
+
+# Accounts configuration (for multi-tenancy)
+# accounts {
+#   SYS {
+#     users = [
+#       { user: "admin", pass: "admin" }
+#     ]
+#   }
+#   
+#   APP {
+#     jetstream: enabled
+#     users = [
+#       { 
+#         user: "github-automation", 
+#         pass: "secure-password",
+#         permissions: {
+#           publish: ["github.>", "workflows.>", "events.>"]
+#           subscribe: ["github.>", "workflows.>", "events.>", "_INBOX.>"]
+#         }
+#       }
+#     ]
+#   }
+# }
+
+# Performance tuning
+write_deadline: "2s"
+max_pending: 67108864  # 64MB
+max_control_line: 4096
+
+# TLS configuration (enable in production)
+# tls {
+#   cert_file: "/etc/nats/tls/server.pem"
+#   key_file: "/etc/nats/tls/server.key"
+#   ca_file: "/etc/nats/tls/ca.pem"
+#   verify: true
+#   timeout: 3
+# }
