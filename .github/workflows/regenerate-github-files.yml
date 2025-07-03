@@ -4,6 +4,9 @@ on:
     paths: ['templates/**']
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   regenerate:
     # Skip if commit message contains [skip-regen] to prevent infinite loops
