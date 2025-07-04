@@ -1,5 +1,5 @@
 // guide-synadia.js - Interactive guidance for Synadia NATS credential setup
-import { chromium } from 'playwright';
+import { launchBrowser as createBrowser, getBrowserInfo, closeBrowser } from './lib/browser-launcher.js';
 
 const TEAM_URL = 'https://cloud.synadia.com/teams/2XrIt5ApHyjVq8XkELhTaP4vfO3';
 const TIMEOUT_MS = 10000; // 10 seconds
@@ -55,14 +55,35 @@ const GUIDANCE_STYLES = `
     animation: pulse 2s infinite !important;
   }
   
+  .browser-badge {
+    position: fixed !important;
+    top: 20px !important;
+    left: 20px !important;
+    background: rgba(0,0,0,0.8) !important;
+    color: white !important;
+    padding: 8px 16px !important;
+    border-radius: 20px !important;
+    font-family: monospace !important;
+    font-size: 12px !important;
+    z-index: 999998 !important;
+  }
+  
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
   }
 `;
 
+async function launchBrowser() {
+  const launchResult = await createBrowser();
+  const browserInfo = getBrowserInfo(launchResult);
+  console.log(`🔧 Using: ${browserInfo.displayName}`);
+  
+  return launchResult.browser;
+}
+
 async function addGuidanceTooltip(page, step, content, progress = 33) {
-  await page.evaluate(({ step, content, progress, styles }) => {
+  await page.evaluate(({ step, content, progress, styles, browser }) => {
     // Remove existing tooltip
     const existing = document.querySelector('.guide-tooltip');
     if (existing) existing.remove();
@@ -73,6 +94,14 @@ async function addGuidanceTooltip(page, step, content, progress = 33) {
       styleEl.id = 'guide-styles';
       styleEl.textContent = styles;
       document.head.appendChild(styleEl);
+    }
+    
+    // Add browser badge if not present
+    if (!document.querySelector('.browser-badge')) {
+      const badge = document.createElement('div');
+      badge.className = 'browser-badge';
+      badge.textContent = browser;
+      document.body.appendChild(badge);
     }
     
     // Create new tooltip
@@ -93,7 +122,13 @@ async function addGuidanceTooltip(page, step, content, progress = 33) {
       </div>
     `;
     document.body.appendChild(tooltip);
-  }, { step, content, progress, styles: GUIDANCE_STYLES });
+  }, { 
+    step, 
+    content, 
+    progress, 
+    styles: GUIDANCE_STYLES,
+    browser: 'Browser Guide'
+  });
 }
 
 async function waitForUserInteraction(page, timeoutMs = 30000) {
@@ -112,14 +147,11 @@ async function waitForUserInteraction(page, timeoutMs = 30000) {
 async function guideSynadiaSetup() {
   console.log('🎭 Starting comprehensive Synadia NATS guidance...');
   
-  const browser = await chromium.launch({ 
-    headless: false,
-    args: ['--start-maximized']
-  });
-  
-  const page = await browser.newPage();
+  const browser = await launchBrowser();
   
   try {
+    const page = await browser.newPage();
+    
     // Step 1: Navigate to Synadia console
     console.log('🌐 Opening Synadia console...');
     await page.goto(TEAM_URL, { waitUntil: 'networkidle' });
@@ -172,8 +204,35 @@ async function guideSynadiaSetup() {
     }
   } finally {
     await browser.close();
-    console.log('🏁 Synadia guidance session ended');
+    console.log(`🏁 Browser guidance session ended`);
   }
 }
+
+// Show usage if help requested
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log(`
+🎭 Synadia Browser Guidance
+
+Usage:
+  bun run guide-synadia.js
+
+Environment Variables:
+  GUIDE_BROWSER  - chromium (default), webkit, chrome
+  GUIDE_REAL     - true to use real Chrome (only with GUIDE_BROWSER=chrome)
+  GUIDE_HEADLESS - true for headless mode (default: false)
+
+Examples:
+  # Auto-detect best browser (default)
+  bun run guide-synadia.js
+  
+  # WebKit (Safari engine)
+  GUIDE_BROWSER=webkit bun run guide-synadia.js
+  
+  # Real Chrome browser
+  GUIDE_BROWSER=chrome GUIDE_REAL=true bun run guide-synadia.js
+  `);
+  process.exit(0);
+}
+
 // Start the guidance
 guideSynadiaSetup().catch(console.error);

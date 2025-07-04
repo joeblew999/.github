@@ -29,7 +29,21 @@ task synadia-demo      # Use Synadia NATS
 **Synadia Setup:**
 1. Run `task synadia-help` for step-by-step guide
 2. Follow tasks `synadia-step1` through `synadia-test`
-3. Or manually: Get connection details from https://cloud.synadia.com/teams/2XrIt5ApHyjVq8XkELhTaP4vfO3
+3. Or use visual guidance: `task guide`
+
+## Visual Guidance
+
+```bash
+# Fresh machine setup (one-time)
+task -t Taskfile.playwright.yml setup    # Install Bun dependencies + browsers
+
+# Interactive browser guidance for Synadia credentials
+task guide                                # Delegates to Playwright taskfile
+# OR directly:
+task -t Taskfile.playwright.yml guide    # Auto-detects best browser
+task -t Taskfile.playwright.yml guide-chrome    # Force Chrome
+task -t Taskfile.playwright.yml guide-safari    # Force Safari/WebKit
+```
 
 ## Benefits
 

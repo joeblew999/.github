@@ -1,0 +1,194 @@
+version: '3'
+
+vars:
+  SYNADIA_TEAM_ID: "2XrIt5ApHyjVq8XkELhTaP4vfO3"
+  SYNADIA_TEAM_URL: "https://cloud.synadia.com/teams/{{.SYNADIA_TEAM_ID}}"
+
+tasks:
+  default:
+    cmds:
+      - task --list-all
+
+  # Setup and Installation
+  check-bun:
+    desc: "Check if Bun is installed"
+    cmds:
+      - echo "🔍 Checking for Bun..."
+      - bun --version
+    silent: true
+
+  setup:
+    desc: "Install Playwright with Bun (one-time setup)"
+    deps: [check-bun]
+    cmds:
+      - echo "🎭 Playwright Guidance Setup for Fresh Machine"
+      - echo "=============================================="
+      - echo ""
+      - echo "📦 Installing dependencies..."
+      - bun install
+      - echo "🌐 Installing Playwright browsers (this may take a few minutes)..."
+      - bunx playwright install chromium webkit chrome
+      - echo ""
+      - echo "🔍 Verifying installation..."
+      - bunx playwright --version
+      - echo ""
+      - echo "✅ Setup complete!"
+      - echo ""
+      - echo "Now you can use:"
+      - echo "  task -f Taskfile.playwright.yml guide-chrome    # Real Chrome"
+      - echo "  task -f Taskfile.playwright.yml guide-safari    # Safari WebKit"
+      - echo "  task -f Taskfile.playwright.yml guide           # Bundled browser"
+    status:
+      - test -d node_modules/@playwright/test
+
+  install-browsers:
+    desc: "Install additional browsers (Chrome, Safari)"
+    cmds:
+      - echo "🌐 Installing browsers..."
+      - bunx playwright install chrome webkit chromium
+      - echo "✅ Browsers installed"
+
+  check-setup:
+    desc: "Check if setup is complete"
+    cmds:
+      - echo "🔍 Checking Playwright setup..."
+      - bun --version
+      - bunx playwright --version
+      - echo "✅ Setup appears complete"
+      - echo "✅ Browsers installed"
+
+  # Browser Guidance (all variants use the same entry point with environment config)
+  guide:
+    desc: "Interactive guide (auto-detects best available browser)"
+    cmds:
+      - echo "🤖 Starting guidance with best available browser..."
+      - bun run guide-synadia.js
+
+  guide-bundled:
+    desc: "Guide using bundled Chromium (most reliable)"
+    cmds:
+      - echo "🤖 Starting guidance with bundled Chromium..."
+      - GUIDE_BROWSER=chromium bun run guide-synadia.js
+
+  guide-chrome:
+    desc: "Guide using real Chrome browser"
+    cmds:
+      - echo "🟢 Starting guidance with real Chrome..."
+      - GUIDE_BROWSER=chrome GUIDE_REAL=true bun run guide-synadia.js
+
+  guide-safari:
+    desc: "Guide using WebKit (Safari engine)"
+    cmds:
+      - echo "🍎 Starting guidance with Safari WebKit..."
+      - GUIDE_BROWSER=webkit bun run guide-synadia.js
+
+  # Testing
+  test:
+    desc: "Run basic Playwright tests for Synadia console"
+    cmds:
+      - echo "🧪 Running Synadia console tests..."
+      - bun install
+      - bunx playwright test tests/synadia-basic.test.js --headed
+      - echo "✅ Tests completed"
+
+  test-headless:
+    desc: "Run tests in headless mode (faster)"
+    cmds:
+      - echo "🏃 Running headless tests..."
+      - bunx playwright test tests/synadia-basic.test.js
+      - echo "✅ Tests completed"
+
+  test-debug:
+    desc: "Run tests in debug mode (step-through)"
+    cmds:
+      - echo "🐛 Running tests in debug mode..."
+      - bun install
+      - bunx playwright test tests/synadia-basic.test.js --debug
+
+  test-ui:
+    desc: "Run tests with Playwright UI (interactive)"
+    cmds:
+      - echo "🎨 Opening Playwright UI..."
+      - bun install
+      - bunx playwright test --ui
+
+  test-all:
+    desc: "Run all browser tests (Chrome, WebKit)"
+    cmds:
+      - echo "🌐 Running tests across all browsers..."
+      - bunx playwright test tests/synadia-basic.test.js --headed
+      - echo "✅ All browser tests completed"
+
+  # Browser-specific Testing
+  test-chrome:
+    desc: "Test specifically with Chrome"
+    cmds:
+      - echo "🟢 Testing with Chrome..."
+      - bunx playwright test tests/synadia-basic.test.js --project=chromium --headed
+
+  test-webkit:
+    desc: "Test specifically with WebKit (Safari engine)"
+    cmds:
+      - echo "🍎 Testing with WebKit..."
+      - bunx playwright test tests/synadia-basic.test.js --project=webkit --headed
+
+  # Development and Debugging
+  record:
+    desc: "Record a new test interaction"
+    cmds:
+      - echo "📹 Recording new test..."
+      - bunx playwright codegen {{.SYNADIA_TEAM_URL}}
+
+  trace:
+    desc: "Run tests with trace recording"
+    cmds:
+      - echo "🔍 Running with trace recording..."
+      - bunx playwright test tests/synadia-basic.test.js --trace=on
+
+  show-report:
+    desc: "Show the last test report"
+    cmds:
+      - echo "📊 Opening test report..."
+      - bunx playwright show-report
+
+  # Utils
+  clean:
+    desc: "Clean up test artifacts"
+    cmds:
+      - echo "🧹 Cleaning test artifacts..."
+      - rm -rf test-results/
+      - rm -rf playwright-report/
+      - echo "✅ Cleaned up"
+
+  help:
+    desc: "Show Playwright task help"
+    cmds:
+      - echo "🎭 Playwright Tasks for Synadia Guidance"
+      - echo ""
+      - echo "Quick Start:"
+      - echo "  task -f Taskfile.playwright.yml setup    # One-time setup"
+      - echo "  task -f Taskfile.playwright.yml guide    # Start guidance"
+      - echo ""
+      - echo "Browser Options:"
+      - echo "  guide          # Auto-detect best browser"
+      - echo "  guide-chrome   # Force real Chrome"
+      - echo "  guide-safari   # Force WebKit (Safari engine)"
+      - echo "  guide-bundled  # Force bundled Chromium"
+      - echo ""
+      - echo "Testing:"
+      - echo "  test          # Basic tests"
+      - echo "  test-ui       # Interactive UI"
+      - echo "  test-debug    # Step-through debugging"
+
+  # Shortcuts for common workflows
+  dev:
+    desc: "Developer workflow: setup + guide"
+    cmds:
+      - task: setup
+      - task: guide
+
+  quick-test:
+    desc: "Quick test cycle"
+    cmds:
+      - task: test-headless
+      - echo "✅ Quick tests passed"
