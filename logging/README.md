@@ -52,3 +52,49 @@ task -t Taskfile.playwright.yml guide-safari    # Force Safari/WebKit
 - **Observable**: Real-time NATS streaming
 - **Resilient**: Works with/without NATS
 - **Simple**: Environment-controlled configuration
+
+
+## Command and Control via NATS
+
+Uses [nats.js](https://github.com/nats-io/nats.js) for JavaScript NATS integration.
+
+**Architecture Overview:**
+
+NATS acts as the central nervous system for Playwright test orchestration and monitoring.
+
+**Control Flow:**
+- NATS Controller receives commands (run, stop, status) 
+- Controller spawns Playwright processes using Task files
+- Playwright publishes real-time events back to NATS
+- External systems can monitor and control tests via NATS subjects
+
+**Event Streams:**
+- Test lifecycle events (start, pass, fail, complete)
+- Browser interactions (page loads, requests, errors)
+- System status and health checks
+
+**Benefits:**
+- Remote test execution and monitoring
+- Real-time visibility into test progress
+- Centralized control across multiple environments
+- Event-driven integration with CI/CD pipelines
+
+**Usage:**
+
+```bash
+# Start everything (manual terminals)
+task -t Taskfile.nats.yml dev
+
+# Start everything (parallel)  
+task -t Taskfile.nats.yml dev-parallel
+
+# Quick test
+task -t Taskfile.nats.yml validate
+```
+
+**NATS Subjects:**
+- Send commands: `playwright.control.*`
+- Monitor events: `playwright.test.*`
+- Health status: `playwright.status.*` 
+
+

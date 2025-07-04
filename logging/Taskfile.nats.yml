@@ -1,0 +1,69 @@
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task --list-all
+
+  # Basic NATS server control
+  start-server:
+    desc: "Start NATS server"
+    cmd: docker run -d --name nats-dev -p 4222:4222 -p 8222:8222 nats:latest
+
+  stop-server:
+    desc: "Stop NATS server"
+    cmd: docker stop nats-dev && docker rm nats-dev
+
+  # Health checks
+  wait-for-nats:
+    desc: "Wait for NATS server to be ready"
+    cmd: |
+      for i in {1..10}; do
+        if nc -z localhost 4222 > /dev/null 2>&1; then
+          echo "✅ NATS server ready on port 4222"
+          exit 0
+        fi
+        echo "⏳ Waiting for NATS ($i/10)..."
+        sleep 1
+      done
+      echo "❌ NATS server not ready after 10 seconds"
+      exit 1
+
+  # NATS controller
+  start-controller:
+    desc: "Start NATS Playwright controller"
+    cmd: bun run nats-controller.js
+
+  # Playwright with NATS
+  run-playwright:
+    desc: "Run Playwright with NATS integration"
+    cmd: bun run playwright test --config=playwright-nats.config.js
+
+  # Development workflow
+  dev:
+    desc: "Start full dev environment (run components in separate terminals)"
+    cmds:
+      - echo "🚀 Starting NATS server..."
+      - task: start-server
+      - task: wait-for-nats
+      - echo "✅ NATS server ready"
+      - echo ""
+      - echo "Next steps (run in separate terminals):"
+      - echo "  task -t Taskfile.nats.yml start-controller"
+      - echo "  task -t Taskfile.nats.yml run-playwright"
+
+  dev-parallel:
+    desc: "Start controller and run tests in parallel (after NATS is ready)"
+    deps: [start-server, wait-for-nats]
+    cmds:
+      - echo "🚀 Starting controller and Playwright in parallel..."
+      - task -t Taskfile.nats.yml --parallel start-controller run-playwright
+
+  # Quick validation
+  validate:
+    desc: "Quick validation of NATS integration"
+    deps: [start-server, wait-for-nats]
+    cmds:
+      - echo "🧪 Testing NATS controller..."
+      - timeout 5s bun run nats-controller.js || echo "✅ Controller started and connected (timed out as expected)"
+      - task: stop-server

@@ -1,7 +1,9 @@
 // guide-synadia.js - Interactive guidance for Synadia NATS credential setup
 import { launchBrowser as createBrowser, getBrowserInfo, closeBrowser } from './lib/browser-launcher.js';
 
-const TEAM_URL = 'https://cloud.synadia.com/teams/2XrIt5ApHyjVq8XkELhTaP4vfO3';
+// Configuration from environment (set by Taskfile)
+const TEAM_URL = process.env.SYNADIA_TEAM_URL || 
+                 `https://cloud.synadia.com/teams/${process.env.SYNADIA_TEAM_ID || '2XrIt5ApHyjVq8XkELhTaP4vfO3'}`;
 const TIMEOUT_MS = 10000; // 10 seconds
 
 // Enhanced visual guidance styles

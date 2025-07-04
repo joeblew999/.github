@@ -5,10 +5,14 @@
     "test": "playwright test",
     "test:debug": "playwright test --debug",
     "test:headed": "playwright test --headed",
-    "test:ui": "playwright test --ui"
+    "test:ui": "playwright test --ui",
+    "test:nats": "playwright test --config=playwright-nats.config.js",
+    "nats-controller": "node nats-controller.js"
   },
   "dependencies": {
-    "playwright": "^1.40.0"
+    "playwright": "^1.40.0",
+    "nats": "^2.28.2",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0"

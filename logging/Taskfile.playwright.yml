@@ -62,25 +62,27 @@ tasks:
     desc: "Interactive guide (auto-detects best available browser)"
     cmds:
       - echo "🤖 Starting guidance with best available browser..."
-      - bun run guide-synadia.js
+      - SYNADIA_TEAM_ID="{{.SYNADIA_TEAM_ID}}" SYNADIA_TEAM_URL="{{.SYNADIA_TEAM_URL}}" bun run guide-synadia.js
 
   guide-bundled:
     desc: "Guide using bundled Chromium (most reliable)"
     cmds:
       - echo "🤖 Starting guidance with bundled Chromium..."
-      - GUIDE_BROWSER=chromium bun run guide-synadia.js
+      - GUIDE_BROWSER=chromium SYNADIA_TEAM_ID="{{.SYNADIA_TEAM_ID}}" SYNADIA_TEAM_URL="{{.SYNADIA_TEAM_URL}}" bun run guide-synadia.js
 
   guide-chrome:
     desc: "Guide using real Chrome browser"
     cmds:
       - echo "🟢 Starting guidance with real Chrome..."
-      - GUIDE_BROWSER=chrome GUIDE_REAL=true bun run guide-synadia.js
+      - echo "🔗 Using team {{.SYNADIA_TEAM_ID}}"
+      - echo "🔗 Using URL {{.SYNADIA_TEAM_URL}}"
+      - GUIDE_BROWSER=chrome GUIDE_REAL=true SYNADIA_TEAM_ID="{{.SYNADIA_TEAM_ID}}" SYNADIA_TEAM_URL="{{.SYNADIA_TEAM_URL}}" bun run guide-synadia.js
 
   guide-safari:
     desc: "Guide using WebKit (Safari engine)"
     cmds:
       - echo "🍎 Starting guidance with Safari WebKit..."
-      - GUIDE_BROWSER=webkit bun run guide-synadia.js
+      - GUIDE_BROWSER=webkit SYNADIA_TEAM_ID="{{.SYNADIA_TEAM_ID}}" SYNADIA_TEAM_URL="{{.SYNADIA_TEAM_URL}}" bun run guide-synadia.js
 
   # Testing
   test:
