@@ -1,0 +1,110 @@
+{
+  "properties": {
+    "metadata": { "ref": "metadata" },
+    "endpoints": {
+      "values": { "ref": "endpoint" }
+    },
+    "categories": {
+      "values": { "ref": "category" }
+    },
+    "browser_support": {
+      "values": { "ref": "browser" }
+    },
+    "testing": { "ref": "testing" }
+  },
+  "definitions": {
+    "metadata": {
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "version": { "type": "string" },
+        "last_updated": { "type": "timestamp" },
+        "collected_by": { "type": "string" },
+        "collection_method": { "type": "string" },
+        "sources": {
+          "elements": { "type": "string" }
+        },
+        "total_endpoints": { "type": "uint32" },
+        "categories": {
+          "elements": { "type": "string" }
+        }
+      }
+    },
+    "endpoint": {
+      "properties": {
+        "path": { "type": "string" },
+        "category": { "type": "string" },
+        "method": { "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"] },
+        "response_type": { "enum": ["redirect", "json", "text", "html", "xml"] },
+        "authority_level": { "enum": ["official", "community", "experimental"] },
+        "verification_status": { "enum": ["verified", "unverified", "disputed"] },
+        "first_collected": { "type": "timestamp" },
+        "last_verified": { "type": "timestamp" },
+        "description": { "type": "string" },
+        "purpose": { "type": "string" },
+        "browser_support": {
+          "elements": { "type": "string" }
+        },
+        "specifications": {
+          "elements": { "type": "string" }
+        },
+        "sources": {
+          "elements": { "type": "string" }
+        }
+      },
+      "optionalProperties": {
+        "status_code": { "type": "uint16" },
+        "content_type": { "type": "string" },
+        "implementation": {
+          "optionalProperties": {
+            "go": { "type": "string" },
+            "nginx": { "type": "string" },
+            "apache": { "type": "string" }
+          }
+        },
+        "example": {
+          "optionalProperties": {
+            "request": { "type": "string" },
+            "response": { "type": "string" }
+          }
+        },
+        "security_considerations": {
+          "elements": { "type": "string" }
+        },
+        "schema": {},
+        "required_fields": {
+          "elements": { "type": "string" }
+        },
+        "optional_fields": {
+          "elements": { "type": "string" }
+        }
+      }
+    },
+    "category": {
+      "properties": {
+        "description": { "type": "string" },
+        "endpoints": {
+          "elements": { "type": "string" }
+        }
+      }
+    },
+    "browser": {
+      "properties": {
+        "supported_endpoints": {
+          "elements": { "type": "string" }
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "testing": {
+      "properties": {
+        "tools": {
+          "elements": { "type": "string" }
+        },
+        "commands": {
+          "values": { "type": "string" }
+        }
+      }
+    }
+  }
+}

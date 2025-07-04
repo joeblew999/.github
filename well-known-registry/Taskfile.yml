@@ -1,0 +1,149 @@
+version: '3'
+
+vars:
+  TOOL_NAME: registry-tool
+  MAIN_FILE: main.go
+  
+tasks:
+  default:
+    desc: "Show available tasks"
+    cmds:
+      - task --list
+
+  setup:
+    desc: "Setup development environment"
+    cmds:
+      - echo "🔧 Setting up well-known registry development environment..."
+      - go mod tidy
+      - task: build
+      - echo "✅ Setup complete! Run 'task --list' to see available commands"
+
+  build:
+    desc: "Build the registry management tool"
+    cmds:
+      - echo "🔨 Building registry tool..."
+      - go build -o {{.TOOL_NAME}} {{.MAIN_FILE}}
+      - echo "✅ Built {{.TOOL_NAME}}"
+    sources:
+      - "{{.MAIN_FILE}}"
+      - go.mod
+      - go.sum
+    generates:
+      - "{{.TOOL_NAME}}"
+
+  validate:
+    desc: "Validate registry against JTD schema"
+    deps: [build]
+    cmds:
+      - echo "🔍 Validating well-known endpoints registry..."
+      - ./{{.TOOL_NAME}} validate
+
+  generate:
+    desc: "Generate Go types and documentation from registry"
+    deps: [build]
+    cmds:
+      - echo "🔧 Generating code and documentation..."
+      - ./{{.TOOL_NAME}} generate
+      - echo "✅ Generated files in generated/ directory"
+
+  stats:
+    desc: "Show registry statistics"
+    deps: [build]
+    cmds:
+      - ./{{.TOOL_NAME}} stats
+
+  collect:
+    desc: "Collect endpoints from external sources (future)"
+    deps: [build]
+    cmds:
+      - ./{{.TOOL_NAME}} collect
+
+  check:
+    desc: "Run all validation and generation checks"
+    deps: [build]
+    cmds:
+      - task: validate
+      - task: generate
+      - echo "🎉 All checks passed!"
+
+  clean:
+    desc: "Clean generated files and build artifacts"
+    cmds:
+      - echo "🧹 Cleaning generated files..."
+      - rm -f {{.TOOL_NAME}}
+      - rm -rf generated/
+      - echo "✅ Cleaned up"
+
+  test:
+    desc: "Run Go tests"
+    cmds:
+      - go test ./...
+
+  lint:
+    desc: "Run Go linter"
+    cmds:
+      - go vet ./...
+      - gofmt -l .
+
+  dev:
+    desc: "Development workflow - validate and generate on file changes"
+    deps: [build]
+    cmds:
+      - echo "👀 Watching for changes... (Ctrl+C to stop)"
+      - |
+        while true; do
+          if [ data/well-known-endpoints.json -nt generated/docs.md ] 2>/dev/null || [ ! -f generated/docs.md ]; then
+            echo "📝 Registry data changed, regenerating..."
+            task validate generate
+          fi
+          sleep 2
+        done
+
+  query:
+    desc: "Query registry data with jq"
+    cmds:
+      - |
+        echo "📋 Available queries:"
+        echo "  Authentication endpoints:"
+        echo "    jq '.endpoints | to_entries | map(select(.value.category == \"authentication\"))' data/well-known-endpoints.json"
+        echo ""
+        echo "  Browser support for WebAuthn:"
+        echo "    jq '.endpoints.webauthn.browser_support' data/well-known-endpoints.json"
+        echo ""
+        echo "  All official endpoints:"
+        echo "    jq '.endpoints | to_entries | map(select(.value.authority_level == \"official\"))' data/well-known-endpoints.json"
+
+  auth-endpoints:
+    desc: "Show all authentication endpoints"
+    cmds:
+      - jq '.endpoints | to_entries | map(select(.value.category == "authentication"))' data/well-known-endpoints.json
+
+  official-endpoints:
+    desc: "Show all official endpoints"
+    cmds:
+      - jq '.endpoints | to_entries | map(select(.value.authority_level == "official"))' data/well-known-endpoints.json
+
+  browser-support:
+    desc: "Show browser support matrix"
+    cmds:
+      - jq '.browser_support' data/well-known-endpoints.json
+
+  install:
+    desc: "Install the tool globally"
+    deps: [build]
+    cmds:
+      - echo "📦 Installing registry-tool globally..."
+      - go install .
+      - echo "✅ Installed! Use 'registry-tool' from anywhere"
+
+  deps:
+    desc: "Update Go dependencies"
+    cmds:
+      - go get -u ./...
+      - go mod tidy
+
+  format:
+    desc: "Format Go code"
+    cmds:
+      - gofmt -w .
+      - go mod tidy

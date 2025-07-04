@@ -1,0 +1,233 @@
+version: '3'
+
+vars:
+  SYNADIA_TEAM_ID: "2XrIt5ApHyjVq8XkELhTaP4vfO3"
+  SYNADIA_TEAM_URL: "https://cloud.synadia.com/teams/{{.SYNADIA_TEAM_ID}}"
+
+tasks:
+  default:
+    cmds:
+      - task --list-all
+  run-text:
+    desc: "Run example with text logging"
+    cmd: go run example.go
+    
+  run-json:
+    desc: "Run example with JSON logging (production)"
+    env:
+      LOG_FORMAT: json
+    cmd: go run example.go
+    
+  run-debug:
+    desc: "Run example with debug level text logging"
+    env:
+      LOG_LEVEL: debug
+    cmd: go run example.go
+    
+  run-debug-json:
+    desc: "Run example with debug level JSON logging"
+    env:
+      LOG_FORMAT: json
+      LOG_LEVEL: debug
+    cmd: go run example.go
+    
+  compare:
+    desc: "Compare text vs JSON output side by side"
+    cmds:
+      - echo "=== TEXT OUTPUT ==="
+      - go run example.go
+      - echo ""
+      - echo "=== JSON OUTPUT ==="
+      - LOG_FORMAT=json go run example.go
+      
+  demo:
+    desc: "Full demo showing different log formats"
+    cmds:
+      - echo "🔍 Development Logging (Text):"
+      - go run example.go
+      - echo ""
+      - echo "📦 Production Logging (JSON):"
+      - LOG_FORMAT=json go run example.go
+      - echo ""
+      - echo "🐛 Debug Logging (Text):"
+      - LOG_LEVEL=debug go run example.go
+      
+  clean:
+    desc: "Clean up any log files"
+    cmd: rm -f *.log
+
+  # NATS Integration Tasks
+  run-nats-text:
+    desc: "Run with NATS logging enabled (text console + NATS)"
+    env:
+      NATS_URL: nats://localhost:4222
+    cmd: go run example.go
+
+  run-nats-json:
+    desc: "Run with NATS logging enabled (JSON console + NATS)"
+    env:
+      LOG_FORMAT: json
+      NATS_URL: nats://localhost:4222
+    cmd: go run example.go
+
+  start-nats:
+    desc: "Start a local NATS server using Docker"
+    cmd: docker run -d --name nats-demo -p 4222:4222 -p 8222:8222 nats:latest
+
+  stop-nats:
+    desc: "Stop and remove the local NATS server"
+    cmds:
+      - docker stop nats-demo || true
+      - docker rm nats-demo || true
+
+  subscribe-logs:
+    desc: "Subscribe to logs via NATS CLI (install with: brew install nats-io/nats-tools/nats)"
+    cmd: nats subscribe "logs.registry"
+
+  # Synadia NATS Cloud Tasks
+  run-synadia-text:
+    desc: "Run with Synadia NATS logging enabled (text console + NATS)"
+    dotenv: ['.env']
+    cmd: go run example.go
+
+  run-synadia-json:
+    desc: "Run with Synadia NATS logging enabled (JSON console + NATS)"
+    dotenv: ['.env']
+    env:
+      LOG_FORMAT: json
+    cmd: go run example.go
+
+  setup-env:
+    desc: "Copy .env.example to .env for local configuration"
+    cmd: cp .env.example .env
+    status:
+      - test -f .env
+
+  subscribe-synadia:
+    desc: "Subscribe to Synadia logs via NATS CLI with credentials"
+    dotenv: ['.env']
+    cmd: nats subscribe "logs.registry" --creds="${NATS_CREDS:-}"
+
+  nats-demo:
+    desc: "Full NATS demo: start server, run app, and show how to subscribe"
+    cmds:
+      - echo "🚀 Starting NATS server..."
+      - task: start-nats
+      - sleep 3
+      - echo ""
+      - echo "✅ NATS server started on localhost:4222"
+      - echo "📡 To see logs in real-time, run in another terminal:"
+      - echo "   task subscribe-logs"
+      - echo ""
+      - echo "🔍 Running example with NATS logging (JSON format)..."
+      - task: run-nats-json
+      - echo ""
+      - echo "To stop NATS server -  task stop-nats"
+
+  synadia-demo:
+    desc: "Demo using Synadia NATS Cloud (requires .env configuration)"
+    deps: [setup-env]
+    cmds:
+      - echo "🌐 Using Synadia NATS Cloud..."
+      - echo "📋 Make sure to configure your .env file with Synadia credentials"
+      - echo "🔍 Running example with Synadia NATS logging (JSON format)..."
+      - task: run-synadia-json
+      - echo ""
+      - echo "📡 To subscribe to logs - task subscribe-synadia"
+
+  build:
+    desc: "Build the example binary"
+    cmd: go build -o logging-example example.go
+    
+  help:
+    desc: "Show available tasks"
+    cmd: task --list
+
+  # Synadia Setup Helper Tasks
+  synadia-help:
+    desc: "Step-by-step guide to get Synadia NATS connection details"
+    cmd: cat docs/synadia-setup.md
+
+  synadia-step1:
+    desc: "Step 1 - Open your Synadia team console"
+    cmds:
+      - cat docs/step1-console.md
+      - echo ""
+      - echo "Opening {{.SYNADIA_TEAM_URL}}"
+      - open "{{.SYNADIA_TEAM_URL}}"
+
+  synadia-step2:
+    desc: "Step 2 - Navigate to connection details"
+    cmd: cat docs/step2-find-details.md
+
+  synadia-step3:
+    desc: "Step 3 - Download credentials and update .env"
+    cmd: cat docs/step3-download.md
+
+  synadia-step4:
+    desc: "Step 4 - Configure your .env file"
+    cmd: cat docs/step4-configure.md
+
+  synadia-test:
+    desc: "Step 5 - Test your Synadia connection"
+    cmds:
+      - cat docs/step5-test.md
+      - echo ""
+      - echo "🧪 Testing your Synadia NATS connection..."
+      - task: run-synadia-json
+
+  synadia-reset:
+    desc: "Reset .env back to local Docker NATS for development"
+    cmds:
+      - echo "🔄 Resetting to local Docker NATS..."
+      - task: setup-env
+      - echo "✅ Back to local development setup"
+      - echo "Use 'task nats-demo' for local testing"
+
+  show-config:
+    desc: "Show current .env configuration"
+    cmd: cat .env
+
+  check-creds:
+    desc: "Check if your .creds file exists"
+    dotenv: ['.env']
+    cmd: ls -la "${NATS_CREDS:-no-creds-file-set}"
+
+
+  # Playwright Guidance Tasks (Basic)
+  
+  setup-playwright:
+    desc: "Install Playwright with Bun (one-time setup)"
+    cmds:
+      - echo "📦 Installing Playwright with Bun..."
+      - bun install
+      - bunx playwright install chromium
+      - echo "✅ Playwright ready for guidance"
+
+  guide-synadia:
+    desc: "Interactive guide for Synadia console (enhanced)"
+    cmds:
+      - echo "🎭 Starting enhanced Synadia guidance..."
+      - bun run guide-synadia.js
+
+  test-synadia:
+    desc: "Run basic Playwright tests for Synadia console"
+    cmds:
+      - echo "🧪 Running Synadia console tests..."
+      - bun install
+      - bunx playwright test tests/synadia-basic.test.js --headed
+      - echo "✅ Tests completed"
+
+  test-synadia-debug:
+    desc: "Run Synadia tests in debug mode (step-through)"
+    cmds:
+      - echo "🐛 Running Synadia tests in debug mode..."
+      - bun install
+      - bunx playwright test tests/synadia-basic.test.js --debug
+      
+  test-synadia-ui:
+    desc: "Run Synadia tests with Playwright UI"
+    cmds:
+      - echo "🎨 Opening Playwright UI for Synadia tests..."
+      - bun install
+      - bunx playwright test --ui
