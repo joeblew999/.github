@@ -95,6 +95,10 @@ task -t Taskfile.nats.yml validate
 **NATS Subjects:**
 - Send commands: `playwright.control.*`
 - Monitor events: `playwright.test.*`
-- Health status: `playwright.status.*` 
+- Health status: `playwright.status.*`
+
+## Future Enhancements
+
+For organization-wide config registry patterns using NATS KV, see the dedicated documentation in the repo root: `ORGANIZATION-CONFIG-REGISTRY.md`
 
 
