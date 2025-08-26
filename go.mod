@@ -6,7 +6,7 @@ toolchain go1.24.4
 
 require (
 	github.com/nats-io/nats-server/v2 v2.11.6
-	github.com/nats-io/nats.go v1.43.0
+	github.com/nats-io/nats.go v1.45.0
 )
 
 require (
