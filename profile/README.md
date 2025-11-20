@@ -15,12 +15,3 @@ Interested in contributing? We welcome contributions from the community! Check o
 For questions or support, please reach out through our GitHub discussions or issues.
 
 for real time chat and video conf i use: https://signal.me/#eu/vgBESlcvaESbERk8FZvKoT8gTOxWwvoG2GbNlR789l4OYUmnMTtO1aiXhPiPK49t
-
-
-## 🎉 Funnies
-
-You must know the first one:
-https://www.youtube.com/watch?v=NlJGfFqYEms
-
-But this is a funny meme:
-https://www.youtube.com/watch?v=KdftbYqA_VQ
