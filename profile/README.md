@@ -1,17 +1,30 @@
-# Welcome to joeblew999! 👋
+# Gerard Webb
+**Remote IT Consultant | Distributed Systems Specialist**
 
-This organization is focused on building innovative software solutions and contributing to the open source community.
+🌏 Based in Thailand | 💼 Available for remote consulting worldwide  
+🔧 Golang • NATS • Distributed Systems • Cloud Architecture
 
-## 🚀 What we're working on
+## About Me
+Independent IT consultant with 25+ years of experience delivering remote projects for international clients. Currently working from Thailand on cutting-edge distributed systems and cloud platforms.
 
-Check out our repositories to see our latest projects and experiments.
+## Recent Projects
+- 🇺🇸 **US Client** (Jan-Mar 2025): Self-sovereign cloud platform using NATS Jetstream & WASM
+- 🇨🇳 **China Client** (Oct 2024-Jan 2025): Drone formation control with real-time digital twin
+- 🇪🇺 **European Climate Foundation** (2020-2023): Remote team leadership across 4 countries
 
-## 🤝 Contributing
+## Specializations
+- Distributed systems architecture
+- Real-time messaging (NATS, Jetstream)
+- Cloud-native platforms
+- WASM compute environments
+- Remote team leadership
 
-Interested in contributing? We welcome contributions from the community! Check out our [contribution guidelines](https://github.com/joeblew999/.github/blob/main/CONTRIBUTING.md).
+## Tech Stack
+`Golang` `NATS` `Jetstream` `WASM` `Kubernetes` `Docker` `HTMX` `Benthos`
 
-## 📫 Contact
+## Contact
+📧 gedw99@gmail.com  
+💬 Signal: [signal.me/#eu/vgBE...](https://signal.me/#eu/vgBESlcvaESbERk8FZvKoT8gTOxWwvoG2GbNlR789l4OYUmnMTtO1aiXhPiPK49t)  
+🔗 GitHub: [@joeblew999](https://github.com/joeblew999)
 
-For questions or support, please reach out through our GitHub discussions or issues.
-
-for real time chat and video conf i use: https://signal.me/#eu/vgBESlcvaESbERk8FZvKoT8gTOxWwvoG2GbNlR789l4OYUmnMTtO1aiXhPiPK49t
+*Remote consultant working from Thailand 🇹🇭 | All work with international clients | Available for distributed systems projects*
