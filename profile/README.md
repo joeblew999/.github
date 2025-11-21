@@ -1,7 +1,7 @@
 # Gerard Webb
 **Remote IT Consultant | Distributed Systems Specialist**
 
-🌏 Based in Thailand | 💼 Available for remote consulting worldwide  
+🌏 💼 Available for remote consulting worldwide  
 🔧 Golang • NATS • Distributed Systems • Cloud Architecture
 
 ## About Me
@@ -22,9 +22,8 @@ Independent IT consultant with 25+ years of experience delivering remote project
 ## Tech Stack
 `Golang` `NATS` `Jetstream` `WASM` `Kubernetes` `Docker` `HTMX` `Benthos`
 
-## Contact
-📧 gedw99@gmail.com  
+## Contact 
 💬 Signal: [signal.me/#eu/vgBE...](https://signal.me/#eu/vgBESlcvaESbERk8FZvKoT8gTOxWwvoG2GbNlR789l4OYUmnMTtO1aiXhPiPK49t)  
 🔗 GitHub: [@joeblew999](https://github.com/joeblew999)
 
-*Remote consultant working from Thailand 🇹🇭 | All work with international clients | Available for distributed systems projects*
+*Remote consulting | All work with international clients | Available for distributed systems projects*
