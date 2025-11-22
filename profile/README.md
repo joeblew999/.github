@@ -9,7 +9,6 @@ Independent IT consultant with 25+ years of experience delivering remote project
 
 ## Recent Projects
 - 🇺🇸 **US Client** (Jan-Mar 2025): Self-sovereign cloud platform using NATS Jetstream & WASM
-- 🇨🇳 **China Client** (Oct 2024-Jan 2025): Drone formation control with real-time digital twin
 - 🇪🇺 **European Climate Foundation** (2020-2023): Remote team leadership across 4 countries
 
 ## Specializations
