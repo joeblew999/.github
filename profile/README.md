@@ -5,7 +5,7 @@
 🔧 Golang • NATS • Distributed Systems • Cloud Architecture
 
 ## About Me
-Independent IT consultant with 25+ years of experience delivering remote projects for international clients. Currently working from Thailand on cutting-edge distributed systems and cloud platforms.
+Independent IT consultant with 25+ years of experience delivering remote projects for international clients. Currently working on cutting-edge distributed systems and cloud platforms.
 
 ## Recent Projects
 - 🇺🇸 **US Client** (Jan-Mar 2025): Self-sovereign cloud platform using NATS Jetstream & WASM
