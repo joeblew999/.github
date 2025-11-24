@@ -2,6 +2,36 @@
 
 https://github.com/joeblew999?preview=true
 
+## What is this Repository?
+
+This is a **meta-repository** that manages GitHub configuration and workflows across the entire `joeblew999` organization. Think of it as the "command center" for all repositories in this organization.
+
+### Why Does This Exist?
+
+**The Problem:** Managing hundreds of repositories with consistent CI/CD workflows, security policies, and automation is tedious and error-prone when done manually. When you need to update a workflow across 100 repos, you're faced with:
+- Copy-pasting the same files repeatedly
+- Configuration drift between repositories
+- No single source of truth
+- Time-consuming manual updates
+
+**The Solution:** This repository uses **template-based automation** to generate and maintain `.github` configurations across all organization repositories. Change a template once here, and it propagates everywhere automatically.
+
+### What It Provides
+
+- **Template System** - Define workflows, issue templates, and GitHub configs once
+- **Automated Distribution** - Templates automatically deploy to all repos via GitHub Actions
+- **Secret Management** - Centralized secret management with GitHub integration
+- **NATS Infrastructure** - Optional event-driven orchestration for complex workflows
+- **Terraform Automation** - Infrastructure-as-code for NATS deployments
+- **Cross-Platform Support** - Works seamlessly on Windows, macOS, and Linux
+
+### Who Should Use This?
+
+- **Organization admins** managing multiple repositories
+- **DevOps engineers** standardizing CI/CD across projects
+- **Open source maintainers** with many repositories to coordinate
+- **Enterprise teams** requiring consistent governance and compliance
+
 ## Quick Start
 
 ### 1. Secret Management Setup
