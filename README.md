@@ -26,6 +26,8 @@ This is a **meta-repository** that manages GitHub configuration and workflows ac
 - **NATS Infrastructure** - Optional event-driven orchestration for complex workflows
 - **Terraform Automation** - Infrastructure-as-code for NATS deployments
 - **Cross-Platform Support** - Works seamlessly on Windows, macOS, and Linux
+- **CGO Build Support** - Build workflows for CGO-dependent applications (WebView, native GUI frameworks)
+- **GUI Application Updates** - Automated build and distribution for cross-platform desktop and mobile apps
 
 ### Who Should Use This?
 
@@ -33,6 +35,10 @@ This is a **meta-repository** that manages GitHub configuration and workflows ac
 - **DevOps engineers** standardizing CI/CD across projects
 - **Open source maintainers** with many repositories to coordinate
 - **Enterprise teams** requiring consistent governance and compliance
+
+### CGO and GUI Application Support
+
+This repository provides build infrastructure for CGO-dependent applications, enabling development of cross-platform GUI applications using WebView and native frameworks. For example, [goup-util](https://github.com/joeblew99/goup-util) uses this infrastructure to build WebView-based applications that run on Web, Desktop (Windows/macOS/Linux), and Mobile platforms. The automated build and distribution workflows handle the complexity of CGO compilation, platform-specific dependencies, and application updates across all target platforms.
 
 ## Quick Start
 
