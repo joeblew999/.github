@@ -109,10 +109,10 @@ I collaborate with IT teams across the US, Europe, and Asia to build robust dist
 
 ## Contact
 
-💬 **Signal**
+💬 **Signal** (Real-time communication when needed)
 [signal.me/#eu/vgBE...](https://signal.me/#eu/vgBESlcvaESbERk8FZvKoT8gTOxWwvoG2GbNlR789l4OYUmnMTtO1aiXhPiPK49t)
 
-📧 **Email**
+📧 **Email** (General communications)
 ![Contact Email](https://raw.githubusercontent.com/joeblew999/.github/main/profile/images/contact-email.svg)
 
 🔗 **GitHub**
