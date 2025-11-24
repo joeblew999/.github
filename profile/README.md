@@ -6,7 +6,11 @@
 
 ## About Me
 
-Independent IT consultant with 25+ years of experience delivering remote projects for international clients. Previously worked in Germany, Sweden, and the UK, including serving as Security Architect for European clients, before establishing my Australian-based consulting practice. Currently working on cutting-edge distributed systems and cloud platforms.
+Independent IT consultant with 25+ years of experience delivering remote projects for international clients. Previously worked in Germany, Sweden, and the UK, including serving as Security Architect for the European Union, before establishing my Australian-based consulting practice.
+
+Led teams of up to 70 developers on enterprise-scale projects for Fortune 500 companies and government organizations. Currently working on cutting-edge distributed systems and cloud platforms.
+
+**Education:** Masters of Architecture, Deakin University
 
 **Company:** [Ubuntu Software](https://www.ubuntusoftware.net) (Australia)
 Develops open source infrastructure and commercial products to help organizations and teams with cross-platform development.
@@ -53,9 +57,26 @@ Currently partnering with organizations and companies to deploy production syste
 
 ---
 
+## Notable Clients
+
+**Government & International Organizations:**
+• German Federal Ministry of Health (BMG)
+• European Union (ECDC)
+
+**Major Corporations:**
+• Metro AG (Germany) - 7,000 K8 server deployment
+• Audi AG - Autonomous transport systems
+• BP (British Petroleum)
+• BG Group - Global gas production ERP
+• Syngenta - Multi-country scientific platform
+• Bauer Media - Global CMS
+• Nomura Bank, ABN AMRO Bank
+
+---
+
 ## Recent Projects
 
-🇺🇸 **US Client** (Jan-Mar 2025)
+🇺🇸 **Archethought Inc.** (Mar 2024-Present)
 Self-sovereign cloud platform using NATS Jetstream & WASM - Enabling decentralized data ownership
 
 🇪🇺 **European Climate Foundation** (2020-2023)
