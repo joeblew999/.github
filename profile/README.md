@@ -19,7 +19,7 @@ Building open source infrastructure and commercial products to help organization
 **Blog & Updates:**
 
 📝 **Technical Blog**
-[ubuntusoftware.net/blog](https://www.ubuntusoftware.net/blog/)
+[https://www.ubuntusoftware.net/blog/](https://www.ubuntusoftware.net/blog/)
 
 Articles on distributed systems, Go, Rust, cloud architecture, and remote consulting
 
