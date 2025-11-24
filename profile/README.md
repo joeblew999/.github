@@ -20,6 +20,9 @@ Independent IT consultant with 25+ years of experience delivering remote project
 - WASM compute environments
 - Remote team leadership
 
+## Global Collaboration Network
+I collaborate with IT teams across the US, Europe, and Asia to build robust distributed systems. Through years of remote work, I've cultivated a network of trusted engineers and architects who complement each other's expertise. We regularly share knowledge, collaborate on complex projects, and support each other in delivering high-quality solutions to clients worldwide.
+
 ## Tech Stack
 `Golang` `NATS` `Jetstream` `WASM` `Kubernetes` `Docker` `HTMX` `Benthos`
 
