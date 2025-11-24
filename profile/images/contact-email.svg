@@ -3,12 +3,7 @@
     .email-text {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
       font-size: 16px;
-      fill: #24292f;
-    }
-    @media (prefers-color-scheme: dark) {
-      .email-text {
-        fill: #c9d1d9;
-      }
+      fill: #ffffff;
     }
   </style>
   <text x="0" y="20" class="email-text">gerard.webb@ubuntusoftware.net</text>
