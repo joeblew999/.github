@@ -56,7 +56,7 @@ I collaborate with IT teams across the US, Europe, and Asia to build robust dist
 
 ## Contact
 💬 Signal: [signal.me/#eu/vgBE...](https://signal.me/#eu/vgBESlcvaESbERk8FZvKoT8gTOxWwvoG2GbNlR789l4OYUmnMTtO1aiXhPiPK49t)
-📧 Email: ![Contact Email](images/contact-email.svg)
+📧 Email: ![Contact Email](https://raw.githubusercontent.com/joeblew999/.github/main/profile/images/contact-email.svg)
 🔗 GitHub: [@joeblew999](https://github.com/joeblew999)
 
 *Remote consulting | All work with international clients | Available for distributed systems projects*
