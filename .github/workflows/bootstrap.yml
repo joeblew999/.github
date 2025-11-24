@@ -27,7 +27,7 @@ jobs:
       terraform_state_exists: ${{ steps.check.outputs.terraform_state_exists }}
       bootstrap_stage: ${{ steps.check.outputs.bootstrap_stage }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       
       - name: Install NATS CLI
         run: |
@@ -76,7 +76,7 @@ jobs:
     needs: check-infrastructure
     if: needs.check-infrastructure.outputs.nats_exists == 'false'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -134,7 +134,7 @@ jobs:
     needs: [check-infrastructure, bootstrap-synadia]
     if: always() && (needs.bootstrap-synadia.result == 'success' || needs.check-infrastructure.outputs.nats_exists == 'true')
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       
       - name: Setup NATS CLI
         run: |
