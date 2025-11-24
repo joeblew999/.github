@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="80" viewBox="0 0 400 80">
+  <style>
+    .sig-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-size: 22px;
+      font-weight: 600;
+      fill: #1a1a1a;
+    }
+    .sig-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      fill: #666666;
+    }
+    .sig-logo-bracket {
+      font-family: 'Courier New', monospace;
+      font-size: 20px;
+      font-weight: 400;
+      fill: #0066cc;
+    }
+    .sig-logo-divider {
+      stroke: #0066cc;
+      stroke-width: 2;
+    }
+    .sig-company {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      fill: #1a1a1a;
+    }
+    .sig-link {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      fill: #0066cc;
+    }
+  </style>
+
+  <!-- Name -->
+  <text x="0" y="20" class="sig-name">Gerard Webb</text>
+
+  <!-- Title -->
+  <text x="0" y="38" class="sig-title">Remote IT Consultant | Distributed Systems Specialist</text>
+
+  <!-- Logo [ U | S ] -->
+  <text x="0" y="60" class="sig-logo-bracket">[</text>
+  <text x="12" y="60" class="sig-logo-bracket">U</text>
+  <line x1="28" y1="48" x2="28" y2="62" class="sig-logo-divider"/>
+  <text x="34" y="60" class="sig-logo-bracket">S</text>
+  <text x="48" y="60" class="sig-logo-bracket">]</text>
+
+  <!-- Company name -->
+  <text x="65" y="60" class="sig-company">Ubuntu Software</text>
+
+  <!-- Website -->
+  <text x="0" y="75" class="sig-link">ubuntusoftware.net</text>
+</svg>
