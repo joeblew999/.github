@@ -6,6 +6,10 @@ https://github.com/joeblew999?preview=true
 
 This is a **meta-repository** that manages GitHub configuration and workflows across the entire `joeblew999` organization. Think of it as the "command center" for all repositories in this organization.
 
+**Special Files:**
+- `profile/README.md` - Organization profile displayed at [github.com/joeblew999](https://github.com/joeblew999)
+- Root `.github/` files - Default community health files (CONTRIBUTING, SECURITY, etc.) that apply to all repos
+
 ### Why Does This Exist?
 
 **The Problem:** Managing hundreds of repositories with consistent CI/CD workflows, security policies, and automation is tedious and error-prone when done manually. When you need to update a workflow across 100 repos, you're faced with:
