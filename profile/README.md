@@ -7,6 +7,8 @@
 ## About Me
 Independent IT consultant with 25+ years of experience delivering remote projects for international clients. Currently working on cutting-edge distributed systems and cloud platforms.
 
+🌐 **Company:** [Ubuntu Software](https://www.ubuntusoftware.net) - Building open source infrastructure and products for cross-platform development
+
 ## Recent Projects
 - 🇺🇸 **US Client** (Jan-Mar 2025): Self-sovereign cloud platform using NATS Jetstream & WASM
 - 🇪🇺 **European Climate Foundation** (2020-2023): Remote team leadership across 4 countries
