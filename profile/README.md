@@ -58,8 +58,8 @@ Articles on distributed systems, Go, Rust, cloud architecture, and remote consul
 
 ## Recent Projects
 
-🇺🇸 **Archethought Inc.** (Mar 2024-Present)
-Self-sovereign cloud platform using NATS Jetstream & WASM - Enabling decentralized data ownership
+🇺🇸 **Archethought Inc. Collaboration** (Mar 2024-Present)
+Partnership developing self-sovereign cloud platform using NATS Jetstream & WASM - Enabling decentralized data ownership
 
 🇪🇺 **European Climate Foundation** (2020-2023)
 Remote team leadership across 4 countries
