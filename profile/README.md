@@ -29,10 +29,11 @@ Independent IT consultant with 25+ years of experience delivering remote project
 Building next-generation **offline AI systems** and **2D/3D vision platforms** that operate independently of cloud infrastructure. This includes:
 - **Offline AI processing** - Running AI models locally for privacy, security, and reliability
 - **Computer vision systems** - 2D and 3D visual processing for industrial, medical, and consumer applications
-- **CAD and design tools** - Cross-platform CAD systems for engineering, architecture, manufacturing, and creative workflows
+- **3D Solids CAD Kernel (Beta)** - Full parametric CAD system running completely offline with real-time synchronization. Runtime-extensible architecture enables custom workflows and integrations.
+- **Digital Twin Integration** - Complete lifecycle system from virtual design to physical automation. Design in 3D, simulate behavior, then monitor and control real-world systems—bridging the gap between digital models and physical reality.
 - **Edge computing** - Bringing powerful compute capabilities to devices without internet dependency
 
-These technologies enable applications across manufacturing automation, medical imaging, autonomous systems, architectural design, quality control, robotics, and more - all running locally with full data sovereignty.
+These technologies enable full lifecycle workflows across manufacturing automation, medical imaging, autonomous systems, architectural design, quality control, robotics, and digital twin deployments—all running locally with full data sovereignty. Currently partnering with organizations and companies to deploy production systems.
 
 ## Global Collaboration Network
 I collaborate with IT teams across the US, Europe, and Asia to build robust distributed systems. Through years of remote work, I've cultivated a network of trusted engineers and architects who complement each other's expertise. We regularly share knowledge, collaborate on complex projects, and support each other in delivering high-quality solutions to clients worldwide.
