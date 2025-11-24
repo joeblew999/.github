@@ -13,6 +13,11 @@ Independent IT consultant with 25+ years of experience delivering remote project
 - 🇺🇸 **US Client** (Jan-Mar 2025): Self-sovereign cloud platform using NATS Jetstream & WASM
 - 🇪🇺 **European Climate Foundation** (2020-2023): Remote team leadership across 4 countries
 
+## Notable Open Source Projects
+- 🚀 **[goup-util](https://github.com/joeblew999/goup-util)** - Write HTML/HTMX once, deploy everywhere: Web, iOS, Android, Desktop with instant updates
+- 🔄 **[automerge-wazero-example](https://github.com/joeblew999/automerge-wazero-example)** - Production-ready collaborative CRDT powered by Automerge (Rust), WASI, and wazero (Go)
+- 🔐 **[wellknown](https://github.com/joeblew999/wellknown)** - Own your data, own your AI, own your routing—use Big Tech as enhancement services, not gatekeepers
+
 ## Specializations
 - Distributed systems architecture
 - Real-time messaging (NATS, Jetstream)
