@@ -43,7 +43,8 @@ Articles on distributed systems, Go, Rust, cloud architecture, and remote consul
 
 **Government & International Organizations:**
 • German Federal Ministry of Health (BMG)
-• European Union (ECDC)
+• European Union (ECDC) - Security Architecture
+• European Climate Foundation - Led team building secure communication and collaboration system
 
 **Major Corporations:**
 • Metro AG (Germany) - 7,000 K8 server deployment
