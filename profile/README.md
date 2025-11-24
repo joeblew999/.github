@@ -11,9 +11,9 @@
 
 ## About Me
 
-Independent IT consultant with 25+ years of experience delivering remote projects for international clients. Currently working on cutting-edge distributed systems and cloud platforms.
+Independent IT consultant with 25+ years of experience delivering remote projects for international clients. Previously worked in Germany, Sweden, and the UK before establishing my Australian-based consulting practice. Currently working on cutting-edge distributed systems and cloud platforms.
 
-**Company:** [Ubuntu Software](https://www.ubuntusoftware.net)
+**Company:** [Ubuntu Software](https://www.ubuntusoftware.net) (Australia)
 Building open source infrastructure and commercial products to help organizations and teams with cross-platform development.
 
 **Blog & Updates:**
