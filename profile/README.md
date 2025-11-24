@@ -27,26 +27,6 @@ Articles on distributed systems, Go, Rust, cloud architecture, and remote consul
 🔔 **RSS Feed**
 [Subscribe via RSS](https://www.ubuntusoftware.net/blog/index.xml)
 
-**Current Focus: Offline AI & Vision Systems**
-
-Building next-generation **offline AI systems** and **2D/3D vision platforms** that operate independently of cloud infrastructure.
-
-**Key Technologies:**
-
-• **Offline AI Processing** - Running AI models locally for privacy, security, and reliability
-
-• **Computer Vision Systems** - 2D and 3D visual processing for industrial, medical, and consumer applications
-
-• **3D Solids CAD Kernel (Beta)** - Full parametric CAD system running completely offline with real-time synchronization. Deploys embedded in client applications, on servers, or on embedded hardware for robotics and factory automation integration. Runtime-extensible architecture enables custom workflows and integrations.
-
-• **Digital Twin Integration** - Complete lifecycle system from virtual design to physical automation. Design in 3D, simulate behavior, then monitor and control real-world systems—bridging the gap between digital models and physical reality.
-
-• **Edge Computing** - Bringing powerful compute capabilities to devices without internet dependency
-
-These technologies enable full lifecycle workflows across manufacturing automation, medical imaging, autonomous systems, architectural design, quality control, robotics, and digital twin deployments—all running locally with full data sovereignty.
-
-Currently partnering with organizations and companies to deploy production systems.
-
 ---
 
 ## Specializations
