@@ -35,8 +35,12 @@ I collaborate with IT teams across the US, Europe, and Asia to build robust dist
 ## Tech Stack
 `Golang` `NATS` `Jetstream` `WASM` `Kubernetes` `Docker` `HTMX` `Benthos`
 
-## Contact 
-💬 Signal: [signal.me/#eu/vgBE...](https://signal.me/#eu/vgBESlcvaESbERk8FZvKoT8gTOxWwvoG2GbNlR789l4OYUmnMTtO1aiXhPiPK49t)  
+## Blog & Updates
+📝 **Technical Blog:** [ubuntusoftware.net/blog](https://www.ubuntusoftware.net/blog/) - Articles on distributed systems, Go, Rust, cloud architecture, and remote consulting
+🔔 **RSS Feed:** [Subscribe via RSS](https://www.ubuntusoftware.net/blog/index.xml) - Stay updated with new posts
+
+## Contact
+💬 Signal: [signal.me/#eu/vgBE...](https://signal.me/#eu/vgBESlcvaESbERk8FZvKoT8gTOxWwvoG2GbNlR789l4OYUmnMTtO1aiXhPiPK49t)
 🔗 GitHub: [@joeblew999](https://github.com/joeblew999)
 
 *Remote consulting | All work with international clients | Available for distributed systems projects*
