@@ -15,6 +15,9 @@ vars:
   NATS_BINARY: 'nats{{.EXE_EXT}}'
   # Platform-specific paths
   HOME_DIR: '{{if eq OS "windows"}}{{.USERPROFILE}}{{else}}{{.HOME}}{{end}}'
+  # Go CLI tools for cross-platform compatibility
+  BIN_DIR: "{{.ROOT_DIR}}/.bin"
+  GOJQ: "{{.BIN_DIR}}/gojq"
 
 tasks:
   default:
@@ -62,7 +65,7 @@ tasks:
         echo "📦 Installing GitHub CLI for {{.OS}}/{{.ARCH}}..."
         
         if command -v {{.GH_BINARY}} >/dev/null 2>&1; then
-          echo "✅ GitHub CLI already installed: $({{.GH_BINARY}} --version | head -1)"
+          echo "✅ GitHub CLI already installed: $({{.GH_BINARY}} --version | {{.GOJQ}} -Rs 'split("\n")[0]')"
         else
           echo "📦 Installing GitHub CLI..."
           
@@ -113,7 +116,7 @@ tasks:
           exit 1
           {{end}}
           
-          echo "✅ GitHub CLI installed: $({{.GH_BINARY}} --version | head -1)"
+          echo "✅ GitHub CLI installed: $({{.GH_BINARY}} --version | {{.GOJQ}} -Rs 'split("\n")[0]')"
         fi
 
   verify-github:
@@ -196,7 +199,7 @@ tasks:
         
         # Platform-aware GitHub CLI check
         if command -v {{.GH_BINARY}} >/dev/null 2>&1; then
-          echo "✅ GitHub CLI available: $({{.GH_BINARY}} --version | head -1 | cut -d' ' -f3)"
+          echo "✅ GitHub CLI available: $({{.GH_BINARY}} --version | {{.GOJQ}} -Rs 'split("\n")[0] | split(" ")[2]')"
         else
           echo "❌ GitHub CLI not installed - run 'task install-gh'"
         fi

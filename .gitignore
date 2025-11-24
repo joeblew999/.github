@@ -59,3 +59,4 @@ Thumbs.db
 # But ignore any temporary test directories
 /test-output/
 /temp-*/
+.bin/

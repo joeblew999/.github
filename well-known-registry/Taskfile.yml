@@ -3,6 +3,8 @@ version: '3'
 vars:
   TOOL_NAME: registry-tool
   MAIN_FILE: main.go
+  BIN_DIR: "{{.ROOT_DIR}}/../.bin"
+  GOJQ: "{{.BIN_DIR}}/gojq"
   
 tasks:
   default:
@@ -100,33 +102,33 @@ tasks:
         done
 
   query:
-    desc: "Query registry data with jq"
+    desc: "Query registry data with gojq (Go-based jq replacement)"
     cmds:
       - |
         echo "📋 Available queries:"
         echo "  Authentication endpoints:"
-        echo "    jq '.endpoints | to_entries | map(select(.value.category == \"authentication\"))' data/well-known-endpoints.json"
+        echo "    {{.GOJQ}} '.endpoints | to_entries | map(select(.value.category == \"authentication\"))' data/well-known-endpoints.json"
         echo ""
         echo "  Browser support for WebAuthn:"
-        echo "    jq '.endpoints.webauthn.browser_support' data/well-known-endpoints.json"
+        echo "    {{.GOJQ}} '.endpoints.webauthn.browser_support' data/well-known-endpoints.json"
         echo ""
         echo "  All official endpoints:"
-        echo "    jq '.endpoints | to_entries | map(select(.value.authority_level == \"official\"))' data/well-known-endpoints.json"
+        echo "    {{.GOJQ}} '.endpoints | to_entries | map(select(.value.authority_level == \"official\"))' data/well-known-endpoints.json"
 
   auth-endpoints:
     desc: "Show all authentication endpoints"
     cmds:
-      - jq '.endpoints | to_entries | map(select(.value.category == "authentication"))' data/well-known-endpoints.json
+      - "{{.GOJQ}} '.endpoints | to_entries | map(select(.value.category == \"authentication\"))' data/well-known-endpoints.json"
 
   official-endpoints:
     desc: "Show all official endpoints"
     cmds:
-      - jq '.endpoints | to_entries | map(select(.value.authority_level == "official"))' data/well-known-endpoints.json
+      - "{{.GOJQ}} '.endpoints | to_entries | map(select(.value.authority_level == \"official\"))' data/well-known-endpoints.json"
 
   browser-support:
     desc: "Show browser support matrix"
     cmds:
-      - jq '.browser_support' data/well-known-endpoints.json
+      - "{{.GOJQ}} '.browser_support' data/well-known-endpoints.json"
 
   install:
     desc: "Install the tool globally"

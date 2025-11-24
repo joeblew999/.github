@@ -1,0 +1,332 @@
+version: '3'
+
+vars:
+  # Cross-platform temp directory handling
+  TMPDIR_JJ:
+    sh: |
+      if command -v mktemp >/dev/null 2>&1; then
+        mktemp -d
+      else
+        echo "${TMPDIR:-/tmp}/jj-install-$$"
+      fi
+  TMPDIR_JJUI:
+    sh: |
+      if command -v mktemp >/dev/null 2>&1; then
+        mktemp -d
+      else
+        echo "${TMPDIR:-/tmp}/jjui-install-$$"
+      fi
+  
+  # Cross-platform binary handling
+  BIN_DIR: "{{.ROOT_DIR}}/.bin"
+  GOBIN: "{{.BIN_DIR}}"
+  # Platform-specific binary suffix (Windows .exe support)
+  BIN_SUFFIX: '{{if eq OS "windows"}}.exe{{end}}'
+  
+  # Auto-detect latest versions using gh CLI with Go CLI tools
+  JJ_VERSION:
+    sh: gh release view --repo jj-vcs/jj --json tagName -q .tagName
+  JJ_VERSION_NO_V:
+    sh: gh release view --repo jj-vcs/jj --json tagName -q '.tagName | ltrimstr("v")'
+  JJUI_VERSION:
+    sh: gh release view --repo idursun/jjui --json tagName -q .tagName
+  JJUI_VERSION_NO_V:
+    sh: gh release view --repo idursun/jjui --json tagName -q '.tagName | ltrimstr("v")'
+  
+  # Cross-platform architecture mapping for jj (uses different naming convention)
+  JJ_ARCH:
+    sh: |
+      case "{{ARCH}}" in
+        amd64) echo "x86_64" ;;
+        arm64) echo "aarch64" ;;
+        *) echo "{{ARCH}}" ;;
+      esac
+  
+  # Cross-platform OS mapping for jj releases
+  JJ_OS:
+    sh: |
+      case "{{OS}}" in
+        darwin) echo "apple-darwin" ;;
+        linux) echo "unknown-linux-gnu" ;;
+        windows) echo "pc-windows-msvc" ;;
+        *) echo "{{OS}}" ;;
+      esac
+  
+  # jjui uses standard OS/ARCH naming
+  JJUI_ARCH: "{{ARCH}}"
+  JJUI_OS: "{{OS}}"
+  
+  # Go CLI tool commands (using gojq for JSON processing and version checks)
+  GOJQ: "{{.BIN_DIR}}/gojq{{.BIN_SUFFIX}}"
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  setup-tools:
+    desc: Install required Go CLI tools for cross-platform scripting
+    cmds:
+      - echo "📦 Installing Go CLI tools for cross-platform compatibility..."
+      - mkdir -p {{.BIN_DIR}}
+      - echo "Installing gojq (jq replacement)..."
+      - GOBIN={{.BIN_DIR}} go install github.com/itchyny/gojq/cmd/gojq@latest
+      - echo "Installing yq (YAML/JSON processor)..."
+      - GOBIN={{.BIN_DIR}} go install github.com/mikefarah/yq/v4@latest
+      - echo "Installing dasel (multi-format data selector)..."
+      - GOBIN={{.BIN_DIR}} go install github.com/tomwright/dasel/cmd/dasel@latest
+      - echo "✅ Go CLI tools installed successfully:"
+      - "{{.GOJQ}} --version || echo 'gojq: install failed'"
+      - "{{.BIN_DIR}}/yq --version || echo 'yq: install failed'"
+      - "{{.BIN_DIR}}/dasel --version || echo 'dasel: install failed'"
+
+  install:
+    desc: Install both jj and jjui binaries
+    deps: [setup-tools, install-jj, install-jjui]
+
+  install-jj:
+    desc: Install jj binary from GitHub releases
+    status:
+      - test -f {{.BIN_DIR}}/jj{{.BIN_SUFFIX}}
+      - '{{.BIN_DIR}}/jj{{.BIN_SUFFIX}} --version | {{.GOJQ}} -Rs "split(\"\n\")[0] | contains(\"{{.JJ_VERSION_NO_V}}\")"'
+    cmds:
+      - echo "Installing jj {{.JJ_VERSION}} for {{.JJ_ARCH}}-{{.JJ_OS}} ({{OS}}/{{ARCH}})"
+      - |
+        TMPDIR_JJ="{{.TMPDIR_JJ}}"
+        mkdir -p "$TMPDIR_JJ" {{.BIN_DIR}}
+        
+        # Download appropriate release for platform
+        echo "📦 Downloading jj {{.JJ_VERSION}} for {{.JJ_ARCH}}-{{.JJ_OS}}..."
+        gh release download {{.JJ_VERSION}} --repo jj-vcs/jj --pattern "*{{.JJ_ARCH}}-{{.JJ_OS}}*" --dir "$TMPDIR_JJ" || (echo "❌ Download failed" && exit 1)
+        
+        # Cross-platform extraction
+        cd "$TMPDIR_JJ"
+        if [ "{{OS}}" = "windows" ]; then
+          # Windows: extract zip files
+          if command -v unzip >/dev/null 2>&1; then
+            unzip -q jj-{{.JJ_VERSION}}-{{.JJ_ARCH}}-{{.JJ_OS}}.zip || (echo "❌ Extract failed" && exit 1)
+          else
+            echo "❌ unzip command not found (required for Windows)"
+            exit 1
+          fi
+          # Windows executable has .exe extension
+          mv jj.exe "{{.BIN_DIR}}/jj.exe"
+        else
+          # Unix-like: extract tar.gz files
+          tar -xzf jj-{{.JJ_VERSION}}-{{.JJ_ARCH}}-{{.JJ_OS}}.tar.gz || (echo "❌ Extract failed" && exit 1)
+          # Set executable permissions (Unix-like only)
+          chmod +x jj
+          mv jj "{{.BIN_DIR}}/jj"
+        fi
+        
+        # Cleanup
+        rm -rf "$TMPDIR_JJ"
+        echo "✅ jj installation complete:"
+      - "{{.BIN_DIR}}/jj{{.BIN_SUFFIX}} --version"
+
+  install-jjui:
+    desc: Install jjui binary from GitHub releases
+    status:
+      - test -f {{.BIN_DIR}}/jjui{{.BIN_SUFFIX}}
+      - '{{.BIN_DIR}}/jjui{{.BIN_SUFFIX}} --version | {{.GOJQ}} -Rs "contains(\"{{.JJUI_VERSION_NO_V}}\")"'
+    cmds:
+      - echo "Installing jjui {{.JJUI_VERSION}} for {{.JJUI_OS}}-{{.JJUI_ARCH}} ({{OS}}/{{ARCH}})"
+      - |
+        TMPDIR_JJUI="{{.TMPDIR_JJUI}}"
+        mkdir -p "$TMPDIR_JJUI" {{.BIN_DIR}}
+        
+        # Download appropriate release for platform
+        echo "📦 Downloading jjui {{.JJUI_VERSION}} for {{.JJUI_OS}}-{{.JJUI_ARCH}}..."
+        gh release download {{.JJUI_VERSION}} --repo idursun/jjui --pattern "*{{.JJUI_OS}}-{{.JJUI_ARCH}}*" --dir "$TMPDIR_JJUI" || (echo "❌ Download failed" && exit 1)
+        
+        # Cross-platform extraction (jjui typically uses zip on all platforms)
+        cd "$TMPDIR_JJUI"
+        if command -v unzip >/dev/null 2>&1; then
+          unzip -q jjui-{{.JJUI_VERSION_NO_V}}-{{.JJUI_OS}}-{{.JJUI_ARCH}}.zip || (echo "❌ Extract failed" && exit 1)
+        else
+          echo "❌ unzip command not found (required for jjui)"
+          exit 1
+        fi
+        
+        # Move binary with appropriate extension
+        if [ "{{OS}}" = "windows" ]; then
+          mv jjui-{{.JJUI_VERSION_NO_V}}-{{.JJUI_OS}}-{{.JJUI_ARCH}}.exe "{{.BIN_DIR}}/jjui.exe"
+        else
+          chmod +x jjui-{{.JJUI_VERSION_NO_V}}-{{.JJUI_OS}}-{{.JJUI_ARCH}}
+          mv jjui-{{.JJUI_VERSION_NO_V}}-{{.JJUI_OS}}-{{.JJUI_ARCH}} "{{.BIN_DIR}}/jjui"
+        fi
+        
+        # Cleanup
+        rm -rf "$TMPDIR_JJUI"
+        echo "✅ jjui installation complete:"
+      - "{{.BIN_DIR}}/jjui{{.BIN_SUFFIX}} --version"
+
+  clean:
+    desc: Remove installed binaries
+    cmds:
+      - rm -f {{.BIN_DIR}}/jj{{.BIN_SUFFIX}} {{.BIN_DIR}}/jjui{{.BIN_SUFFIX}}
+
+  which:
+    desc: Show paths to installed binaries
+    cmds:
+      - |
+        echo "🔍 Checking for jj/jjui binaries in {{.BIN_DIR}}:"
+        if [ -f "{{.BIN_DIR}}/jj{{.BIN_SUFFIX}}" ]; then
+          echo "✅ jj: {{.BIN_DIR}}/jj{{.BIN_SUFFIX}}"
+        else
+          echo "❌ jj: not found"
+        fi
+        if [ -f "{{.BIN_DIR}}/jjui{{.BIN_SUFFIX}}" ]; then
+          echo "✅ jjui: {{.BIN_DIR}}/jjui{{.BIN_SUFFIX}}"
+        else
+          echo "❌ jjui: not found"
+        fi
+
+  version:
+    desc: Show versions of installed binaries and available updates
+    cmds:
+      - |
+        echo "=== Current Versions ==="
+        if [ -f "{{.BIN_DIR}}/jj{{.BIN_SUFFIX}}" ]; then
+          echo -n "jj: "
+          {{.BIN_DIR}}/jj{{.BIN_SUFFIX}} --version
+        else
+          echo "jj: not installed"
+        fi
+        if [ -f "{{.BIN_DIR}}/jjui{{.BIN_SUFFIX}}" ]; then
+          echo -n "jjui: "
+          {{.BIN_DIR}}/jjui{{.BIN_SUFFIX}} --version
+        else
+          echo "jjui: not installed"
+        fi
+        echo ""
+        echo "=== Latest Available ==="
+        echo "jj: {{.JJ_VERSION}} ({{.JJ_ARCH}}-{{.JJ_OS}})"
+        echo "jjui: {{.JJUI_VERSION}} ({{.JJUI_OS}}-{{.JJUI_ARCH}})"
+        echo ""
+        echo "=== Platform Info ==="
+        echo "Detected OS: {{OS}} / Architecture: {{ARCH}}"
+        echo "jj mapping: {{.JJ_ARCH}}-{{.JJ_OS}}"
+        echo "jjui mapping: {{.JJUI_OS}}-{{.JJUI_ARCH}}"
+
+  update:
+    desc: Force update to latest versions (removes and reinstalls)
+    cmds:
+      - task: clean
+      - task: install
+
+  check-deps:
+    desc: Check if required dependencies are available
+    cmds:
+      - |
+        echo "🔍 Checking dependencies for {{OS}}/{{ARCH}}..."
+        missing_deps=0
+        
+        # Check GitHub CLI
+        if ! command -v gh >/dev/null 2>&1; then
+          echo "❌ GitHub CLI (gh) is required but not found"
+          case "{{OS}}" in
+            darwin) echo "   Install with: brew install gh" ;;
+            linux) echo "   Install with: sudo apt install gh  # or your package manager" ;;
+            windows) echo "   Install with: choco install gh  # or scoop install gh" ;;
+          esac
+          missing_deps=1
+        else
+          echo "✅ GitHub CLI: $(gh --version | head -n1)"
+        fi
+        
+        # Check Task
+        if ! command -v task >/dev/null 2>&1; then
+          echo "❌ Task is required but not found"
+          case "{{OS}}" in
+            darwin) echo "   Install with: brew install go-task/tap/go-task" ;;
+            linux) echo "   Install with: sudo snap install task --classic" ;;
+            windows) echo "   Install with: choco install go-task" ;;
+          esac
+          missing_deps=1
+        else
+          echo "✅ Task: $(task --version)"
+        fi
+        
+        # Check Go
+        if ! command -v go >/dev/null 2>&1; then
+          echo "❌ Go is required but not found"
+          case "{{OS}}" in
+            darwin) echo "   Install with: brew install go" ;;
+            linux) echo "   Install with: sudo apt install golang-go  # or download from https://golang.org" ;;
+            windows) echo "   Install with: choco install golang" ;;
+          esac
+          missing_deps=1
+        else
+          echo "✅ Go: $(go version | cut -d' ' -f3)"
+        fi
+        
+        # Check unzip (needed for jjui on all platforms)
+        if ! command -v unzip >/dev/null 2>&1; then
+          echo "❌ unzip is required but not found"
+          case "{{OS}}" in
+            darwin) echo "   Usually pre-installed. Try: xcode-select --install" ;;
+            linux) echo "   Install with: sudo apt install unzip" ;;
+            windows) echo "   Usually available. If not, install Git for Windows or use WSL" ;;
+          esac
+          missing_deps=1
+        else
+          echo "✅ unzip: available"
+        fi
+        
+        if [ $missing_deps -eq 1 ]; then
+          echo ""
+          echo "❌ Please install missing dependencies before continuing"
+          exit 1
+        fi
+        
+        echo "✅ All dependencies available for {{OS}}/{{ARCH}}"
+
+  tools-check:
+    desc: Check if Go CLI tools are installed and working
+    cmds:
+      - |
+        echo "Checking Go CLI tools..."
+        tools_missing=0
+        
+        if [ ! -f "{{.GOJQ}}" ]; then
+          echo "❌ gojq not found at {{.GOJQ}}"
+          tools_missing=1
+        else
+          echo "✅ gojq: $({{.GOJQ}} --version)"
+        fi
+        
+        if [ ! -f "{{.BIN_DIR}}/yq" ]; then
+          echo "❌ yq not found at {{.BIN_DIR}}/yq"
+          tools_missing=1
+        else
+          echo "✅ yq: $({{.BIN_DIR}}/yq --version)"
+        fi
+        
+        if [ ! -f "{{.BIN_DIR}}/dasel" ]; then
+          echo "❌ dasel not found at {{.BIN_DIR}}/dasel"
+          tools_missing=1
+        else
+          echo "✅ dasel: $({{.BIN_DIR}}/dasel --version)"
+        fi
+        
+        if [ $tools_missing -eq 1 ]; then
+          echo ""
+          echo "🔧 Install missing tools with: task setup-tools"
+          exit 1
+        fi
+        
+        echo "All Go CLI tools are installed and working ✓"
+
+  init:
+    desc: Initialize jj repository
+    deps: [install]
+    cmds:
+      - "{{.BIN_DIR}}/jj git init"
+
+  status:
+    desc: Show repository status with jjui
+    deps: [install]
+    cmds:
+      - "{{.BIN_DIR}}/jjui"

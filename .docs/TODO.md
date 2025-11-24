@@ -22,6 +22,10 @@ cd logging && task -t Taskfile.nats.yml dev-parallel
 
 # Manual terminal mode
 cd logging && task -t Taskfile.nats.yml dev
+
+# Install/manage jj and jjui (see jj-readme.md for details)
+task -t jj-taskfile.yml install       # Install both binaries
+task -t jj-taskfile.yml version       # Show current and available versions
 ```
 
 ---
@@ -31,7 +35,8 @@ cd logging && task -t Taskfile.nats.yml dev
 ### Taskfile Cleanup (Low Priority)
 - [ ] **Review Taskfile overlaps** - Ensure each taskfile is truly independent
 - [ ] **Consistent naming** - Standardize task names across all taskfiles
-- [ ] **Remove cross-dependencies** - Confirm no taskfile references another
+- [ ] **Propagate Go CLI tools** - Apply Go CLI tool patterns to other taskfiles (main Taskfile.yml, logging/Taskfile.yml)
+- [ ] **Remove remaining non-Go tools** - Replace any remaining grep/head/tail/cut/awk usage with Go alternatives
 
 ### Organization Config Registry (Future Feature)
 - [ ] **Implement config/ directory structure** in repo root
@@ -62,11 +67,12 @@ cd logging && task -t Taskfile.nats.yml dev
 - Parallel and sequential execution modes
 
 **Key Files**:
-- `logging/Taskfile.nats.yml` - Main orchestration
+- `logging/Taskfile.nats.yml` - NATS/Playwright orchestration
 - `logging/nats-controller.js` - NATS command & control
 - `logging/lib/nats-reporter.js` - Custom Playwright reporter
 - `logging/playwright-nats.config.js` - Playwright config with NATS
 - `ORGANIZATION-CONFIG-REGISTRY.md` - Future pattern documentation
+- `jj-taskfile.yml` + `jj-readme.md` - Jujutsu tooling (complete, see jj-readme.md)
 
 **Next Steps When You Return**:
 1. Test the integration: `cd logging && task -t Taskfile.nats.yml validate`
@@ -83,5 +89,17 @@ cd logging && task -t Taskfile.nats.yml dev
 - Each taskfile should remain independent (no cross-references)
 - Focus on simplicity - the current integration follows KISS principles
 
-**Last Updated**: July 4, 2025
-**Integration Status**: ✅ Complete and Working
+**Last Updated**: July 5, 2025
+**Integration Status**: ✅ Complete and Working  
+**Cross-Platform Status**: ✅ Go CLI Tools Implemented
+
+---
+
+### Cross-Platform Go CLI Tools
+- [x] **Go CLI Tools Documentation** - Created `GO-CLI-TOOLS.md` with recommended tools and strategy
+- [x] **Setup Tools Task** - Added `setup-tools` task to install gojq, yq, dasel via `go install`
+- [x] **Replace jq with gojq** - Updated well-known-registry taskfile to use gojq instead of jq
+- [x] **Replace grep/head/cut** - Updated jj-taskfile.yml to use gojq for version checking and string manipulation
+- [x] **Main Taskfile Updates** - Added Go CLI tool variables and replaced head/cut usage
+- [x] **Validation** - All Go CLI tools tested and working correctly
+- [x] **Standards Applied** - OS-agnostic scripting using only Go CLI tools
