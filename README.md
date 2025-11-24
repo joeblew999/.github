@@ -16,6 +16,8 @@ This is a **meta-repository** that manages GitHub configuration and workflows ac
 
 **The Solution:** This repository uses **template-based automation** to generate and maintain `.github` configurations across all organization repositories. Change a template once here, and it propagates everywhere automatically.
 
+**Inspired By:** This pattern was pioneered by [charmbracelet/.github](https://github.com/charmbracelet/.github), which established the use of a `.github` repository for organization-wide community health files. This repository extends that pattern with additional automation, template generation, and optional NATS-based orchestration for complex multi-repo workflows.
+
 ### What It Provides
 
 - **Template System** - Define workflows, issue templates, and GitHub configs once
