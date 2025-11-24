@@ -102,10 +102,12 @@ I collaborate with IT teams across the US, Europe, and Asia to build robust dist
 ## Blog & Updates
 
 📝 **Technical Blog**
-[ubuntusoftware.net/blog](https://www.ubuntusoftware.net/blog/) - Articles on distributed systems, Go, Rust, cloud architecture, and remote consulting
+[ubuntusoftware.net/blog](https://www.ubuntusoftware.net/blog/)
+
+Articles on distributed systems, Go, Rust, cloud architecture, and remote consulting
 
 🔔 **RSS Feed**
-[Subscribe via RSS](https://www.ubuntusoftware.net/blog/index.xml) - Stay updated with new posts
+[Subscribe via RSS](https://www.ubuntusoftware.net/blog/index.xml)
 
 ---
 
