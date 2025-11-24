@@ -20,6 +20,15 @@ Independent IT consultant with 25+ years of experience delivering remote project
 - WASM compute environments
 - Remote team leadership
 
+## Current Focus: Offline AI & Vision Systems
+Building next-generation **offline AI systems** and **2D/3D vision platforms** that operate independently of cloud infrastructure. This includes:
+- **Offline AI processing** - Running AI models locally for privacy, security, and reliability
+- **Computer vision systems** - 2D and 3D visual processing for industrial, medical, and consumer applications
+- **CAD and design tools** - Cross-platform CAD systems for engineering, architecture, manufacturing, and creative workflows
+- **Edge computing** - Bringing powerful compute capabilities to devices without internet dependency
+
+These technologies enable applications across manufacturing automation, medical imaging, autonomous systems, architectural design, quality control, robotics, and more - all running locally with full data sovereignty.
+
 ## Global Collaboration Network
 I collaborate with IT teams across the US, Europe, and Asia to build robust distributed systems. Through years of remote work, I've cultivated a network of trusted engineers and architects who complement each other's expertise. We regularly share knowledge, collaborate on complex projects, and support each other in delivering high-quality solutions to clients worldwide.
 
