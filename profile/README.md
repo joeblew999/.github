@@ -35,6 +35,15 @@ Building next-generation **offline AI systems** and **2D/3D vision platforms** t
 
 These technologies enable full lifecycle workflows across manufacturing automation, medical imaging, autonomous systems, architectural design, quality control, robotics, and digital twin deployments—all running locally with full data sovereignty. Currently partnering with organizations and companies to deploy production systems.
 
+## Partnership Opportunities
+We're actively developing strategic partnerships in two models:
+
+**Embedded Solutions** - Organizations embedding our offline AI, 3D CAD kernel, and digital twin technology into their products and platforms. Ideal for companies building industrial automation systems, IoT platforms, manufacturing software, or engineering tools who want to offer cutting-edge capabilities without cloud dependencies.
+
+**SaaS Deployments** - Organizations adopting our complete platform as-is for their teams and workflows. Perfect for manufacturers, design firms, engineering departments, and enterprises seeking turnkey offline-first solutions with full data sovereignty.
+
+Interested in exploring partnership opportunities? Reach out via the contact methods below.
+
 ## Global Collaboration Network
 I collaborate with IT teams across the US, Europe, and Asia to build robust distributed systems. Through years of remote work, I've cultivated a network of trusted engineers and architects who complement each other's expertise. We regularly share knowledge, collaborate on complex projects, and support each other in delivering high-quality solutions to clients worldwide.
 
