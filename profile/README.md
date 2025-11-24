@@ -105,7 +105,7 @@ These open source projects form the foundation for our commercial offline AI and
 
 ## Partnership Opportunities
 
-Actively developing strategic partnerships in two models:
+Actively seeking investors and developing strategic partnerships in two models:
 
 **Embedded Solutions**
 Organizations embedding our offline AI, 3D CAD kernel, and digital twin technology into their products and platforms. Self-sovereign architecture simplifies compliance (GDPR, HIPAA, SOC2) and reduces security risks by eliminating cloud dependencies. Ideal for companies building industrial automation systems, IoT platforms, manufacturing software, or engineering tools who want to offer cutting-edge capabilities without cloud dependencies.
@@ -113,7 +113,7 @@ Organizations embedding our offline AI, 3D CAD kernel, and digital twin technolo
 **SaaS Deployments**
 Organizations adopting our complete platform as-is for their teams and workflows. Offline-first design ensures data sovereignty and simplified compliance frameworks. Perfect for manufacturers, design firms, engineering departments, and enterprises seeking turnkey solutions with full control over their data.
 
-Interested in exploring partnership opportunities? Reach out via the contact methods below.
+Interested in investment or partnership opportunities? Reach out via the contact methods below.
 
 ---
 
