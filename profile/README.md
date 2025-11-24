@@ -14,7 +14,7 @@
 Independent IT consultant with 25+ years of experience delivering remote projects for international clients. Previously worked in Germany, Sweden, and the UK before establishing my Australian-based consulting practice. Currently working on cutting-edge distributed systems and cloud platforms.
 
 **Company:** [Ubuntu Software](https://www.ubuntusoftware.net) (Australia)
-Building open source infrastructure and commercial products to help organizations and teams with cross-platform development.
+Develops open source infrastructure and commercial products to help organizations and teams with cross-platform development.
 
 **Blog & Updates:**
 
@@ -51,7 +51,7 @@ Currently partnering with organizations and companies to deploy production syste
 ## Recent Projects
 
 🇺🇸 **US Client** (Jan-Mar 2025)
-Self-sovereign cloud platform using NATS Jetstream & WASM
+Self-sovereign cloud platform using NATS Jetstream & WASM - Enabling decentralized data ownership
 
 🇪🇺 **European Climate Foundation** (2020-2023)
 Remote team leadership across 4 countries
@@ -67,7 +67,7 @@ Write HTML/HTMX once, deploy everywhere: Web, iOS, Android, Desktop with instant
 Production-ready collaborative CRDT powered by Automerge (Rust), WASI, and wazero (Go)
 
 🔐 **[wellknown](https://github.com/joeblew999/wellknown)**
-Own your data, own your AI, own your routing—use Big Tech as enhancement services, not gatekeepers
+Decentralized identity and routing infrastructure - Own your data, own your AI, own your routing. Use Big Tech as enhancement services, not gatekeepers.
 
 ---
 
@@ -83,7 +83,7 @@ Own your data, own your AI, own your routing—use Big Tech as enhancement servi
 
 ## Partnership Opportunities
 
-We're actively developing strategic partnerships in two models:
+Actively developing strategic partnerships in two models:
 
 **Embedded Solutions**
 Organizations embedding our offline AI, 3D CAD kernel, and digital twin technology into their products and platforms. Ideal for companies building industrial automation systems, IoT platforms, manufacturing software, or engineering tools who want to offer cutting-edge capabilities without cloud dependencies.
@@ -103,7 +103,11 @@ I collaborate with IT teams across the US, Europe, and Asia to build robust dist
 
 ## Tech Stack
 
-`Golang` `NATS` `Jetstream` `WASM` `Kubernetes` `Docker` `HTMX` `Benthos`
+**Core:** `Golang` `Rust`
+**Messaging:** `NATS` `Jetstream`
+**Infrastructure:** `Kubernetes` `Docker`
+**Frontend:** `HTMX` `WebAssembly`
+**Streaming:** `Benthos`
 
 ---
 
