@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="400" height="30" viewBox="0 0 400 30">
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="24" viewBox="0 0 400 24">
   <style>
     .email-text {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
@@ -6,5 +6,5 @@
       fill: #ffffff;
     }
   </style>
-  <text x="0" y="20" class="email-text">gerard.webb@ubuntusoftware.net</text>
+  <text x="0" y="16" class="email-text">gerard.webb@ubuntusoftware.net</text>
 </svg>
