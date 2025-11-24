@@ -6,9 +6,11 @@
 
 ## About Me
 
+**Currently focusing on product development** - Building next-generation offline AI systems, 3D CAD kernel, and vision platforms. Open to select consulting engagements.
+
 Independent IT consultant with 25+ years of experience delivering remote projects for international clients. Previously worked in Germany, Sweden, and the UK, including serving as Security Architect for the European Union, before establishing my Australian-based consulting practice.
 
-Led teams of up to 70 developers on enterprise-scale projects for Fortune 500 companies and government organizations. Currently focusing on product development with cutting-edge distributed systems and cloud platforms, while remaining open to select consulting engagements.
+Led teams of up to 70 developers on enterprise-scale projects for Fortune 500 companies and government organizations.
 
 **Education:** Masters of Architecture, Deakin University
 
