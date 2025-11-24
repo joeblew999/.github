@@ -7,7 +7,7 @@
 ## About Me
 Independent IT consultant with 25+ years of experience delivering remote projects for international clients. Currently working on cutting-edge distributed systems and cloud platforms.
 
-🌐 **Company:** [Ubuntu Software](https://www.ubuntusoftware.net) - Building open source infrastructure and commercial products on top of these tools to help organizations and teams with cross-platform development
+🌐 **Company:** [Ubuntu Software](https://www.ubuntusoftware.net) - Building open source infrastructure and commercial products on top of these tools to help organizations and teams with cross-platform development. Visit the website for product information, tools, and blog updates.
 
 ## Recent Projects
 - 🇺🇸 **US Client** (Jan-Mar 2025): Self-sovereign cloud platform using NATS Jetstream & WASM
