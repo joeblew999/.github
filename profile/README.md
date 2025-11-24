@@ -14,8 +14,11 @@ Led teams of up to 70 developers on enterprise-scale projects for Fortune 500 co
 
 **Education:** Masters of Architecture, Deakin University
 
-**Company:** [Ubuntu Software](https://www.ubuntusoftware.net) (Australia)
-Develops open source infrastructure and commercial products to help organizations and teams with cross-platform development.
+**Company:**
+
+[![Ubuntu Software](https://raw.githubusercontent.com/joeblew999/.github/main/profile/images/ubuntu-software-logo.svg)](https://www.ubuntusoftware.net)
+
+[Ubuntu Software](https://www.ubuntusoftware.net) (Australia) - Develops open source infrastructure and commercial products to help organizations and teams with cross-platform development.
 
 **Blog & Updates:**
 
