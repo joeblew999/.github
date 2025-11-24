@@ -4,11 +4,6 @@
 
 ---
 
-🌏 Available for remote consulting worldwide
-🔧 Golang • NATS • Distributed Systems • Cloud Architecture
-
----
-
 ## About Me
 
 Independent IT consultant with 25+ years of experience delivering remote projects for international clients. Previously worked in Germany, Sweden, and the UK, including serving as Security Architect for European clients, before establishing my Australian-based consulting practice. Currently working on cutting-edge distributed systems and cloud platforms.
@@ -36,7 +31,7 @@ Building next-generation **offline AI systems** and **2D/3D vision platforms** t
 
 • **Computer Vision Systems** - 2D and 3D visual processing for industrial, medical, and consumer applications
 
-• **3D Solids CAD Kernel (Beta)** - Full parametric CAD system running completely offline with real-time synchronization. Runtime-extensible architecture enables custom workflows and integrations.
+• **3D Solids CAD Kernel (Beta)** - Full parametric CAD system running completely offline with real-time synchronization. Deploys embedded in client applications, on servers, or on embedded hardware for robotics and factory automation integration. Runtime-extensible architecture enables custom workflows and integrations.
 
 • **Digital Twin Integration** - Complete lifecycle system from virtual design to physical automation. Design in 3D, simulate behavior, then monitor and control real-world systems—bridging the gap between digital models and physical reality.
 
@@ -45,6 +40,16 @@ Building next-generation **offline AI systems** and **2D/3D vision platforms** t
 These technologies enable full lifecycle workflows across manufacturing automation, medical imaging, autonomous systems, architectural design, quality control, robotics, and digital twin deployments—all running locally with full data sovereignty.
 
 Currently partnering with organizations and companies to deploy production systems.
+
+---
+
+## Specializations
+
+• Distributed systems architecture
+• Real-time messaging (NATS, Jetstream)
+• Cloud-native platforms
+• WASM compute environments
+• Remote team leadership
 
 ---
 
@@ -72,16 +77,6 @@ Production-ready collaborative CRDT powered by Automerge (Rust), WASI, and wazer
 Decentralized identity and routing infrastructure - Own your data, own your AI, own your routing. Use Big Tech as enhancement services, not gatekeepers.
 
 These open source projects form the foundation for our commercial offline AI and vision systems.
-
----
-
-## Specializations
-
-• Distributed systems architecture
-• Real-time messaging (NATS, Jetstream)
-• Cloud-native platforms
-• WASM compute environments
-• Remote team leadership
 
 ---
 
@@ -127,5 +122,8 @@ I collaborate with IT teams across the US, Europe, and Asia to build robust dist
 [@joeblew999](https://github.com/joeblew999)
 
 ---
+
+🌏 Available for remote consulting worldwide
+🔧 Golang • NATS • Distributed Systems • Cloud Architecture
 
 *Remote consulting | All work with international clients | Available for distributed systems projects*
