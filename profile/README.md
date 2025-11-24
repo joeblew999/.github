@@ -14,7 +14,17 @@
 Independent IT consultant with 25+ years of experience delivering remote projects for international clients. Currently working on cutting-edge distributed systems and cloud platforms.
 
 **Company:** [Ubuntu Software](https://www.ubuntusoftware.net)
-Building open source infrastructure and commercial products to help organizations and teams with cross-platform development. Visit the website for product information, tools, and blog updates.
+Building open source infrastructure and commercial products to help organizations and teams with cross-platform development.
+
+**Blog & Updates:**
+
+📝 **Technical Blog**
+[ubuntusoftware.net/blog](https://www.ubuntusoftware.net/blog/)
+
+Articles on distributed systems, Go, Rust, cloud architecture, and remote consulting
+
+🔔 **RSS Feed**
+[Subscribe via RSS](https://www.ubuntusoftware.net/blog/index.xml)
 
 ---
 
@@ -96,18 +106,6 @@ I collaborate with IT teams across the US, Europe, and Asia to build robust dist
 ## Tech Stack
 
 `Golang` `NATS` `Jetstream` `WASM` `Kubernetes` `Docker` `HTMX` `Benthos`
-
----
-
-## Blog & Updates
-
-📝 **Technical Blog**
-[ubuntusoftware.net/blog](https://www.ubuntusoftware.net/blog/)
-
-Articles on distributed systems, Go, Rust, cloud architecture, and remote consulting
-
-🔔 **RSS Feed**
-[Subscribe via RSS](https://www.ubuntusoftware.net/blog/index.xml)
 
 ---
 
