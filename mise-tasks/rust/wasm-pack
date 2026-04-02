@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="compile Truck kernel to WASM via wasm-pack"
+set -euo pipefail
+CRATE=${1:-""}
+if [ -z "$CRATE" ]; then
+  echo "Usage: mise run rust:wasm-pack <crate-dir>"
+  exit 1
+fi
+cd "$CRATE"
+wasm-pack build --target web --out-dir pkg "$@"
