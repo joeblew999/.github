@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="deploy to Cloudflare Workers"
+set -euo pipefail
+wrangler deploy "$@"
