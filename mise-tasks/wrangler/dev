@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="wrangler local dev (multi-worker)"
+set -euo pipefail
+wrangler dev "$@"
