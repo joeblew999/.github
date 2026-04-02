@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="cargo build (all targets)"
+#MISE env = {RUST_BACKTRACE = "1"}
+set -euo pipefail
+cargo build --all-targets "$@"
