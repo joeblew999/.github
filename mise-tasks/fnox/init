@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#MISE description="bootstrap fnox for a fresh dev — sets up the keychain provider in ~/.config/fnox/config.toml (no age key, no plain-file secrets)"
+set -euo pipefail
+
+unset FNOX_AGE_KEY
+
+CONFIG_DIR="$HOME/.config/fnox"
+CONFIG="$CONFIG_DIR/config.toml"
+
+mkdir -p "$CONFIG_DIR"
+
+if [ ! -f "$CONFIG" ]; then
+  echo "→ writing fresh fnox config at $CONFIG"
+  cat > "$CONFIG" <<'EOF'
+# fnox global config — keychain-only.
+# All secrets are stored directly in the OS keychain (macOS Keychain,
+# Windows Credential Manager, or Linux secret-service). No age key, no
+# plaintext blobs in this file. Only the secret *names* live here.
+
+[providers.keychain]
+type = "keychain"
+service = "fnox"
+
+[secrets]
+# Add secrets via:
+#   fnox set --global -p keychain SECRET_NAME
+# Then read them via:
+#   fnox get SECRET_NAME
+EOF
+  echo "✓ wrote $CONFIG"
+else
+  if grep -qE '^\[providers\.keychain\]|^keychain[[:space:]]*=' "$CONFIG"; then
+    echo "✓ $CONFIG already has keychain provider — nothing to do"
+  else
+    echo "→ adding keychain provider to existing $CONFIG"
+    fnox provider add --global keychain keychain
+    echo "✓ keychain provider added"
+  fi
+fi
+
+echo
+echo "Next:"
+echo "  fnox set --global -p keychain MY_SECRET   # add a secret (reads stdin or prompts)"
+echo "  fnox list                                 # verify"
+echo "  mise run secrets:status                   # check fnox + GitHub state"
