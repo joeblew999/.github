@@ -3,9 +3,10 @@ name: mise-tasks lint
 on:
   push:
     branches: [main]
-    paths: ["mise-tasks/**", "mise.toml"]
+    paths: ["mise-tasks/**", "mise.toml", ".github/workflows/mise-tasks-lint.yml"]
   pull_request:
-    paths: ["mise-tasks/**", "mise.toml"]
+    paths: ["mise-tasks/**", "mise.toml", ".github/workflows/mise-tasks-lint.yml"]
+  workflow_dispatch:
 
 jobs:
   lint:
