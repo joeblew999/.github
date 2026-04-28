@@ -5,4 +5,6 @@ includes = ["mise-tasks"]
 "github:jdx/fnox" = "1.23"
 "aqua:cli/cli"    = "2"
 "aqua:jqlang/jq"  = "1"
-"cargo:usage-cli" = "latest"
+"cargo:usage-cli" = "3"
+# utm-dev Rust CLI — add once utm-dev is rewritten as a Rust binary:
+# "cargo:utm-dev" = "3"
