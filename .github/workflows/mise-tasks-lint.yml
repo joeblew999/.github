@@ -9,17 +9,26 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    name: lint (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
     steps:
       - uses: actions/checkout@v4
 
+      # mise is the SSOT for all tool versions — reads mise.toml
       - name: Install mise
         uses: jdx/mise-action@v2
 
       - name: Verify tasks load
+        shell: bash
         run: mise tasks ls
 
       - name: Verify task scripts are executable and well-formed
+        shell: bash
         run: |
           fail=0
           while IFS= read -r f; do
@@ -40,8 +49,9 @@ jobs:
           exit "$fail"
 
       - name: Check for Tera-breaking syntax
+        shell: bash
         run: |
-          if grep -rn '\${#' mise-tasks/ --include='*' 2>/dev/null | grep -v README; then
+          if grep -rn '\${#' mise-tasks/ 2>/dev/null | grep -v README; then
             echo "✗ found \${# syntax — Tera template engine treats {# as a comment block opener"
             echo "  Use wc -c / wc -l / printf instead of \${#VAR} / \${#ARRAY[@]}"
             exit 1
