@@ -37,7 +37,10 @@ mise tasks ls         # verify tasks loaded
 | `rust:wasm-pack` | Compile Truck kernel to WASM via wasm-pack |
 | `wrangler:dev` | Local dev (multi-worker) |
 | `wrangler:deploy` | Deploy to Cloudflare Workers |
+| `wrangler:tail` | Tail live logs from a deployed Worker — `ENV=staging` to switch env |
+| `wrangler:secret-list` | List secrets set on a deployed Worker (values hidden) |
 | `cf:d1-migrate` | Run D1 migrations |
+| `cf:token-check` | Verify `CLOUDFLARE_API_TOKEN` is valid — reads from env or fnox |
 
 ### Secrets / fnox
 
@@ -65,8 +68,8 @@ includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.2
 FNOX_SYNC_KEYS = "CLOUDFLARE_API_TOKEN,GITHUB_TOKEN,TAURI_SIGNING_PRIVATE_KEY"
 ```
 
-The shared task auto-detects the current repo via `gh repo view --json nameWithOwner`,
-so the same task body works for all consumers.
+The shared task auto-detects the current repo via `git remote get-url origin`,
+so the same task body works for all consumers including forks.
 
 ## Adding a new task
 

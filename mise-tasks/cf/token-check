@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#MISE description="verify CLOUDFLARE_API_TOKEN is valid — reads from env or fnox"
+set -euo pipefail
+
+unset FNOX_AGE_KEY
+
+export CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(fnox get CLOUDFLARE_API_TOKEN 2>/dev/null || true)}"
+[ -n "$CLOUDFLARE_API_TOKEN" ] || { echo "✗ CLOUDFLARE_API_TOKEN not set and not in fnox"; exit 1; }
+
+RESULT=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  "https://api.cloudflare.com/client/v4/user/tokens/verify")
+
+SUCCESS=$(printf '%s' "$RESULT" | grep -o '"success":[^,}]*' | head -1 | grep -o 'true\|false')
+
+if [ "$SUCCESS" = "true" ]; then
+  STATUS=$(printf '%s' "$RESULT" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
+  TOKEN_ID=$(printf '%s' "$RESULT" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+  echo "✓ token valid (id=$TOKEN_ID status=$STATUS)"
+else
+  echo "✗ token invalid or expired"
+  printf '%s\n' "$RESULT"
+  exit 1
+fi

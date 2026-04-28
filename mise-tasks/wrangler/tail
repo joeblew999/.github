@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="tail live logs from a deployed Worker — ENV=staging mise run wrangler:tail"
+set -euo pipefail
+
+ENV="${ENV:-production}"
+exec wrangler tail --env "$ENV" "$@"
