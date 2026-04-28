@@ -56,6 +56,9 @@ Thumbs.db
 # (this is our main output)
 !/.github/
 
+# mise local overrides (per-machine, gitignored by convention)
+.mise.local.toml
+
 # But ignore any temporary test directories
 /test-output/
 /temp-*/

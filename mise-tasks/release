@@ -6,7 +6,12 @@ TAG="${1:?usage: mise run release -- vX.Y.Z}"
 
 [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "✗ tag must be vX.Y.Z (e.g. v0.3.0)"; exit 1; }
 
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+[ "$BRANCH" = "main" ] || { echo "✗ not on main (currently on $BRANCH) — switch to main first"; exit 1; }
+
 git diff --quiet && git diff --cached --quiet || { echo "✗ working tree is dirty — commit first"; exit 1; }
+
+git tag -l "$TAG" | grep -q . && { echo "✗ tag $TAG already exists"; exit 1; }
 
 git tag "$TAG"
 git push origin "$TAG"

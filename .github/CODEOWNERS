@@ -10,10 +10,11 @@ go.sum @joeblew999
 *.md @joeblew999
 docs/ @joeblew999
 
+# Shared mise task library — changes here affect all consuming repos
+mise-tasks/ @joeblew999
+
 # CI/CD
 .github/ @joeblew999
-Taskfile.yml @joeblew999
-Dockerfile @joeblew999
 
 # Configuration files
 *.yml @joeblew999

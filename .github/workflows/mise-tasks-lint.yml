@@ -19,7 +19,7 @@ jobs:
       - name: Verify tasks load
         run: mise tasks ls
 
-      - name: Verify task scripts are executable
+      - name: Verify task scripts are executable and well-formed
         run: |
           fail=0
           while IFS= read -r f; do
@@ -27,6 +27,23 @@ jobs:
               echo "✗ not executable: $f"
               fail=1
             fi
+            if ! head -1 "$f" | grep -q '^#!/usr/bin/env bash'; then
+              echo "✗ missing shebang: $f"
+              fail=1
+            fi
+            if ! grep -q '^#MISE description=' "$f"; then
+              echo "✗ missing #MISE description= header: $f"
+              fail=1
+            fi
           done < <(find mise-tasks -type f ! -name "README.md")
-          [ "$fail" -eq 0 ] && echo "✓ all task files are executable"
+          [ "$fail" -eq 0 ] && echo "✓ all task files are executable and well-formed"
           exit "$fail"
+
+      - name: Check for Tera-breaking syntax
+        run: |
+          if grep -rn '\${#' mise-tasks/ --include='*' 2>/dev/null | grep -v README; then
+            echo "✗ found \${# syntax — Tera template engine treats {# as a comment block opener"
+            echo "  Use wc -c / wc -l / printf instead of \${#VAR} / \${#ARRAY[@]}"
+            exit 1
+          fi
+          echo "✓ no Tera-breaking syntax found"

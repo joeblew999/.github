@@ -22,6 +22,12 @@ mise tasks ls         # verify tasks loaded
 
 ## Available Tasks
 
+### Release
+
+| Task | Description |
+|------|-------------|
+| `release` | Tag and push a new semver release — `mise run release -- v0.3.0` |
+
 ### Build / dev / deploy
 
 | Task | Description |
