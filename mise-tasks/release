@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+#MISE description="tag and push a new release — usage: mise run release -- v0.3.0"
+set -euo pipefail
+
+TAG="${1:?usage: mise run release -- vX.Y.Z}"
+
+[[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "✗ tag must be vX.Y.Z (e.g. v0.3.0)"; exit 1; }
+
+git diff --quiet && git diff --cached --quiet || { echo "✗ working tree is dirty — commit first"; exit 1; }
+
+git tag "$TAG"
+git push origin "$TAG"
+
+echo "✓ tagged $TAG and pushed"
+echo
+echo "Consuming repos: bump ?ref=$TAG in their mise.toml, then:"
+echo "  mise cache clear && mise tasks ls"

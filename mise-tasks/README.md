@@ -62,12 +62,38 @@ FNOX_SYNC_KEYS = "CLOUDFLARE_API_TOKEN,GITHUB_TOKEN,TAURI_SIGNING_PRIVATE_KEY"
 The shared task auto-detects the current repo via `gh repo view --json nameWithOwner`,
 so the same task body works for all consumers.
 
+## Adding a new task
+
+1. Create `mise-tasks/<namespace>/<task-name>` with a shebang + MISE description header:
+   ```bash
+   #!/usr/bin/env bash
+   #MISE description="one-line description"
+   set -euo pipefail
+   ```
+2. `chmod +x mise-tasks/<namespace>/<task-name>` — mise silently skips non-executable files
+3. Test: `mise tasks ls` from this repo (the root `mise.toml` includes `mise-tasks/` directly)
+4. Update the task table above
+5. Release: `mise run release -- vX.Y.Z`
+
+### Gotcha: no `${#array[@]}` in task scripts
+
+mise pre-processes scripts with the Tera template engine. `{#` opens a Tera comment block,
+swallowing everything until `#}`. Use `wc -l` or `IFS=',' read -ra ARR` instead.
+
+## Releasing
+
+```bash
+mise run release -- v0.3.0
+```
+
+Then in consuming repos: bump `?ref=v0.3.0` and run `mise cache clear`.
+
 ## Pinning
 
 Always pin to a tag in production:
 
 ```toml
-"git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.1.0"
+"git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.2.0"
 ```
 
 Use `ref=main` on local dev only. Bump the tag intentionally when tasks change.
@@ -77,5 +103,3 @@ Use `ref=main` on local dev only. Bump the tag intentionally when tasks change.
 ```bash
 mise cache clear   # force re-fetch after bumping ref
 ```
-
-Set `MISE_TASK_REMOTE_NO_CACHE=true` to always fetch latest (slow, CI use only).
