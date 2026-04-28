@@ -1,0 +1,32 @@
+name: mise-tasks lint
+
+on:
+  push:
+    branches: [main]
+    paths: ["mise-tasks/**", "mise.toml"]
+  pull_request:
+    paths: ["mise-tasks/**", "mise.toml"]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+
+      - name: Verify tasks load
+        run: mise tasks ls
+
+      - name: Verify task scripts are executable
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            if [ ! -x "$f" ]; then
+              echo "✗ not executable: $f"
+              fail=1
+            fi
+          done < <(find mise-tasks -type f ! -name "README.md")
+          [ "$fail" -eq 0 ] && echo "✓ all task files are executable"
+          exit "$fail"
