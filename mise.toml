@@ -5,3 +5,4 @@ includes = ["mise-tasks"]
 "github:jdx/fnox" = "1.23"
 "aqua:cli/cli"    = "2"
 "aqua:jqlang/jq"  = "1"
+"cargo:usage-cli" = "latest"

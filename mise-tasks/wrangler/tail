@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-#MISE description="tail live logs from a deployed Worker — ENV=staging mise run wrangler:tail"
+#MISE description="tail live logs from a deployed Worker"
+#USAGE flag "--env <env>" help="Cloudflare environment to tail" env="ENV" default="production"
 set -euo pipefail
 
-ENV="${ENV:-production}"
+ENV="${usage_env:-${ENV:-production}}"
 exec wrangler tail --env "$ENV" "$@"

@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-#MISE description="compile Truck kernel to WASM via wasm-pack"
+#MISE description="compile a Rust crate to WASM via wasm-pack"
+#USAGE arg "<crate-dir>" help="path to the crate directory to compile"
 set -euo pipefail
-CRATE=${1:-""}
-if [ -z "$CRATE" ]; then
-  echo "Usage: mise run rust:wasm-pack <crate-dir>"
-  exit 1
-fi
+CRATE="${usage_crate_dir:-${1:-""}}"
+[ -n "$CRATE" ] || { echo "✗ usage: mise run rust:wasm-pack <crate-dir>"; exit 1; }
 cd "$CRATE" || { echo "✗ directory not found: $CRATE"; exit 1; }
+shift 1 2>/dev/null || true
 wasm-pack build --target web --out-dir pkg "$@"
