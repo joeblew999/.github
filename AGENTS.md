@@ -77,15 +77,31 @@ mise tasks ls   # verify
 
 ## Consuming repo wiring (copy-paste)
 
+**CI/CD only** (Cloudflare Workers, secrets, Rust/WASM):
 ```toml
 [task_config]
-includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.2.0"]
+includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.3.0"]
 
 [env]
 FNOX_SYNC_KEYS = "CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID,..."
 ```
 
+**CI/CD + cross-platform local builds** (Tauri apps — adds Windows 11 / Linux VMs via utm-dev):
+```toml
+[task_config]
+includes = [
+  "git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.3.0",
+  "git::https://github.com/joeblew999/utm-dev.git//.mise/tasks?ref=v2.1.0",
+]
+
+[env]
+FNOX_SYNC_KEYS = "CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID,TAURI_SIGNING_PRIVATE_KEY"
+```
+
 Each repo pins its own ref and bumps deliberately — no forced upgrades.
+
+mise does **not** chain `git::` includes, so both libraries must be listed explicitly. utm-dev tasks
+are TypeScript/Bun; `.github` tasks are bash — they coexist cleanly under separate namespaces.
 
 ## Secrets model
 

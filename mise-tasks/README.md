@@ -9,7 +9,7 @@ Add to your project's `mise.toml`:
 ```toml
 [task_config]
 includes = [
-  "git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.2.0"
+  "git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.3.0"
 ]
 ```
 
@@ -19,6 +19,22 @@ Then run:
 mise install          # install tools
 mise tasks ls         # verify tasks loaded
 ```
+
+### With utm-dev (cross-platform builds — Windows / Linux VMs)
+
+For Tauri apps or anything that needs Windows 11 / Linux builds on Apple Silicon, include
+[utm-dev](https://github.com/joeblew999/utm-dev) alongside:
+
+```toml
+[task_config]
+includes = [
+  "git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.3.0",
+  "git::https://github.com/joeblew999/utm-dev.git//.mise/tasks?ref=v2.1.0",
+]
+```
+
+utm-dev adds `windows:build`, `linux:build`, `linux:dev`, `mac:dev`, `ios:sim`,
+`android:sim`, and more. mise does not chain `git::` includes, so both must be listed.
 
 ## Available Tasks
 
@@ -62,7 +78,7 @@ populates from a dev machine.
 ```toml
 # repo's mise.toml
 [task_config]
-includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.2.0"]
+includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.3.0"]
 
 [env]
 FNOX_SYNC_KEYS = "CLOUDFLARE_API_TOKEN,GITHUB_TOKEN,TAURI_SIGNING_PRIVATE_KEY"
@@ -102,7 +118,7 @@ Then in consuming repos: bump `?ref=v0.3.0` and run `mise cache clear`.
 Always pin to a tag in production:
 
 ```toml
-"git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.2.0"
+"git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.3.0"
 ```
 
 Use `ref=main` on local dev only. Bump the tag intentionally when tasks change.
