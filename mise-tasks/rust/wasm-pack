@@ -6,5 +6,5 @@ if [ -z "$CRATE" ]; then
   echo "Usage: mise run rust:wasm-pack <crate-dir>"
   exit 1
 fi
-cd "$CRATE"
+cd "$CRATE" || { echo "✗ directory not found: $CRATE"; exit 1; }
 wasm-pack build --target web --out-dir pkg "$@"
