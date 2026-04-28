@@ -21,7 +21,7 @@ jobs:
 
       # mise is the SSOT for all tool versions — reads mise.toml
       - name: Install mise
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@v4
 
       - name: Verify tasks load
         shell: bash
