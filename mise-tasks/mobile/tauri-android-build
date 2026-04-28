@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="tauri android build — release APK/AAB"
+set -euo pipefail
+${TAURI_CMD:-tauri} android build "$@"

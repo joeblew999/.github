@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#MISE description="tauri ios dev — hot-reload on connected device or simulator (macOS only)"
+set -euo pipefail
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "✗ iOS builds require macOS" >&2; exit 1
+fi
+${TAURI_CMD:-tauri} ios dev "$@"

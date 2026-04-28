@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+#MISE description="Assert Android toolchain: Java 17+, ANDROID_HOME, NDK. Run once per machine."
+set -euo pipefail
+
+# ── Java ───────────────────────────────────────────────────────────────────────
+if ! command -v java &>/dev/null; then
+  echo "✗ java not found — run: mise use java@temurin-17" >&2
+  exit 1
+fi
+JAVA_VER=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d. -f1)
+if [ "${JAVA_VER:-0}" -lt 17 ] 2>/dev/null; then
+  echo "✗ Java 17+ required, found: $(java -version 2>&1 | head -1)" >&2
+  exit 1
+fi
+echo "✓ Java ${JAVA_VER}"
+
+# ── ANDROID_HOME ───────────────────────────────────────────────────────────────
+if [ -z "${ANDROID_HOME:-}" ]; then
+  # Android Studio default locations
+  if [ -d "$HOME/Library/Android/sdk" ]; then
+    export ANDROID_HOME="$HOME/Library/Android/sdk"
+    echo "→ auto-detected ANDROID_HOME=$ANDROID_HOME (Android Studio default)"
+    echo "  Add to .mise.toml [env]: ANDROID_HOME = \"$ANDROID_HOME\""
+  elif [ -d "$HOME/Android/Sdk" ]; then
+    export ANDROID_HOME="$HOME/Android/Sdk"
+    echo "→ auto-detected ANDROID_HOME=$ANDROID_HOME"
+  else
+    echo "✗ ANDROID_HOME not set and no SDK found at default paths." >&2
+    echo "  Install Android Studio, or set ANDROID_HOME in .mise.toml [env]." >&2
+    exit 1
+  fi
+fi
+echo "✓ ANDROID_HOME=$ANDROID_HOME"
+
+# ── Android NDK ────────────────────────────────────────────────────────────────
+NDK_BASE="${ANDROID_HOME}/ndk"
+if [ -d "$NDK_BASE" ] && [ "$(ls -A "$NDK_BASE" 2>/dev/null)" ]; then
+  NDK_VER=$(ls "$NDK_BASE" | sort -V | tail -1)
+  echo "✓ NDK $NDK_VER ($NDK_BASE/$NDK_VER)"
+  export ANDROID_NDK_HOME="$NDK_BASE/$NDK_VER"
+else
+  SDKMGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+  if [ ! -x "$SDKMGR" ]; then
+    echo "✗ sdkmanager not found at $SDKMGR" >&2
+    echo "  Install 'Command-line tools' from Android Studio → SDK Manager → SDK Tools." >&2
+    exit 1
+  fi
+  echo "→ installing NDK 27 + platform 34 via sdkmanager..."
+  "$SDKMGR" --install "ndk;27.0.12077973" "platforms;android-34" "build-tools;34.0.0"
+  export ANDROID_NDK_HOME="${NDK_BASE}/27.0.12077973"
+  echo "✓ NDK installed: $ANDROID_NDK_HOME"
+fi
+
+# ── Rust Android targets ────────────────────────────────────────────────────────
+echo "→ adding Rust Android targets..."
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+
+echo ""
+echo "✓ Android toolchain ready."
+echo "  Next: mise run init:android   (first time only)"
+echo "        mise run dev:android    (requires device or emulator)"

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#MISE description="tauri ios build — release IPA (macOS only)"
+set -euo pipefail
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "✗ iOS builds require macOS" >&2; exit 1
+fi
+${TAURI_CMD:-tauri} ios build "$@"

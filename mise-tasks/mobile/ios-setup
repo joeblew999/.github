@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#MISE description="Assert iOS toolchain: macOS + Xcode CLI tools + CocoaPods. Run once per machine."
+set -euo pipefail
+
+# ── macOS only ─────────────────────────────────────────────────────────────────
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "✗ iOS builds require macOS (Xcode is macOS-only)" >&2
+  exit 1
+fi
+
+# ── Xcode CLI tools ────────────────────────────────────────────────────────────
+if ! xcode-select -p &>/dev/null; then
+  echo "✗ Xcode CLI tools not installed." >&2
+  echo "  Run: xcode-select --install" >&2
+  echo "  Or install Xcode from the App Store (includes CLI tools)." >&2
+  exit 1
+fi
+XCODE_PATH=$(xcode-select -p)
+echo "✓ Xcode: $XCODE_PATH"
+
+# Warn if pointing at CLI tools stub rather than full Xcode (required for iOS sim)
+if [[ "$XCODE_PATH" == *"CommandLineTools"* ]]; then
+  echo "⚠  CLI tools only — iOS simulator builds need full Xcode." >&2
+  echo "   Install Xcode from the App Store, then: sudo xcode-select -s /Applications/Xcode.app" >&2
+fi
+
+# ── CocoaPods ──────────────────────────────────────────────────────────────────
+if ! command -v pod &>/dev/null; then
+  echo "→ installing CocoaPods..."
+  gem install cocoapods
+fi
+POD_VER=$(pod --version)
+echo "✓ CocoaPods $POD_VER"
+
+# ── Rust iOS targets ───────────────────────────────────────────────────────────
+echo "→ adding Rust iOS targets..."
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+
+echo ""
+echo "✓ iOS toolchain ready."
+echo "  Next: mise run init:ios   (first time only)"
+echo "        mise run dev:ios    (requires connected device or simulator)"

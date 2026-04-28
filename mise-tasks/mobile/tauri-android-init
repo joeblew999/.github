@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="tauri android init — generate the Android project (run once per clone)"
+set -euo pipefail
+# Override TAURI_CMD in your repo's .mise.toml [env] if tauri is not on PATH.
+# e.g. TAURI_CMD = "pnpm --filter @my-app/desktop exec tauri"
+${TAURI_CMD:-tauri} android init "$@"
