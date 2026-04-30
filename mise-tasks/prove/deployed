@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+#MISE description="Smoke-test the deployed Worker — expect 302 to CF Access challenge with the AUD stored in fnox under APP_POLICY_AUD_FNOX_KEY."
+set -euo pipefail
+unset FNOX_AGE_KEY
+
+file=$(mise run -q env:resolve)
+set -a; . "$file"; set +a
+
+: "${WORKER_NAME:?WORKER_NAME not set in $file}"
+: "${CF_SUBDOMAIN:?CF_SUBDOMAIN not set in $file}"
+: "${APP_POLICY_AUD_FNOX_KEY:?APP_POLICY_AUD_FNOX_KEY not set in $file}"
+
+url="https://${WORKER_NAME}.${CF_SUBDOMAIN}.workers.dev"
+expected_aud=$(fnox get "$APP_POLICY_AUD_FNOX_KEY")
+
+echo "GET $url"
+hdrs=$(curl -sI "$url" | tr -d '\r')
+status=$(echo "$hdrs" | head -1)
+loc=$(echo "$hdrs" | awk '/^location:/ {print $2}')
+echo "  $status"
+echo "  location: ${loc:0:120}..."
+
+[[ "$status" =~ ^HTTP/[0-9.]+[[:space:]]+302 ]] \
+  || { echo "✗ expected 302, got: $status"; exit 1; }
+[[ "$loc" == *"/cdn-cgi/access/login/"* ]] \
+  || { echo "✗ location is not a CF Access challenge URL"; exit 1; }
+[[ "$loc" == *"kid=$expected_aud"* ]] \
+  || { echo "✗ challenge AUD does not match fnox:$APP_POLICY_AUD_FNOX_KEY"; exit 1; }
+echo "✓ CF Access is gating with the correct app AUD"

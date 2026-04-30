@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+#MISE description="Generate wrangler.toml from wrangler.toml.template + config/<env>.env via envsubst. Per-fork values are interpolated; the resulting wrangler.toml is gitignored."
+set -euo pipefail
+unset FNOX_AGE_KEY
+
+file=$(mise run -q env:resolve)
+set -a; . "$file"; set +a
+envsubst < wrangler.toml.template > wrangler.toml
+echo "wrote wrangler.toml from $file"

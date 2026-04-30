@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#MISE description="Verify the CF Access App for this Worker has at least one allow policy. Without one, login 403s after OAuth."
+set -euo pipefail
+unset FNOX_AGE_KEY
+
+# This task depends on cf:token-check (from this same shared library).
+# Forks that pin v0.6.0+ inherit both.
+
+file=$(mise run -q env:resolve)
+set -a; . "$file"; set +a
+
+: "${WORKER_NAME:?WORKER_NAME not set in $file}"
+: "${CF_SUBDOMAIN:?CF_SUBDOMAIN not set in $file}"
+
+TOKEN=$(fnox get CLOUDFLARE_API_TOKEN)
+ACCOUNT=$(fnox get CLOUDFLARE_ACCOUNT_ID)
+APP_DOMAIN="${WORKER_NAME}.${CF_SUBDOMAIN}.workers.dev"
+
+TMPD=$(mktemp -d); trap "rm -rf '$TMPD'" EXIT
+hdr=(-H "Authorization: Bearer $TOKEN")
+API="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT"
+
+curl -sS "${hdr[@]}" "$API/access/apps" -o "$TMPD/apps.json"
+APP_ID=$(jq -r --arg d "$APP_DOMAIN" '.result[] | select(.domain == $d) | .id' "$TMPD/apps.json" | head -1)
+[ -z "$APP_ID" ] && {
+  echo "✗ no Access App found for $APP_DOMAIN — run cf:access-setup first"
+  exit 1
+}
+
+curl -sS "${hdr[@]}" "$API/access/apps/$APP_ID/policies" -o "$TMPD/pol.json"
+allow_count=$(jq '[.result[] | select(.decision=="allow")] | length' "$TMPD/pol.json")
+[ "$allow_count" -lt 1 ] && {
+  echo "✗ Access App $APP_DOMAIN has no allow policy. Login would 403 after OAuth."
+  echo "  Re-run cf:access-setup with OPERATOR_EMAIL set in config/<env>.env."
+  exit 1
+}
+echo "✓ Access App $APP_DOMAIN has $allow_count allow policy/policies"
+jq -r '.result[] | "  - \(.name): \(.decision) [\(.include | map(keys[0]) | join(","))]"' "$TMPD/pol.json"

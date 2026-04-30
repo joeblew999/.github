@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#MISE description="Confirm the deployed Worker's bindings via wrangler --dry-run (no upload). Catches drift between wrangler.toml.template and the resources actually created."
+set -euo pipefail
+
+# Depends on wrangler:gen having been run so wrangler.toml exists; mise.toml
+# in the fork should declare `depends = ["wrangler:gen"]` if the bindings
+# are templated.
+
+echo "→ wrangler deploy --dry-run"
+wrangler deploy --dry-run --outdir build/dryrun 2>&1 \
+  | grep -E '^Binding|^Total Upload|env\.|^\s+env\.' \
+  | head -20
