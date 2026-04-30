@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+#MISE description="One-shot CF Access setup: ensure GitHub IdP + Access App for this Worker exist; write TEAM_DOMAIN + the per-app POLICY_AUD to fnox. Idempotent. Requires CLOUDFLARE_API_TOKEN with Access:Edit + Access:Organizations:Read + Account.Settings:Read."
+set -euo pipefail
+unset FNOX_AGE_KEY
+
+# ── Inputs ───────────────────────────────────────────────────────────────────
+file=$(mise run -q env:resolve)
+set -a; . "$file"; set +a
+
+# Required from config/<env>.env:
+#   WORKER_NAME                — the worker's name (also the URL prefix)
+#   CF_SUBDOMAIN               — workers.dev subdomain (operator's)
+#   APP_POLICY_AUD_FNOX_KEY    — name of the fnox key where the app's AUD is stashed
+#                                (e.g. D1_MANAGER_POLICY_AUD, KV_MANAGER_POLICY_AUD)
+#   OPERATOR_EMAIL  (optional) — comma-separated emails to allow via policy
+
+: "${WORKER_NAME:?WORKER_NAME not set in $file}"
+: "${CF_SUBDOMAIN:?CF_SUBDOMAIN not set in $file}"
+: "${APP_POLICY_AUD_FNOX_KEY:?APP_POLICY_AUD_FNOX_KEY not set in $file (e.g. D1_MANAGER_POLICY_AUD)}"
+
+TOKEN=$(fnox get CLOUDFLARE_API_TOKEN)
+ACCOUNT=$(fnox get CLOUDFLARE_ACCOUNT_ID)
+APP_DOMAIN="${WORKER_NAME}.${CF_SUBDOMAIN}.workers.dev"
+APP_NAME="${WORKER_NAME}"
+
+API="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT"
+hdr=(-H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json")
+
+# Responses go to a temp file — bash variable round-tripping corrupts the
+# raw \r in some app payloads (X.509 certs etc.) and jq fails to parse.
+TMPD=$(mktemp -d)
+trap "rm -rf '$TMPD'" EXIT
+
+api_get()  { curl -sS "${hdr[@]}" "$API$1" -o "$TMPD/r.json"; printf '%s' "$TMPD/r.json"; }
+api_post() { curl -sS -X POST "${hdr[@]}" -d "$2" "$API$1" -o "$TMPD/r.json"; printf '%s' "$TMPD/r.json"; }
+ok()       { jq -e '.success == true' "$1" >/dev/null 2>&1; }
+err_msg()  { jq -r '.errors[]?.message // empty' "$1"; }
+
+# ── Team Domain ──────────────────────────────────────────────────────────────
+echo "→ Checking Team Domain"
+f=$(api_get "/access/organizations")
+if ! ok "$f"; then echo "✗ access/organizations failed: $(err_msg "$f")"; exit 1; fi
+auth_domain=$(jq -r '.result.auth_domain' "$f")
+team_url="https://${auth_domain}"
+echo "  team_domain = $team_url"
+
+# ── Apps list ────────────────────────────────────────────────────────────────
+echo "→ Listing existing Access Apps"
+f=$(api_get "/access/apps")
+if ! ok "$f"; then echo "✗ apps list failed: $(err_msg "$f")"; exit 1; fi
+cp "$f" "$TMPD/apps.json"
+
+# ── IdP UUID: fnox cache → existing app → fail with help ─────────────────────
+echo "→ Resolving Identity Provider UUID"
+gh_idp_id=$(fnox get CF_ACCESS_GITHUB_IDP_ID 2>/dev/null || true)
+if [ -n "$gh_idp_id" ]; then
+  echo "  idp_id = $gh_idp_id  (from fnox cache)"
+else
+  gh_idp_id=$(jq -r '.result[].allowed_idps[]?' "$TMPD/apps.json" | head -1)
+  if [ -z "$gh_idp_id" ]; then
+    echo "✗ No existing Access App has an IdP set — can't infer the IdP UUID."
+    echo "  Create at least one app + IdP via dashboard once:"
+    echo "  https://one.dash.cloudflare.com/?to=/:account/access/authentication"
+    echo "  Then: fnox set --global -p keychain CF_ACCESS_GITHUB_IDP_ID <uuid>"
+    exit 1
+  fi
+  echo "  idp_id = $gh_idp_id  (inherited from an existing app — caching to fnox)"
+  fnox set --global -p keychain CF_ACCESS_GITHUB_IDP_ID <<< "$gh_idp_id"
+fi
+
+# ── App: find or create ──────────────────────────────────────────────────────
+echo "→ Looking for existing Access App for $APP_DOMAIN"
+app_aud=$(jq -r --arg d "$APP_DOMAIN" '.result[] | select(.domain == $d) | .aud' "$TMPD/apps.json" | head -1)
+if [ -z "$app_aud" ]; then
+  echo "→ Creating Access Application for $APP_DOMAIN"
+  body=$(jq -n \
+    --arg name "$APP_NAME" \
+    --arg domain "$APP_DOMAIN" \
+    --arg idp "$gh_idp_id" \
+    '{
+      name: $name,
+      domain: $domain,
+      type: "self_hosted",
+      session_duration: "24h",
+      auto_redirect_to_identity: true,
+      allowed_idps: [$idp]
+    }')
+  f=$(api_post "/access/apps" "$body")
+  if ! ok "$f"; then echo "✗ create app failed: $(err_msg "$f")"; exit 1; fi
+  app_id=$(jq -r '.result.id' "$f")
+  app_aud=$(jq -r '.result.aud' "$f")
+  echo "  created app id=$app_id aud=$app_aud"
+  app_id_for_policy="$app_id"
+else
+  echo "  found existing app aud=$app_aud"
+  app_id_for_policy=$(jq -r --arg d "$APP_DOMAIN" '.result[] | select(.domain == $d) | .id' "$TMPD/apps.json" | head -1)
+fi
+
+# ── Allow policy: idempotent per email ───────────────────────────────────────
+if [ -n "${OPERATOR_EMAIL:-}" ]; then
+  echo "→ Ensuring allow policy for $OPERATOR_EMAIL"
+  f=$(api_get "/access/apps/$app_id_for_policy/policies")
+  existing=$(jq -r --arg e "$OPERATOR_EMAIL" \
+    '.result[]? | select(.decision=="allow") | .include[]?.email?.email | select(. == $e)' \
+    "$f" | head -1)
+  if [ -n "$existing" ]; then
+    echo "  ✓ allow-by-email policy for $OPERATOR_EMAIL already present"
+  else
+    includes=$(echo "$OPERATOR_EMAIL" | tr ',' '\n' | jq -R '{email: {email: .}}' | jq -s '.')
+    pbody=$(jq -n --argjson include "$includes" \
+      '{name: "operator-only", decision: "allow", include: $include}')
+    f=$(api_post "/access/apps/$app_id_for_policy/policies" "$pbody")
+    if ok "$f"; then
+      echo "  ✓ created allow policy for $OPERATOR_EMAIL"
+    else
+      echo "  ⚠ policy create failed: $(err_msg "$f")"
+    fi
+  fi
+else
+  echo "→ OPERATOR_EMAIL unset in $file — skipping policy creation"
+  echo "  (Login through OAuth will 403 until you add a policy. cf:prove:access-policy will catch this.)"
+fi
+
+# ── Write back to fnox ───────────────────────────────────────────────────────
+echo
+echo "→ Writing values back to fnox"
+fnox set --global -p keychain CF_ACCESS_TEAM_DOMAIN <<< "$team_url"
+fnox set --global -p keychain "$APP_POLICY_AUD_FNOX_KEY" <<< "$app_aud"
+echo "  ✓ CF_ACCESS_TEAM_DOMAIN  = $team_url"
+echo "  ✓ $APP_POLICY_AUD_FNOX_KEY  = $app_aud"
+echo
+echo "Next: mise run cf:secrets-put-mapped  →  mise run 10-deploy  →  mise run prove:all"
