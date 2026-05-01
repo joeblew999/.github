@@ -1,9 +1,23 @@
 #!/usr/bin/env bash
-#MISE description="Generate wrangler.toml from wrangler.toml.template + config/<env>.env via envsubst. Per-fork values are interpolated; the resulting wrangler.toml is gitignored."
+#MISE description="Generate wrangler.{toml,jsonc} from wrangler.{toml,jsonc}.template + config/<env>.env via envsubst. Auto-detects which template format the fork uses. Per-fork values are interpolated; the result is gitignored."
 set -euo pipefail
 unset FNOX_AGE_KEY
 
 file=$(mise run -q env:resolve)
 set -a; . "$file"; set +a
-envsubst < wrangler.toml.template > wrangler.toml
-echo "wrote wrangler.toml from $file"
+
+# Auto-detect template format. TOML preferred for backward compat; JSONC
+# supported for newer CF Workers (saasmail, agentic-inbox, etc.).
+if [ -f wrangler.toml.template ]; then
+  src=wrangler.toml.template
+  dst=wrangler.toml
+elif [ -f wrangler.jsonc.template ]; then
+  src=wrangler.jsonc.template
+  dst=wrangler.jsonc
+else
+  echo "ERROR: no wrangler.{toml,jsonc}.template found in $(pwd)" >&2
+  exit 1
+fi
+
+envsubst < "$src" > "$dst"
+echo "wrote $dst from $src (env: $file)"
