@@ -19,5 +19,10 @@ else
   exit 1
 fi
 
-envsubst < "$src" > "$dst"
+# Substitute ONLY vars actually defined in the env file. Without this,
+# envsubst greedily replaces every $WORD in the template — including
+# JSON Schema refs ($schema), false positives in comments, etc. We build
+# the allowlist as `'$VAR1 $VAR2 …'` from the env file's KEY=… lines.
+allow=$(grep -E '^[A-Z_][A-Z0-9_]*=' "$file" | sed -E 's/^([A-Z_][A-Z0-9_]*)=.*/$\1/' | tr '\n' ' ')
+envsubst "$allow" < "$src" > "$dst"
 echo "wrote $dst from $src (env: $file)"
