@@ -19,10 +19,24 @@ else
   exit 1
 fi
 
-# Substitute ONLY vars actually defined in the env file. Without this,
-# envsubst greedily replaces every $WORD in the template — including
-# JSON Schema refs ($schema), false positives in comments, etc. We build
-# the allowlist as `'$VAR1 $VAR2 …'` from the env file's KEY=… lines.
-allow=$(grep -E '^[A-Z_][A-Z0-9_]*=' "$file" | sed -E 's/^([A-Z_][A-Z0-9_]*)=.*/$\1/' | tr '\n' ' ')
-envsubst "$allow" < "$src" > "$dst"
+# Substitute ONLY vars actually defined in the env file.
+#
+# We don't use envsubst because:
+#   - GNU envsubst's positional-arg allowlist ('$VAR1 $VAR2 …') works
+#   - But aqua's a8m/envsubst (default in mise installs) ignores it and
+#     substitutes everything — including JSON Schema refs ($schema),
+#     undefined vars in comments, etc.
+#
+# Instead: read KEY=VAL pairs from the env file and do bash native
+# substitution. Robust on any system, no envsubst version dependency.
+output=$(cat "$src")
+while IFS='=' read -r key val; do
+  # Skip comments and blanks.
+  case "$key" in '#'*|'') continue ;; esac
+  # Strip surrounding quotes if present.
+  val="${val%\"}"; val="${val#\"}"
+  output="${output//\$\{$key\}/$val}"
+  output="${output//\$$key/$val}"
+done < <(grep -E '^[A-Z_][A-Z0-9_]*=' "$file")
+printf '%s\n' "$output" > "$dst"
 echo "wrote $dst from $src (env: $file)"
