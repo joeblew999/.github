@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#MISE description="Provision Cloudflare Queues for the active env. Reads QUEUE_NAMES (comma-separated) from config/<env>.env. Idempotent. No-op if QUEUE_NAMES is empty or unset."
+set -euo pipefail
+unset FNOX_AGE_KEY
+
+file=$(mise run -q env:resolve)
+set -a; . "$file"; set +a
+
+if [ -z "${QUEUE_NAMES:-}" ]; then
+  echo "↷ Queues: QUEUE_NAMES not set — skipped"
+  exit 0
+fi
+
+# Force-populate CLOUDFLARE_API_TOKEN so wrangler doesn't fall back to OAuth.
+export CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(fnox get CLOUDFLARE_API_TOKEN 2>/dev/null || true)}"
+
+# Cache the queues list once — avoids N round-trips for N queues.
+existing=$(wrangler queues list 2>/dev/null || true)
+
+IFS=',' read -ra names <<< "$QUEUE_NAMES"
+for raw in "${names[@]}"; do
+  name=$(echo "$raw" | xargs)  # trim whitespace
+  [ -z "$name" ] && continue
+  if echo "$existing" | grep -qE "(^|\\s)$name(\\s|$)"; then
+    echo "✓ Queue '$name' already exists"
+  else
+    echo "Creating queue '$name' ..."
+    wrangler queues create "$name"
+  fi
+done
+
+echo "Done. Queue bindings still need to be declared in your wrangler config."

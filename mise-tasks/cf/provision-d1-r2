@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
-#MISE description="Provision Cloudflare D1 + R2 for the active env. Reads METADATA_DB_NAME, BACKUP_BUCKET_NAME from config/<env>.env. Writes new METADATA_DB_ID back. Idempotent. Skips create when name already present."
+#MISE description="Provision Cloudflare D1 + R2 for the active env. Reads METADATA_DB_NAME, BACKUP_BUCKET_NAME from config/<env>.env. Either may be empty (skipped). Writes new METADATA_DB_ID back. Idempotent. Skips create when name already present."
 set -euo pipefail
 unset FNOX_AGE_KEY
 
 file=$(mise run -q env:resolve)
 set -a; . "$file"; set +a
 
-: "${METADATA_DB_NAME:?METADATA_DB_NAME not set in $file}"
-: "${BACKUP_BUCKET_NAME:?BACKUP_BUCKET_NAME not set in $file}"
-
 # Force-populate CLOUDFLARE_API_TOKEN so wrangler doesn't fall back to OAuth.
 export CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(fnox get CLOUDFLARE_API_TOKEN 2>/dev/null || true)}"
 
 # ── R2 bucket — idempotent via list ──────────────────────────────────────────
-if wrangler r2 bucket list 2>/dev/null | grep -qE "(^|\\s)$BACKUP_BUCKET_NAME(\\s|$)"; then
+if [ -z "${BACKUP_BUCKET_NAME:-}" ]; then
+  echo "↷ R2: BACKUP_BUCKET_NAME not set — skipped"
+elif wrangler r2 bucket list 2>/dev/null | grep -qE "(^|\\s)$BACKUP_BUCKET_NAME(\\s|$)"; then
   echo "✓ R2 bucket '$BACKUP_BUCKET_NAME' already exists"
 else
   echo "Creating R2 bucket '$BACKUP_BUCKET_NAME' ..."
@@ -21,7 +20,9 @@ else
 fi
 
 # ── Metadata D1 — idempotent via env ID ──────────────────────────────────────
-if [ -n "${METADATA_DB_ID:-}" ]; then
+if [ -z "${METADATA_DB_NAME:-}" ]; then
+  echo "↷ D1: METADATA_DB_NAME not set — skipped"
+elif [ -n "${METADATA_DB_ID:-}" ]; then
   echo "✓ Metadata D1 id already set ($METADATA_DB_ID); skipping create."
 else
   echo "Creating D1 database '$METADATA_DB_NAME' ..."
@@ -39,7 +40,7 @@ else
 fi
 
 # ── Schema apply — idempotent (wrangler skips already-applied) ───────────────
-if [ -f "worker/schema.sql" ]; then
+if [ -n "${METADATA_DB_NAME:-}" ] && [ -f "worker/schema.sql" ]; then
   echo "Applying worker/schema.sql to '$METADATA_DB_NAME' ..."
   wrangler d1 execute "$METADATA_DB_NAME" --remote --file=worker/schema.sql || true
 fi
