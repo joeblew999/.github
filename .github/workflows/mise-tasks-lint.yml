@@ -68,36 +68,17 @@ jobs:
           print "✓ all task files are executable and well-formed"
 
       - name: Check for Tera-breaking syntax (bash files only)
-        shell: 'mise exec -- nu --no-newline {0}'
+        # Kept as bash — nu's where+open chain hit parser/external_command
+        # issues across platforms. grep does this in 1 line; not every step
+        # benefits from migration. Pragmatism > purity for this check.
+        shell: bash
         run: |
-          # Tera treats {# as a comment opener. Only bash uses ${#VAR};
-          # nu has its own length syntax (str length / length).
-          # Skip files whose shebang is nu — they don't have bash semantics.
-          def is-bash-file [path: string] {
-            let head = (open --raw $path | lines | first)
-            ($head != "#!/usr/bin/env nu")
-          }
-
-          let bad = (
-            ls **/*
-            | where type == file
-            | get name
-            | where { |p|
-                ($p | str starts-with "mise-tasks/")
-                and (not ($p | str ends-with ".md"))
-                and (not ($p | str ends-with ".nu"))
-                and (is-bash-file $p)
-              }
-            | where { |p| open --raw $p | str contains '${#' }
-          )
-          if ($bad | length) > 0 {
-            print "✗ found bash variable-length syntax in:"
-            $bad | each { |f| print $"  ($f)" }
-            print ""
-            print "  Bash's curly-hash-VAR triggers Tera comment parsing — use wc -c / printf instead."
+          if find mise-tasks -type f -name '*.sh' -o -type f ! -name '*.nu' ! -name '*.md' \
+               | xargs grep -l '\${#' 2>/dev/null | grep -v README; then
+            echo "✗ found \${# syntax in a bash file — use wc -c / printf instead"
             exit 1
-          }
-          print "✓ no Tera-breaking syntax found"
+          fi
+          echo "✓ no Tera-breaking syntax found"
 
       # Cross-platform proof: install nu via mise, run the proof script.
       # If this passes on all 3 OS legs, the nushell migration plan is
