@@ -171,18 +171,28 @@ jobs:
         run: |
           set -eu
           fail=0
+          # Expected error per task — varies because some tasks check for
+          # the bw CLI before checking fnox state. .github CI doesn't have bw
+          # in [tools] (it's only required by repos that use bw:* tasks),
+          # so bw-checking tasks fail at "bw CLI not found".
           declare -A expected_substr=(
             [bw/list]="no BW_SESSION"
-            [bw/status]="no BW_SESSION"
+            [bw/status]="bw CLI not found"
             [bw/diff]="no BW_SESSION"
             [bw/sync]="no BW_SESSION"
             [bw/migrate-from-keychain]="no BW_SESSION"
+            [bw/unlock]="bw CLI not found"
+            [bw/bootstrap]="bw CLI not found"
             [cf/token-check]="not set and not in fnox"
             [secrets/sync-github]="FNOX_SYNC_KEYS not set"
             [env/resolve]="not found"
             [release]="usage: mise run release"
             [rust/wasm-pack]="usage: mise run rust:wasm-pack"
           )
+
+          # Ensure fnox global config exists on every OS — Linux skipped the
+          # keychain round-trip step above, so config may not be initialized.
+          mise exec -- fnox init --global 2>/dev/null || true
 
           # Make sure no fnox secrets exist that would let bw:* tasks past
           # the guard. The keychain round-trip step above may have left
