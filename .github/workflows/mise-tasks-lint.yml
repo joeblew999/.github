@@ -74,11 +74,9 @@ jobs:
       # Cross-platform proof: install nu via mise, run the proof script.
       # If this passes on all 3 OS legs, the nushell migration plan is
       # CI-validated for the joeblew999 org.
-      - name: Install nushell + fnox via mise (ad-hoc — not committed to repo mise.toml)
-        shell: bash
-        run: |
-          mise use --global github:nushell/nushell@latest
-          mise use --global github:jdx/fnox@1.23
+      # nushell + fnox are pinned in this repo's mise.toml [tools].
+      # 'mise install' (run by mise-action above) installs them at those
+      # pinned versions automatically — no need for ad-hoc 'mise use --global'.
 
       - name: Run nu cross-platform proof script
         shell: bash

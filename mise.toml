@@ -2,9 +2,10 @@
 includes = ["mise-tasks"]
 
 [tools]
-"github:jdx/fnox" = "1.23"
-"aqua:cli/cli"    = "2"
-"aqua:jqlang/jq"  = "1"
-"cargo:usage-cli" = "3"
+"github:jdx/fnox"        = "1.23"
+"github:nushell/nushell" = "0.112"   # pinned — bw:* shared tasks are nu (cross-platform; bash unavailable on Windows)
+"aqua:cli/cli"           = "2"
+"aqua:jqlang/jq"         = "1"
+"cargo:usage-cli"        = "3"
 # utm-dev Rust CLI — add once utm-dev is rewritten as a Rust binary:
 # "cargo:utm-dev" = "3"
