@@ -74,10 +74,55 @@ jobs:
       # Cross-platform proof: install nu via mise, run the proof script.
       # If this passes on all 3 OS legs, the nushell migration plan is
       # CI-validated for the joeblew999 org.
-      - name: Install nushell via mise (ad-hoc — not committed to repo mise.toml)
+      - name: Install nushell + fnox via mise (ad-hoc — not committed to repo mise.toml)
         shell: bash
-        run: mise use --global github:nushell/nushell@latest
+        run: |
+          mise use --global github:nushell/nushell@latest
+          mise use --global github:jdx/fnox@1.23
 
       - name: Run nu cross-platform proof script
         shell: bash
         run: mise exec -- nu mise-tasks/_proof/nu-cross-platform.nu
+
+      # fnox keychain provider proof — the question is whether GHA runners'
+      # interactive logon sessions allow Credential Manager (Win) / Keychain
+      # (mac) / secret-service (Linux) writes. fnox docs say "headless CI
+      # not supported" — this step proves whether GHA's session-handling
+      # qualifies as "interactive enough" for the real-world Windows desktop
+      # user case we care about.
+      #
+      # Linux secret-service requires gnome-keyring + dbus, which Ubuntu
+      # GHA runners don't have. The step is skipped there.
+      - name: fnox keychain round-trip (macOS + Windows)
+        if: matrix.os != 'ubuntu-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Bootstrap empty fnox global config + keychain provider
+          mise exec -- fnox init --global || true   # idempotent on already-init'd
+          mise exec -- fnox provider add --global keychain keychain || true
+
+          # Round-trip: set → get → assert match → remove
+          EXPECTED='hello-from-${{ matrix.os }}-via-fnox-keychain'
+          echo "→ writing TEST_FNOX_WIN_PROOF=$EXPECTED"
+          printf '%s' "$EXPECTED" | mise exec -- fnox set --global -p keychain TEST_FNOX_WIN_PROOF
+
+          echo "→ reading back via fnox get"
+          ACTUAL=$(mise exec -- fnox get TEST_FNOX_WIN_PROOF)
+
+          echo "→ asserting"
+          if [ "$ACTUAL" = "$EXPECTED" ]; then
+            echo "✓ round-trip succeeded — fnox keychain works on ${{ matrix.os }} GHA runners"
+          else
+            echo "✗ mismatch — expected: $EXPECTED, got: $ACTUAL"
+            exit 1
+          fi
+
+          echo "→ cleanup"
+          mise exec -- fnox remove TEST_FNOX_WIN_PROOF --global || true
+
+      - name: fnox keychain skipped on Linux (gnome-keyring not on Ubuntu GHA)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: echo "⤬ Linux secret-service requires gnome-keyring + dbus — skipped. Use age provider for Linux CI."
