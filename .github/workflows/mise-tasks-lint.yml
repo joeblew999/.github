@@ -31,18 +31,19 @@ jobs:
       - name: Verify task scripts are executable and well-formed
         shell: 'mise exec -- nu --no-newline {0}'
         run: |
-          # All mise-tasks files except *.md.
+          # All files under mise-tasks/, excluding markdown.
           let files = (
-            ls **/*
-            | where type == file
-            | get name
-            | where { |p| ($p | str starts-with "mise-tasks/") and (not ($p | str ends-with ".md")) }
+            glob "mise-tasks/**/*"
+            | where { |p|
+                let info = (try { ls $p | first } catch { null })
+                ($info != null) and ($info.type == "file") and (not ($p | str ends-with ".md"))
+              }
           )
 
           mut fail = false
           for f in $files {
-            let head = (open --raw $f | lines | first)
-            let is_proof = ($f | str starts-with "mise-tasks/_proof/")
+            let head = (try { open --raw $f | lines | first } catch { "" })
+            let is_proof = ($f | str contains "mise-tasks/_proof/")
 
             # Shebang: bash OR nu only (port-on-touch migration in progress)
             if not (($head == "#!/usr/bin/env bash") or ($head == "#!/usr/bin/env nu")) {
@@ -51,21 +52,25 @@ jobs:
             }
             # Tasks (not _proof smoke tests) require #MISE description= header
             if not $is_proof {
-              let has_desc = (open --raw $f | lines | any { |l| $l | str starts-with "#MISE description=" })
+              let has_desc = (try { open --raw $f | lines | any { |l| $l | str starts-with "#MISE description=" } } catch { false })
               if not $has_desc {
                 print $"✗ missing #MISE description= header: ($f)"
                 $fail = true
               }
             }
-            # Executable bit — nu's path/file metadata
-            let is_exec = (try { ls -l $f | first | get mode | str contains "x" } catch { false })
-            if not $is_exec {
-              print $"✗ not executable: ($f)"
-              $fail = true
+            # On Windows runners, executable bit doesn't apply the same way.
+            # Skip the exec-bit check there.
+            let is_windows = ((sys host | get name) == "Windows")
+            if not $is_windows {
+              let mode = (try { ls -l $f | first | get mode | default "" } catch { "" })
+              if not ($mode | str contains "x") {
+                print $"✗ not executable: ($f)"
+                $fail = true
+              }
             }
           }
           if $fail { exit 1 }
-          print "✓ all task files are executable and well-formed"
+          print $"✓ all ($files | length) task files are well-formed"
 
       - name: Check for Tera-breaking syntax (bash files only)
         # Kept as bash — nu's where+open chain hit parser/external_command
@@ -143,24 +148,24 @@ jobs:
       - name: Parse-check every nu task script
         shell: 'mise exec -- nu --no-newline {0}'
         run: |
-          # Find every file under mise-tasks/ whose first line is the nu shebang.
+          # We're already inside 'mise exec -- nu', so 'nu' is on PATH.
+          # No need for another mise wrapper.
           let nu_files = (
-            ls **/*
-            | where type == file
-            | get name
+            glob "mise-tasks/**/*"
             | where { |p|
-                ($p | str starts-with "mise-tasks/")
+                let info = (try { ls $p | first } catch { null })
+                ($info != null)
+                and ($info.type == "file")
                 and (not ($p | str ends-with ".md"))
-                and ((open --raw $p | lines | first) == "#!/usr/bin/env nu")
+                and ((try { open --raw $p | lines | first } catch { "" }) == "#!/usr/bin/env nu")
               }
           )
 
           mut fail = false
           for f in $nu_files {
             print $"→ ($f)"
-            let result = (^mise exec -- nu --ide-check 1 $f | complete)
+            let result = (^nu --ide-check 1 $f | complete)
             let combined = $"($result.stdout)($result.stderr)"
-            # ide-check emits JSON; lines with "type":"diagnostic" are parse errors
             if ($combined | str contains '"type":"diagnostic"') {
               print $"✗ parse errors in ($f):"
               print $combined
