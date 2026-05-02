@@ -126,3 +126,30 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: echo "⤬ Linux secret-service requires gnome-keyring + dbus — skipped. Use age provider for Linux CI."
+
+      # Parse-check every nu task script. This proves all our shared nu scripts
+      # are syntactically valid on every OS — the SSOT promise: same script
+      # runs on macOS, Linux, Windows desktops + CI.
+      #
+      # nu --ide-check returns parse errors in JSON to stdout if any.
+      # Empty stdout = clean parse. Non-zero exit = error.
+      - name: Parse-check every nu task script
+        shell: bash
+        run: |
+          set -eu
+          fail=0
+          while IFS= read -r f; do
+            echo "→ $f"
+            output=$(mise exec -- nu --ide-check 1 "$f" 2>&1 || true)
+            # ide-check emits one JSON object per error to stdout
+            if [ -n "$output" ] && echo "$output" | grep -q '"type":"diagnostic"'; then
+              echo "✗ parse errors in $f:"
+              echo "$output"
+              fail=1
+            fi
+          done < <(find mise-tasks -type f \
+                        \( -name '*.nu' -o ! -name '*.md' \) \
+                        -exec sh -c 'head -1 "$1" | grep -q "^#!/usr/bin/env nu"' _ {} \; \
+                        -print)
+          [ "$fail" -eq 0 ] && echo "✓ all nu scripts parse cleanly"
+          exit "$fail"
