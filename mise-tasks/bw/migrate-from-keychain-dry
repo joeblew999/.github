@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+#MISE description="DRY RUN of bw:migrate-from-keychain (preview, no changes)."
+set -euo pipefail
+
+unset FNOX_AGE_KEY
+
+# Delegate to migrate-from-keychain with --dry-run.
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$HERE/migrate-from-keychain" --dry-run

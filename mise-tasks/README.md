@@ -109,6 +109,34 @@ settings, which `secrets:sync-github` populates from a dev machine.
 | `secrets:sync-github-dry` | Alias for `secrets:sync-github --dry-run` |
 | `secrets:migrate-to-keychain` | Migrate any age-encrypted fnox secrets → OS keychain. Idempotent |
 
+### Bitwarden (`bw:*`) — keychain ↔ NodeWarden hybrid
+
+Self-hosted [NodeWarden](https://github.com/shuaiplus/nodewarden) (Bitwarden-compatible CF Worker) is the canonical store; macOS keychain is the local cache that fnox reads at runtime. Sync tasks keep them aligned. **Reads stay fast (keychain, offline) — NodeWarden is only hit by the `bw:*` tasks themselves**, never by your `.github` tasks at runtime.
+
+**Setup (once per machine):**
+
+1. Deploy NodeWarden (or any Bitwarden-compatible server). Default URL: `https://nodewarden.gedw99.workers.dev` — override via `NODEWARDEN_URL` env var.
+2. Add `"npm:@bitwarden/cli" = "latest"` to your repo's `[tools]` and run `mise install`.
+3. `mise run bw:bootstrap` — three hidden prompts (API client_id, client_secret, master password). Stores creds in fnox keychain + registers `[providers.bitwarden]` in fnox global config. Idempotent.
+4. `mise run bw:migrate-from-keychain` — push existing keychain secrets to NodeWarden (idempotent, safe to re-run).
+
+**Day-to-day:**
+
+| Task | Description |
+|------|-------------|
+| `bw:status` | Show bw login state — server URL, lock state, email |
+| `bw:unlock` | Refresh `BW_SESSION` after vault auto-locks (hidden prompt for master password) |
+| `bw:list` | List item names + sizes in NodeWarden vault. Values not shown |
+| `bw:diff` | Parity check between keychain and NodeWarden. Hash-prefix comparison, no values revealed |
+| `bw:sync [--dry-run]` | Pull NodeWarden → keychain (idempotent). Run after rotating a secret on iPhone or web vault |
+| `bw:sync-dry` | Alias for `bw:sync --dry-run` |
+| `bw:set -- <NAME>` | Hidden-input prompt → write to NodeWarden + mirror to keychain in one shot. Use to rotate a secret on Mac |
+| `bw:migrate-from-keychain [--dry-run]` | Push every keychain-backed fnox secret → matching NodeWarden item. Idempotent |
+| `bw:migrate-from-keychain-dry` | Alias with `--dry-run` |
+| `bw:bootstrap` | One-time setup (rerun safely to refresh `BW_SESSION`) |
+
+**Skip list (never migrated to NodeWarden — chicken/egg):** `BW_CLIENTID`, `BW_CLIENTSECRET`, `BW_SESSION`. Override via `BW_MIGRATE_SKIP` / `BW_SYNC_SKIP` env vars.
+
 #### Wiring `secrets:sync-github` in a consuming repo
 
 ```toml

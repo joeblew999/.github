@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="DRY RUN of bw:sync (preview, no changes)."
+set -euo pipefail
+
+unset FNOX_AGE_KEY
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$HERE/sync" --dry-run

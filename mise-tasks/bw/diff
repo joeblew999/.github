@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+#MISE description="Show drift between keychain and NodeWarden — which keys are in each, which match. Values are NOT revealed (only sha256 prefix comparison)."
+set -euo pipefail
+
+unset FNOX_AGE_KEY
+
+BW_SESSION=$(fnox get BW_SESSION 2>/dev/null || true)
+[ -z "$BW_SESSION" ] && { echo "✗ no BW_SESSION — run 'mise run bw:bootstrap'" >&2; exit 1; }
+export BW_SESSION
+
+if ! bw status 2>/dev/null | jq -e '.status == "unlocked"' >/dev/null; then
+  echo "✗ vault locked — run 'mise run bw:unlock'" >&2
+  exit 1
+fi
+
+# All keychain-backed fnox secrets
+KC_KEYS=$(awk '/^\[secrets\]/{f=1; next} /^\[/{f=0} f && /^[A-Z_][A-Z0-9_]*[[:space:]]*=/{sub(/[[:space:]]*=.*/,""); print}' "$HOME/.config/fnox/config.toml" | sort -u)
+# All NodeWarden items
+BW_KEYS=$(bw list items 2>/dev/null | jq -r '.[] | select(.type==1) | .name' | sort -u)
+
+echo "Name                                    keychain  NodeWarden  match"
+echo "─────────────────────────────────────── ────────  ──────────  ─────"
+ALL=$(printf "%s\n%s" "$KC_KEYS" "$BW_KEYS" | sort -u)
+for k in $ALL; do
+  [ -z "$k" ] && continue
+  IN_KC=$(echo "$KC_KEYS" | grep -Fxq -- "$k" && echo "✓" || echo "·")
+  IN_BW=$(echo "$BW_KEYS" | grep -Fxq -- "$k" && echo "✓" || echo "·")
+  MATCH="—"
+  if [ "$IN_KC" = "✓" ] && [ "$IN_BW" = "✓" ]; then
+    # Strip trailing newlines — bw get password adds one, fnox get does not
+    KC_HASH=$(fnox get "$k" 2>/dev/null | tr -d '\n' | shasum -a 256 | head -c 8)
+    BW_HASH=$(bw get password "$k" 2>/dev/null | tr -d '\n' | shasum -a 256 | head -c 8)
+    [ "$KC_HASH" = "$BW_HASH" ] && MATCH="✓" || MATCH="✗ DIFFER"
+  fi
+  printf "%-39s %-9s %-11s %s\n" "$k" "$IN_KC" "$IN_BW" "$MATCH"
+done

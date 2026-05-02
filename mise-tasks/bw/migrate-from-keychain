@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+#MISE description="Push every keychain-backed fnox secret → matching NodeWarden item. Idempotent. Skips BW_* (chicken/egg). Override skip list via BW_MIGRATE_SKIP env var (comma-separated)."
+#USAGE flag "--dry-run" help="show plan, change nothing"
+set -euo pipefail
+
+unset FNOX_AGE_KEY
+
+# Support both: mise usage parsing (usage_dry_run=true) and direct $1=--dry-run from sibling tasks
+if [ "${usage_dry_run:-}" = "true" ] || [ "${1:-}" = "--dry-run" ]; then
+  DRY_RUN=1
+else
+  DRY_RUN=0
+fi
+
+SKIP="${BW_MIGRATE_SKIP:-BW_CLIENTID,BW_CLIENTSECRET,BW_SESSION}"
+SKIP_LF=$(printf '%s' "$SKIP" | tr ',' '\n')
+is_skipped() { printf '%s' "$SKIP_LF" | grep -Fxq -- "$1"; }
+
+BW_SESSION=$(fnox get BW_SESSION 2>/dev/null || true)
+[ -z "$BW_SESSION" ] && { echo "✗ no BW_SESSION in fnox — run 'mise run bw:bootstrap' first" >&2; exit 1; }
+export BW_SESSION
+
+if ! bw status 2>/dev/null | jq -e '.status == "unlocked"' >/dev/null; then
+  echo "✗ vault locked — run 'mise run bw:unlock' to refresh BW_SESSION" >&2
+  exit 1
+fi
+
+bw sync >/dev/null 2>&1 || true
+
+CONFIG="$HOME/.config/fnox/config.toml"
+[ -f "$CONFIG" ] || { echo "✗ $CONFIG not found" >&2; exit 1; }
+
+ALL_SECRETS=$(awk '/^\[secrets\]/{f=1; next} /^\[/{f=0} f && /^[A-Z_][A-Z0-9_]*[[:space:]]*=/{sub(/[[:space:]]*=.*/,""); print}' "$CONFIG")
+TOTAL=$(printf '%s\n' "$ALL_SECRETS" | grep -c . || true)
+
+BW_ITEMS=$(bw list items 2>/dev/null)
+get_bw_id() { printf '%s' "$BW_ITEMS" | jq -r --arg n "$1" '[.[] | select(.type==1 and .name==$n) | .id] | first // ""'; }
+get_bw_pw() { printf '%s' "$BW_ITEMS" | jq -r --arg n "$1" '[.[] | select(.type==1 and .name==$n) | .login.password // ""] | first // ""'; }
+
+[ "$DRY_RUN" = "1" ] && echo "=== DRY RUN — no changes ===" || echo "=== migration (real) ==="
+echo "Skip list:    $SKIP"
+echo "fnox secrets: $TOTAL"
+echo
+
+create_count=0; update_count=0; skip_count=0; same_count=0; empty_count=0
+
+while IFS= read -r NAME; do
+  [ -z "$NAME" ] && continue
+
+  if is_skipped "$NAME"; then
+    echo "  ⤬ $NAME (in skip list)"
+    skip_count=$((skip_count + 1))
+    continue
+  fi
+
+  KC_VAL=$(fnox get "$NAME" 2>/dev/null || true)
+  if [ -z "$KC_VAL" ]; then
+    echo "  ⤬ $NAME (empty in keychain)"
+    empty_count=$((empty_count + 1))
+    continue
+  fi
+
+  EXISTING_ID=$(get_bw_id "$NAME")
+  EXISTING_PW=$(get_bw_pw "$NAME")
+
+  if [ -n "$EXISTING_ID" ] && [ "$EXISTING_PW" = "$KC_VAL" ]; then
+    echo "  = $NAME (already in NodeWarden, in sync)"
+    same_count=$((same_count + 1))
+    continue
+  fi
+
+  VERB_WOULD="would "
+  [ "$DRY_RUN" = "0" ] && VERB_WOULD=""
+
+  if [ -n "$EXISTING_ID" ]; then
+    echo "  ↻ $NAME (${VERB_WOULD}update existing item)"
+    if [ "$DRY_RUN" = "0" ]; then
+      bw get item "$EXISTING_ID" \
+        | jq --arg pw "$KC_VAL" '.login.password = $pw' \
+        | bw encode \
+        | bw edit item "$EXISTING_ID" >/dev/null
+    fi
+    update_count=$((update_count + 1))
+  else
+    echo "  + $NAME (${VERB_WOULD}create new item)"
+    if [ "$DRY_RUN" = "0" ]; then
+      jq -n --arg name "$NAME" --arg pw "$KC_VAL" \
+        '{type: 1, name: $name, notes: "managed by fnox+bw-migrate; rotate via mise run bw:set", login: {username: "", password: $pw, uris: []}, fields: [], favorite: false, reprompt: 0}' \
+        | bw encode \
+        | bw create item >/dev/null
+    fi
+    create_count=$((create_count + 1))
+  fi
+done <<< "$ALL_SECRETS"
+
+echo
+[ "$DRY_RUN" = "1" ] && echo "=== DRY RUN summary ===" || echo "=== migration complete ==="
+if [ "$DRY_RUN" = "1" ]; then
+  printf "  %d would-create / %d would-update / %d already-in-sync / %d skipped / %d empty\n" \
+    "$create_count" "$update_count" "$same_count" "$skip_count" "$empty_count"
+  echo
+  echo "  Re-run with 'mise run bw:migrate-from-keychain' to apply."
+else
+  printf "  %d created / %d updated / %d already-in-sync / %d skipped / %d empty\n" \
+    "$create_count" "$update_count" "$same_count" "$skip_count" "$empty_count"
+fi

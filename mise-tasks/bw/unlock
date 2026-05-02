@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+#MISE description="Refresh BW_SESSION (vault auto-locks after inactivity). Hidden prompt for master password, stores new session in fnox keychain."
+set -euo pipefail
+
+unset FNOX_AGE_KEY
+
+if ! command -v bw >/dev/null 2>&1; then
+  echo "✗ bw CLI not found — run 'mise install' in a repo that declares it" >&2
+  exit 1
+fi
+
+read -r -s -p "master password: " PW; echo
+[ -z "$PW" ] && { echo "✗ empty"; exit 1; }
+export BW_PASSWORD="$PW"; unset PW
+
+NEW_SESSION=$(bw unlock --raw --passwordenv BW_PASSWORD)
+unset BW_PASSWORD
+[ -z "$NEW_SESSION" ] && { echo "✗ unlock failed"; exit 1; }
+
+printf '%s' "$NEW_SESSION" | fnox set --global -p keychain BW_SESSION
+unset NEW_SESSION
+echo "✓ BW_SESSION refreshed in fnox keychain"

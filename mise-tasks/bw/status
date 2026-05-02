@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#MISE description="Show bw login status against NodeWarden (server URL, lock state, email). Reads BW_SESSION from fnox keychain."
+set -euo pipefail
+
+unset FNOX_AGE_KEY
+
+if ! command -v bw >/dev/null 2>&1; then
+  echo "✗ bw CLI not found — run 'mise install' in a repo that declares it" >&2
+  exit 1
+fi
+
+SESSION=$(fnox get BW_SESSION 2>/dev/null || true)
+[ -z "$SESSION" ] && { echo "✗ no BW_SESSION in fnox — run 'mise run bw:bootstrap'" >&2; exit 1; }
+
+BW_SESSION="$SESSION" bw status 2>&1 \
+  | jq -r '"  status:    \(.status)\n  serverUrl: \(.serverUrl)\n  userEmail: \(.userEmail // "?")"'

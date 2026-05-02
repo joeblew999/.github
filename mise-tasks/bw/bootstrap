@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+#MISE description="One-shot Bitwarden CLI ↔ fnox bootstrap. Three hidden prompts (client_id, client_secret, master password). Configures bw against NODEWARDEN_URL, logs in via API key, unlocks vault, stores all three creds in macOS keychain via fnox, registers bitwarden provider in fnox global config. Idempotent — re-run to refresh BW_SESSION."
+set -euo pipefail
+
+unset FNOX_AGE_KEY
+
+URL="${NODEWARDEN_URL:-https://nodewarden.gedw99.workers.dev}"
+FNOX_CONFIG="$HOME/.config/fnox/config.toml"
+
+if ! command -v bw >/dev/null 2>&1; then
+  echo "✗ bw CLI not found — add 'npm:@bitwarden/cli' to your repo's [tools] in mise.toml, then 'mise install'" >&2
+  exit 1
+fi
+if ! command -v fnox >/dev/null 2>&1; then
+  echo "✗ fnox not found — add 'github:jdx/fnox' to your repo's [tools]" >&2
+  exit 1
+fi
+
+echo "=== Bitwarden CLI bootstrap → $URL ==="
+echo
+echo "Three hidden prompts:"
+echo "  1. Personal API client_id     ('user.<UUID>' from NodeWarden Settings → API Key)"
+echo "  2. Personal API client_secret (random string from 'View API Key')"
+echo "  3. Master password            (used to unlock; not stored)"
+echo
+
+read -r -s -p "client_id: " BW_CLIENTID; echo
+read -r -s -p "client_secret: " BW_CLIENTSECRET; echo
+read -r -s -p "master password: " BW_PASSWORD; echo
+echo
+
+[ -z "$BW_CLIENTID" ]     && { echo "✗ client_id empty";     exit 1; }
+[ -z "$BW_CLIENTSECRET" ] && { echo "✗ client_secret empty"; exit 1; }
+[ -z "$BW_PASSWORD" ]     && { echo "✗ master password empty"; exit 1; }
+
+echo "→ ensuring bw is logged out (idempotent)"
+bw logout 2>/dev/null || true
+
+echo "→ pointing bw at $URL"
+bw config server "$URL" >/dev/null
+
+echo "→ logging in via API key"
+export BW_CLIENTID BW_CLIENTSECRET
+bw login --apikey 2>&1 | tail -3
+
+echo "→ unlocking vault → BW_SESSION"
+# bw --passwordenv requires the env var to be exported, not just shell-local
+export BW_PASSWORD
+BW_SESSION=$(bw unlock --raw --passwordenv BW_PASSWORD)
+unset BW_PASSWORD
+
+[ -z "$BW_SESSION" ] && { echo "✗ unlock failed — bad master password?"; exit 1; }
+
+echo "→ storing all three in fnox keychain (global config)"
+printf '%s' "$BW_CLIENTID"     | fnox set --global -p keychain BW_CLIENTID
+printf '%s' "$BW_CLIENTSECRET" | fnox set --global -p keychain BW_CLIENTSECRET
+printf '%s' "$BW_SESSION"      | fnox set --global -p keychain BW_SESSION
+
+echo "→ adding bitwarden provider to $FNOX_CONFIG"
+# fnox's bitwarden provider doesn't accept a 'server' field — bw config server (above) handles URL.
+mkdir -p "$(dirname "$FNOX_CONFIG")"
+touch "$FNOX_CONFIG"
+if grep -q '^\[providers\.bitwarden\]' "$FNOX_CONFIG"; then
+  echo "  ✓ already present"
+else
+  printf '\n[providers.bitwarden]\ntype = "bitwarden"\n' >> "$FNOX_CONFIG"
+  echo "  ✓ appended"
+fi
+
+unset BW_CLIENTID BW_CLIENTSECRET BW_SESSION
+
+echo
+echo "=== verify ==="
+SESSION=$(fnox get BW_SESSION)
+BW_SESSION="$SESSION" bw status 2>&1 \
+  | jq -r '"  status:    \(.status)\n  serverUrl: \(.serverUrl)\n  userEmail: \(.userEmail // "?")"' \
+  || echo "  (bw status check skipped — non-fatal)"
+unset SESSION
+echo
+for k in BW_CLIENTID BW_CLIENTSECRET BW_SESSION; do
+  V=$(fnox get "$k" 2>/dev/null || true)
+  [ -n "$V" ] && echo "  ✓ $k (${#V} chars)" || echo "  ✗ $k missing"
+done
+echo
+echo "============================================================"
+echo "✓ bootstrap complete"
+echo "  Next: 'mise run bw:migrate-from-keychain-dry' to preview"
+echo "        which keychain secrets would be pushed to NodeWarden"
+echo "============================================================"
