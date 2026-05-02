@@ -17,7 +17,7 @@ if ($s.status? != "unlocked") {
 # Locate fnox global config file (cross-platform: Mac/Linux ~/.config/fnox/,
 # Windows %LOCALAPPDATA%\fnox\). Use fnox itself to find it.
 let config_path = (
-  ^fnox config-files --global
+  ^fnox config-files
   | lines
   | where { |l| ($l | str trim) ends-with ".toml" }
   | first

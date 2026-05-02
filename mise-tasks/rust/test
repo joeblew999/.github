@@ -1,5 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nu
 #MISE description="cargo test (all targets)"
 #MISE env = {RUST_BACKTRACE = "1"}
-set -euo pipefail
-cargo test --all-targets "$@"
+def main [...args] {
+  ^cargo test --all-targets ...$args
+}

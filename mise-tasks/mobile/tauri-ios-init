@@ -1,7 +1,10 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nu
 #MISE description="tauri ios init — generate the Xcode project (macOS only, run once per clone)"
-set -euo pipefail
-if [[ "$(uname -s)" != "Darwin" ]]; then
-  echo "✗ iOS builds require macOS" >&2; exit 1
-fi
-${TAURI_CMD:-tauri} ios init "$@"
+def main [...args] {
+  if (sys host | get name) != "Darwin" {
+    print --stderr "✗ iOS builds require macOS"
+    exit 1
+  }
+  let cmd = ($env.TAURI_CMD? | default "tauri")
+  ^$cmd ios init ...$args
+}

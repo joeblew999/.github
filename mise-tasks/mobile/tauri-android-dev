@@ -1,4 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nu
 #MISE description="tauri android dev — hot-reload on connected device or emulator"
-set -euo pipefail
-${TAURI_CMD:-tauri} android dev "$@"
+def main [...args] {
+  let cmd = ($env.TAURI_CMD? | default "tauri")
+  ^$cmd android dev ...$args
+}

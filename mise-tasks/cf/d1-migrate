@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nu
 #MISE description="run D1 migrations"
-set -euo pipefail
-wrangler d1 migrations apply "$@"
+def main [...args] {
+  ^wrangler d1 migrations apply ...$args
+}

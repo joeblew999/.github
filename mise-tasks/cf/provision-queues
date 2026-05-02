@@ -1,32 +1,50 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nu
 #MISE description="Provision Cloudflare Queues for the active env. Reads QUEUE_NAMES (comma-separated) from config/<env>.env. Idempotent. No-op if QUEUE_NAMES is empty or unset."
-set -euo pipefail
-unset FNOX_AGE_KEY
 
-file=$(mise run -q env:resolve)
-set -a; . "$file"; set +a
+def load-env-file [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let file = $"config/($env_name).env"
+  if not ($file | path exists) {
+    print --stderr $"ERROR: ($file) not found."
+    exit 1
+  }
+  open --raw $file
+  | lines
+  | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+  | reduce -f {} {|line, acc|
+      let parts = ($line | split row -n 2 "=")
+      let key = ($parts | get 0)
+      let val = ($parts | get 1 | str trim --char '"')
+      $acc | upsert $key $val
+    }
+}
 
-if [ -z "${QUEUE_NAMES:-}" ]; then
-  echo "↷ Queues: QUEUE_NAMES not set — skipped"
-  exit 0
-fi
+def main [] {
+  let cfg = (load-env-file)
+  let names = ($cfg.QUEUE_NAMES? | default "")
+  if ($names | is-empty) {
+    print "↷ Queues: QUEUE_NAMES not set — skipped"
+    return
+  }
 
-# Force-populate CLOUDFLARE_API_TOKEN so wrangler doesn't fall back to OAuth.
-export CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(fnox get CLOUDFLARE_API_TOKEN 2>/dev/null || true)}"
+  $env.CLOUDFLARE_API_TOKEN = (
+    if ($env.CLOUDFLARE_API_TOKEN? | default "" | is-not-empty) {
+      $env.CLOUDFLARE_API_TOKEN
+    } else {
+      try { ^fnox get CLOUDFLARE_API_TOKEN | str trim } catch { "" }
+    }
+  )
 
-# Cache the queues list once — avoids N round-trips for N queues.
-existing=$(wrangler queues list 2>/dev/null || true)
+  let existing = (try { ^wrangler queues list | complete | get stdout } catch { "" })
 
-IFS=',' read -ra names <<< "$QUEUE_NAMES"
-for raw in "${names[@]}"; do
-  name=$(echo "$raw" | xargs)  # trim whitespace
-  [ -z "$name" ] && continue
-  if echo "$existing" | grep -qE "(^|\\s)$name(\\s|$)"; then
-    echo "✓ Queue '$name' already exists"
-  else
-    echo "Creating queue '$name' ..."
-    wrangler queues create "$name"
-  fi
-done
-
-echo "Done. Queue bindings still need to be declared in your wrangler config."
+  let names_list = ($names | split row "," | each { |n| $n | str trim } | where { |n| not ($n | is-empty) })
+  for name in $names_list {
+    if ($existing | str contains $name) {
+      print $"✓ Queue '($name)' already exists"
+    } else {
+      print $"Creating queue '($name)' ..."
+      ^wrangler queues create $name
+    }
+  }
+  print "Done. Queue bindings still need to be declared in your wrangler config."
+}

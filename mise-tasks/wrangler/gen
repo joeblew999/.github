@@ -1,42 +1,43 @@
-#!/usr/bin/env bash
-#MISE description="Generate wrangler.{toml,jsonc} from wrangler.{toml,jsonc}.template + config/<env>.env via envsubst. Auto-detects which template format the fork uses. Per-fork values are interpolated; the result is gitignored."
-set -euo pipefail
-unset FNOX_AGE_KEY
+#!/usr/bin/env nu
+#MISE description="Generate wrangler.{toml,jsonc} from wrangler.{toml,jsonc}.template + config/<env>.env via bash native substitution. Auto-detects which template format the fork uses. Per-fork values are interpolated; the result is gitignored."
 
-file=$(mise run -q env:resolve)
-set -a; . "$file"; set +a
+def main [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let env_file = $"config/($env_name).env"
+  if not ($env_file | path exists) {
+    print --stderr $"ERROR: ($env_file) not found."
+    exit 1
+  }
 
-# Auto-detect template format. TOML preferred for backward compat; JSONC
-# supported for newer CF Workers (saasmail, agentic-inbox, etc.).
-if [ -f wrangler.toml.template ]; then
-  src=wrangler.toml.template
-  dst=wrangler.toml
-elif [ -f wrangler.jsonc.template ]; then
-  src=wrangler.jsonc.template
-  dst=wrangler.jsonc
-else
-  echo "ERROR: no wrangler.{toml,jsonc}.template found in $(pwd)" >&2
-  exit 1
-fi
+  let pair = if ("wrangler.toml.template" | path exists) {
+    {src: "wrangler.toml.template", dst: "wrangler.toml"}
+  } else if ("wrangler.jsonc.template" | path exists) {
+    {src: "wrangler.jsonc.template", dst: "wrangler.jsonc"}
+  } else {
+    print --stderr $"ERROR: no wrangler.{toml,jsonc}.template found in \(pwd\)"
+    exit 1
+  }
 
-# Substitute ONLY vars actually defined in the env file.
-#
-# We don't use envsubst because:
-#   - GNU envsubst's positional-arg allowlist ('$VAR1 $VAR2 …') works
-#   - But aqua's a8m/envsubst (default in mise installs) ignores it and
-#     substitutes everything — including JSON Schema refs ($schema),
-#     undefined vars in comments, etc.
-#
-# Instead: read KEY=VAL pairs from the env file and do bash native
-# substitution. Robust on any system, no envsubst version dependency.
-output=$(cat "$src")
-while IFS='=' read -r key val; do
-  # Skip comments and blanks.
-  case "$key" in '#'*|'') continue ;; esac
-  # Strip surrounding quotes if present.
-  val="${val%\"}"; val="${val#\"}"
-  output="${output//\$\{$key\}/$val}"
-  output="${output//\$$key/$val}"
-done < <(grep -E '^[A-Z_][A-Z0-9_]*=' "$file")
-printf '%s\n' "$output" > "$dst"
-echo "wrote $dst from $src (env: $file)"
+  # Substitute ${KEY} and $KEY for every defined KEY=VAL in env_file.
+  let env_pairs = (
+    open --raw $env_file
+    | lines
+    | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+    | each {|line|
+        let parts = ($line | split row -n 2 "=")
+        let key = ($parts | get 0)
+        let val = (($parts | get 1) | str trim --char '"')
+        {key: $key, val: $val}
+      }
+  )
+
+  let template = (open --raw $pair.src)
+  let output = ($env_pairs | reduce -f $template {|p, acc|
+    $acc
+    | str replace --all $"${($p.key)}" $p.val
+    | str replace --all $"$($p.key)" $p.val
+  })
+
+  $output | save -f $pair.dst
+  print $"wrote ($pair.dst) from ($pair.src) \(env: ($env_file)\)"
+}

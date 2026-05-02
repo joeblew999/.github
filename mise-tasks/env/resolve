@@ -1,13 +1,14 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nu
 #MISE description="resolve which config/<env>.env file to read; default `production`. Prints path. Hidden helper used by other shared tasks."
 #MISE hide=true
-set -euo pipefail
 
-env_name="${MISE_ENV:-${ENV:-production}}"
-file="config/${env_name}.env"
-if [ ! -f "$file" ]; then
-  echo "ERROR: $file not found." >&2
-  echo "       cp config/template.env $file  and fill it in." >&2
-  exit 1
-fi
-printf '%s' "$file"
+def main [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let file = $"config/($env_name).env"
+  if not ($file | path exists) {
+    print --stderr $"ERROR: ($file) not found."
+    print --stderr $"       cp config/template.env ($file)  and fill it in."
+    exit 1
+  }
+  print -n $file
+}

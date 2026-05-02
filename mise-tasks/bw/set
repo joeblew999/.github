@@ -22,7 +22,7 @@ def main [name?: string] {
     exit 1
   }
 
-  let val = (input --suppress-output $"value for ($n) (hidden): ")
+  let val = (input --suppress-output $"value for ($n) \(hidden\): ")
   print ""
   if ($val | is-empty) {
     print --stderr "✗ empty value — aborting"

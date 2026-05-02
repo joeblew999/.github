@@ -1,9 +1,16 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nu
 #MISE description="compile a Rust crate to WASM via wasm-pack"
 #USAGE arg "<crate-dir>" help="path to the crate directory to compile"
-set -euo pipefail
-CRATE="${usage_crate_dir:-${1:-""}}"
-[ -n "$CRATE" ] || { echo "✗ usage: mise run rust:wasm-pack <crate-dir>"; exit 1; }
-cd "$CRATE" || { echo "✗ directory not found: $CRATE"; exit 1; }
-shift 1 2>/dev/null || true
-wasm-pack build --target web --out-dir pkg "$@"
+def main [crate_dir?: string, ...args] {
+  let crate = ($crate_dir | default "")
+  if ($crate | is-empty) {
+    print --stderr "✗ usage: mise run rust:wasm-pack <crate-dir>"
+    exit 1
+  }
+  if not ($crate | path exists) {
+    print --stderr $"✗ directory not found: ($crate)"
+    exit 1
+  }
+  cd $crate
+  ^wasm-pack build --target web --out-dir pkg ...$args
+}

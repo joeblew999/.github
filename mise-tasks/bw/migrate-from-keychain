@@ -23,7 +23,7 @@ def main [--dry-run] {
 
   # Locate fnox global config (cross-platform via fnox itself)
   let config_path = (
-    ^fnox config-files --global
+    ^fnox config-files
     | lines
     | where { |l| ($l | str trim) ends-with ".toml" }
     | first
@@ -74,14 +74,14 @@ def main [--dry-run] {
 
   for name in $all_secrets {
     if $name in $skip_list {
-      print $"  ⤬ ($name) (in skip list)"
+      print $"  ⤬ ($name) \(in skip list\)"
       $skip_count = ($skip_count + 1)
       continue
     }
 
     let kc_val = (try { ^fnox get $name | str trim } catch { "" })
     if ($kc_val | is-empty) {
-      print $"  ⤬ ($name) (empty in keychain)"
+      print $"  ⤬ ($name) \(empty in keychain\)"
       $empty_count = ($empty_count + 1)
       continue
     }
@@ -92,7 +92,7 @@ def main [--dry-run] {
     let existing_id = if $existing_count > 0 { $existing | first | get id } else { "" }
 
     if ($existing_count > 0) and ($existing_pw == $kc_val) {
-      print $"  = ($name) (already in NodeWarden, in sync)"
+      print $"  = ($name) \(already in NodeWarden, in sync\)"
       $same_count = ($same_count + 1)
       continue
     }

@@ -43,7 +43,7 @@ def main [--dry-run] {
       continue
     }
     if ($pw | is-empty) {
-      print $"  ⤬ ($name) (empty in NodeWarden)"
+      print $"  ⤬ ($name) \(empty in NodeWarden\)"
       $empty = ($empty + 1)
       continue
     }
@@ -52,9 +52,9 @@ def main [--dry-run] {
       $same = ($same + 1)
     } else {
       if ($cur | is-empty) {
-        print $"  + ($name) (new in keychain)"
+        print $"  + ($name) \(new in keychain\)"
       } else {
-        print $"  ↻ ($name) (keychain differs from NodeWarden — would update)"
+        print $"  ↻ ($name) \(keychain differs from NodeWarden — would update\)"
       }
       if not $dry {
         $pw | ^fnox set --global -p keychain $name | ignore

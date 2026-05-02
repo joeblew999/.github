@@ -1,48 +1,80 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nu
 #MISE description="Provision Cloudflare D1 + R2 for the active env. Reads METADATA_DB_NAME, BACKUP_BUCKET_NAME from config/<env>.env. Either may be empty (skipped). Writes new METADATA_DB_ID back. Idempotent. Skips create when name already present."
-set -euo pipefail
-unset FNOX_AGE_KEY
 
-file=$(mise run -q env:resolve)
-set -a; . "$file"; set +a
-
-# Force-populate CLOUDFLARE_API_TOKEN so wrangler doesn't fall back to OAuth.
-export CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(fnox get CLOUDFLARE_API_TOKEN 2>/dev/null || true)}"
-
-# ── R2 bucket — idempotent via list ──────────────────────────────────────────
-if [ -z "${BACKUP_BUCKET_NAME:-}" ]; then
-  echo "↷ R2: BACKUP_BUCKET_NAME not set — skipped"
-elif wrangler r2 bucket list 2>/dev/null | grep -qE "(^|\\s)$BACKUP_BUCKET_NAME(\\s|$)"; then
-  echo "✓ R2 bucket '$BACKUP_BUCKET_NAME' already exists"
-else
-  echo "Creating R2 bucket '$BACKUP_BUCKET_NAME' ..."
-  wrangler r2 bucket create "$BACKUP_BUCKET_NAME"
-fi
-
-# ── Metadata D1 — idempotent via env ID ──────────────────────────────────────
-if [ -z "${METADATA_DB_NAME:-}" ]; then
-  echo "↷ D1: METADATA_DB_NAME not set — skipped"
-elif [ -n "${METADATA_DB_ID:-}" ]; then
-  echo "✓ Metadata D1 id already set ($METADATA_DB_ID); skipping create."
-else
-  echo "Creating D1 database '$METADATA_DB_NAME' ..."
-  out=$(wrangler d1 create "$METADATA_DB_NAME")
-  # wrangler 4.84+ JSON-style "database_id": "<uuid>"; older = TOML database_id = "<uuid>"
-  id=$(echo "$out" | grep -oE '"database_id"\s*:\s*"[^"]+"|database_id\s*=\s*"[^"]+"' | head -1 | sed -E 's/.*"([0-9a-f-]{36})".*/\1/')
-  if [ -z "$id" ]; then
-    echo "ERROR: could not parse database_id from output:" >&2
-    echo "$out" >&2
+def load-env-file [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let file = $"config/($env_name).env"
+  if not ($file | path exists) {
+    print --stderr $"ERROR: ($file) not found."
     exit 1
-  fi
-  sed -i.bak -E "s|^METADATA_DB_ID=.*|METADATA_DB_ID=$id|" "$file"
-  rm -f "$file.bak"
-  echo "✓ Created D1 '$METADATA_DB_NAME' (id $id) and wrote to $file"
-fi
+  }
+  let cfg = (
+    open --raw $file
+    | lines
+    | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+    | reduce -f {} {|line, acc|
+        let parts = ($line | split row -n 2 "=")
+        let key = ($parts | get 0)
+        let val = ($parts | get 1 | str trim --char '"')
+        $acc | upsert $key $val
+      }
+  )
+  { file: $file, cfg: $cfg }
+}
 
-# ── Schema apply — idempotent (wrangler skips already-applied) ───────────────
-if [ -n "${METADATA_DB_NAME:-}" ] && [ -f "worker/schema.sql" ]; then
-  echo "Applying worker/schema.sql to '$METADATA_DB_NAME' ..."
-  wrangler d1 execute "$METADATA_DB_NAME" --remote --file=worker/schema.sql || true
-fi
+def main [] {
+  let env_data = (load-env-file)
+  let cfg = $env_data.cfg
+  let file = $env_data.file
 
-echo "Done. Next: fnox CLOUDFLARE_API_TOKEN/ACCOUNT_ID set; mise run cf:access-setup"
+  $env.CLOUDFLARE_API_TOKEN = (
+    if ($env.CLOUDFLARE_API_TOKEN? | default "" | is-not-empty) {
+      $env.CLOUDFLARE_API_TOKEN
+    } else {
+      try { ^fnox get CLOUDFLARE_API_TOKEN | str trim } catch { "" }
+    }
+  )
+
+  let bucket = ($cfg.BACKUP_BUCKET_NAME? | default "")
+  if ($bucket | is-empty) {
+    print "↷ R2: BACKUP_BUCKET_NAME not set — skipped"
+  } else {
+    let listing = (try { ^wrangler r2 bucket list | complete | get stdout } catch { "" })
+    if ($listing | str contains $bucket) {
+      print $"✓ R2 bucket '($bucket)' already exists"
+    } else {
+      print $"Creating R2 bucket '($bucket)' ..."
+      ^wrangler r2 bucket create $bucket
+    }
+  }
+
+  let db_name = ($cfg.METADATA_DB_NAME? | default "")
+  let existing_id = ($cfg.METADATA_DB_ID? | default "")
+
+  if ($db_name | is-empty) {
+    print "↷ D1: METADATA_DB_NAME not set — skipped"
+  } else if (not ($existing_id | is-empty)) {
+    print $"✓ Metadata D1 id already set \(($existing_id)\); skipping create."
+  } else {
+    print $"Creating D1 database '($db_name)' ..."
+    let out = (^wrangler d1 create $db_name | complete | get stdout)
+    let parsed = ($out | parse --regex '"database_id"\s*:\s*"([0-9a-f-]{36})"|database_id\s*=\s*"([0-9a-f-]{36})"')
+    if ($parsed | length) == 0 {
+      print --stderr "ERROR: could not parse database_id from output:"
+      print --stderr $out
+      exit 1
+    }
+    let id = ($parsed | first | get capture0? | default ($parsed | first | get capture1?))
+    let original = (open --raw $file)
+    let updated = ($original | str replace --regex '^METADATA_DB_ID=.*' $"METADATA_DB_ID=($id)" --multiline)
+    $updated | save -f $file
+    print $"✓ Created D1 '($db_name)' \(id ($id)\) and wrote to ($file)"
+  }
+
+  if (not ($db_name | is-empty)) and ("worker/schema.sql" | path exists) {
+    print $"Applying worker/schema.sql to '($db_name)' ..."
+    try { ^wrangler d1 execute $db_name --remote --file=worker/schema.sql }
+  }
+
+  print "Done. Next: fnox CLOUDFLARE_API_TOKEN/ACCOUNT_ID set; mise run cf:access-setup"
+}

@@ -57,7 +57,7 @@ $session       | ^fnox set --global -p keychain BW_SESSION
 
 # Locate fnox global config (cross-platform)
 let config_path = (
-  ^fnox config-files --global
+  ^fnox config-files
   | lines
   | where { |l| ($l | str trim) ends-with ".toml" }
   | first
