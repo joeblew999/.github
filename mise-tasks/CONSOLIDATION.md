@@ -183,8 +183,34 @@ endgame; today's nu scripts are the stepping stone.
 | `kv-manager` / `d1-manager` | Add canonical CF-Access composition tasks (template for others) |
 | `agentic-inbox` / `saasmail` | Same pattern |
 | `ifc-lite` / `mon-house` | Different — Tauri + content. Compose around their actual workflows |
-| `utm-dev-cli` | Already minimal, no composition needed |
+| `utm-dev-cli` | Generalize beyond Tauri — see below |
 | `joeblew999/.github` | Rename `prove/` → `cf-access/` for v0.11.0 |
+
+### utm-dev-cli generalization (not just Tauri)
+
+Today `utm-dev windows build` / `linux build` assume a Tauri project (output: `.msi`, `.deb`, `.AppImage`). For plain Rust binaries (future `secrets-manager`), the high-level commands don't apply. The VM primitives (`vm up/push/exec/pull`) DO work for any project, but it's verbose.
+
+**~1 day of Rust work** in `utm-dev-cli`:
+1. In `src/windows.rs` / `src/linux.rs` `build` commands: detect `src-tauri/` or `tauri.conf.json`
+2. If Tauri: keep current behavior (`cargo tauri build`, bundle outputs)
+3. If plain cargo: run `cargo build --release --target <triple>` and copy
+   `target/<triple>/release/<binary-name>` back to host
+4. VM lifecycle code stays the same — only the build-step branch changes
+
+After this lands, building `secrets-manager` for Windows from Mac is one command:
+```bash
+utm-dev windows build --release
+```
+
+This is the right shape because the eventual Rust port to `joeblew999/secrets-manager` (Phase 5) needs cross-platform binaries — and utm-dev-cli is already the org's cross-platform build orchestrator. Generalizing it benefits both Tauri apps and pure CLI tools.
+
+Until that lands, the recipe for any Rust crate is:
+```bash
+utm-dev vm up --name windows-build
+utm-dev vm push --name windows-build --from . --to /Users/vagrant/myproject
+utm-dev vm exec --name windows-build -- "cd myproject && mise run rust:build -- --release --target x86_64-pc-windows-msvc"
+utm-dev vm pull --name windows-build --from "C:\\Users\\vagrant\\myproject\\target\\x86_64-pc-windows-msvc\\release\\myapp.exe" --to ./dist/
+```
 
 ## Why STOP NOW vs keep going
 
