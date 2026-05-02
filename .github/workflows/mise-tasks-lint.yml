@@ -35,8 +35,7 @@ jobs:
           let files = (
             glob "mise-tasks/**/*"
             | where { |p|
-                let info = (try { ls $p | first } catch { null })
-                ($info != null) and ($info.type == "file") and (not ($p | str ends-with ".md"))
+                (($p | path type) == "file") and (not ($p | str ends-with ".md"))
               }
           )
 
@@ -153,9 +152,7 @@ jobs:
           let nu_files = (
             glob "mise-tasks/**/*"
             | where { |p|
-                let info = (try { ls $p | first } catch { null })
-                ($info != null)
-                and ($info.type == "file")
+                (($p | path type) == "file")
                 and (not ($p | str ends-with ".md"))
                 and ((try { open --raw $p | lines | first } catch { "" }) == "#!/usr/bin/env nu")
               }
