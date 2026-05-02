@@ -29,47 +29,34 @@ jobs:
         run: mise tasks ls
 
       - name: Verify task scripts are executable and well-formed
-        shell: 'mise exec -- nu --no-newline {0}'
+        # Reverted to bash — nu's glob returned platform-specific path
+        # separators (\ on Windows, / on POSIX), making the _proof exclusion
+        # check fragile. find handles this uniformly.
+        shell: bash
         run: |
-          # All files under mise-tasks/, excluding markdown.
-          let files = (
-            glob "mise-tasks/**/*"
-            | where { |p|
-                (($p | path type) == "file") and (not ($p | str ends-with ".md"))
-              }
-          )
-
-          mut fail = false
-          for f in $files {
-            let head = (try { open --raw $f | lines | first } catch { "" })
-            let is_proof = ($f | str contains "mise-tasks/_proof/")
-
-            # Shebang: bash OR nu only (port-on-touch migration in progress)
-            if not (($head == "#!/usr/bin/env bash") or ($head == "#!/usr/bin/env nu")) {
-              print $"✗ unsupported shebang \(($head)\): ($f)"
-              $fail = true
-            }
-            # Tasks (not _proof smoke tests) require #MISE description= header
-            if not $is_proof {
-              let has_desc = (try { open --raw $f | lines | any { |l| $l | str starts-with "#MISE description=" } } catch { false })
-              if not $has_desc {
-                print $"✗ missing #MISE description= header: ($f)"
-                $fail = true
-              }
-            }
-            # On Windows runners, executable bit doesn't apply the same way.
-            # Skip the exec-bit check there.
-            let is_windows = ((sys host | get name) == "Windows")
-            if not $is_windows {
-              let mode = (try { ls -l $f | first | get mode | default "" } catch { "" })
-              if not ($mode | str contains "x") {
-                print $"✗ not executable: ($f)"
-                $fail = true
-              }
-            }
-          }
-          if $fail { exit 1 }
-          print $"✓ all ($files | length) task files are well-formed"
+          fail=0
+          while IFS= read -r f; do
+            if [ ! -x "$f" ]; then
+              echo "✗ not executable: $f"
+              fail=1
+            fi
+            shebang=$(head -1 "$f")
+            case "$shebang" in
+              '#!/usr/bin/env bash'|'#!/usr/bin/env nu') : ;;
+              *) echo "✗ unsupported shebang ($shebang): $f"; fail=1 ;;
+            esac
+            case "$f" in
+              mise-tasks/_proof/*) : ;;
+              *)
+                if ! grep -q '^#MISE description=' "$f"; then
+                  echo "✗ missing #MISE description= header: $f"
+                  fail=1
+                fi
+                ;;
+            esac
+          done < <(find mise-tasks -type f ! -name "README.md" ! -name "*.md")
+          [ "$fail" -eq 0 ] && echo "✓ all task files are executable and well-formed"
+          exit "$fail"
 
       - name: Check for Tera-breaking syntax (bash files only)
         # Kept as bash — nu's where+open chain hit parser/external_command
@@ -145,32 +132,28 @@ jobs:
       # nu --ide-check returns parse errors in JSON to stdout if any.
       # Empty stdout = clean parse. Non-zero exit = error.
       - name: Parse-check every nu task script
-        shell: 'mise exec -- nu --no-newline {0}'
+        # Reverted to bash — '^nu --ide-check' from inside a 'shell: nu'
+        # context errored as nu::shell::external_command on all 3 OS.
+        # find + while-read works uniformly; mise-activated 'nu' on PATH
+        # for the inner invocation.
+        shell: bash
         run: |
-          # We're already inside 'mise exec -- nu', so 'nu' is on PATH.
-          # No need for another mise wrapper.
-          let nu_files = (
-            glob "mise-tasks/**/*"
-            | where { |p|
-                (($p | path type) == "file")
-                and (not ($p | str ends-with ".md"))
-                and ((try { open --raw $p | lines | first } catch { "" }) == "#!/usr/bin/env nu")
-              }
-          )
-
-          mut fail = false
-          for f in $nu_files {
-            print $"→ ($f)"
-            let result = (^nu --ide-check 1 $f | complete)
-            let combined = $"($result.stdout)($result.stderr)"
-            if ($combined | str contains '"type":"diagnostic"') {
-              print $"✗ parse errors in ($f):"
-              print $combined
-              $fail = true
-            }
-          }
-          if $fail { exit 1 }
-          print $"✓ all nu scripts parse cleanly \(($nu_files | length) files\)"
+          set -eu
+          fail=0
+          while IFS= read -r f; do
+            echo "→ $f"
+            output=$(mise exec -- nu --ide-check 1 "$f" 2>&1 || true)
+            if [ -n "$output" ] && echo "$output" | grep -q '"type":"diagnostic"'; then
+              echo "✗ parse errors in $f:"
+              echo "$output"
+              fail=1
+            fi
+          done < <(find mise-tasks -type f \
+                        \( -name '*.nu' -o ! -name '*.md' \) \
+                        -exec sh -c 'head -1 "$1" | grep -q "^#!/usr/bin/env nu"' _ {} \; \
+                        -print)
+          [ "$fail" -eq 0 ] && echo "✓ all nu scripts parse cleanly"
+          exit "$fail"
 
       # Real execution: run each task with no env, expect the friendly
       # "missing prerequisite" error path. Proves every task EXECUTES on
