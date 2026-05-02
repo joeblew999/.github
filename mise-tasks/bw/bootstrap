@@ -80,8 +80,8 @@ echo
 for k in BW_CLIENTID BW_CLIENTSECRET BW_SESSION; do
   V=$(fnox get "$k" 2>/dev/null || true)
   if [ -n "$V" ]; then
-    # Tera template engine (mise) treats {# as a comment block opener, so
-    # bash's ${#V} length syntax is forbidden in mise-task scripts. Use wc -c.
+    # Use wc -c here — bash variable-length syntax is forbidden in mise-task
+    # scripts because the curly-brace-hash combination opens a Tera comment.
     LEN=$(printf '%s' "$V" | wc -c | tr -d ' ')
     echo "  ✓ $k ($LEN chars)"
   else
