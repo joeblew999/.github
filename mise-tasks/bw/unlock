@@ -1,22 +1,27 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nu
 #MISE description="Refresh BW_SESSION (vault auto-locks after inactivity). Hidden prompt for master password, stores new session in fnox keychain."
-set -euo pipefail
 
-unset FNOX_AGE_KEY
-
-if ! command -v bw >/dev/null 2>&1; then
-  echo "✗ bw CLI not found — run 'mise install' in a repo that declares it" >&2
+if (which bw | is-empty) {
+  print --stderr "✗ bw CLI not found — run 'mise install' in a repo that declares it"
   exit 1
-fi
+}
 
-read -r -s -p "master password: " PW; echo
-[ -z "$PW" ] && { echo "✗ empty"; exit 1; }
-export BW_PASSWORD="$PW"; unset PW
+let pw = (input --suppress-output "master password: ")
+print ""
+if ($pw | is-empty) {
+  print --stderr "✗ empty"
+  exit 1
+}
 
-NEW_SESSION=$(bw unlock --raw --passwordenv BW_PASSWORD)
-unset BW_PASSWORD
-[ -z "$NEW_SESSION" ] && { echo "✗ unlock failed"; exit 1; }
+# bw --passwordenv reads from env; export, run, then drop the env var.
+$env.BW_PASSWORD = $pw
+let new_session = (try { ^bw unlock --raw --passwordenv BW_PASSWORD | str trim } catch { "" })
+hide-env BW_PASSWORD
 
-printf '%s' "$NEW_SESSION" | fnox set --global -p keychain BW_SESSION
-unset NEW_SESSION
-echo "✓ BW_SESSION refreshed in fnox keychain"
+if ($new_session | is-empty) {
+  print --stderr "✗ unlock failed"
+  exit 1
+}
+
+$new_session | ^fnox set --global -p keychain BW_SESSION
+print "✓ BW_SESSION refreshed in fnox keychain"

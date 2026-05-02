@@ -1,63 +1,73 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nu
 #MISE description="Pull all NodeWarden items → update keychain (idempotent). Run after rotating a secret on iPhone or web vault. Skip list: BW_CLIENTID/BW_CLIENTSECRET/BW_SESSION (override via BW_SYNC_SKIP)."
-#USAGE flag "--dry-run" help="show plan, change nothing"
-set -euo pipefail
 
-unset FNOX_AGE_KEY
+# Args: optional --dry-run as $1
+def main [--dry-run] {
+  let dry = $dry_run
 
-if [ "${usage_dry_run:-}" = "true" ] || [ "${1:-}" = "--dry-run" ]; then
-  DRY_RUN=1
-else
-  DRY_RUN=0
-fi
+  let skip_str = ($env.BW_SYNC_SKIP? | default "BW_CLIENTID,BW_CLIENTSECRET,BW_SESSION")
+  let skip_list = ($skip_str | split row "," | each { |s| $s | str trim })
 
-SKIP="${BW_SYNC_SKIP:-BW_CLIENTID,BW_CLIENTSECRET,BW_SESSION}"
-SKIP_LF=$(printf '%s' "$SKIP" | tr ',' '\n')
-is_skipped() { printf '%s' "$SKIP_LF" | grep -Fxq -- "$1"; }
+  let session = (try { ^fnox get BW_SESSION | str trim } catch { "" })
+  if ($session | is-empty) {
+    print --stderr "✗ no BW_SESSION — run 'mise run bw:bootstrap'"
+    exit 1
+  }
+  $env.BW_SESSION = $session
 
-BW_SESSION=$(fnox get BW_SESSION 2>/dev/null || true)
-[ -z "$BW_SESSION" ] && { echo "✗ no BW_SESSION — run 'mise run bw:bootstrap'" >&2; exit 1; }
-export BW_SESSION
+  let s = (try { ^bw status | from json } catch { {status: "error"} })
+  if ($s.status? != "unlocked") {
+    print --stderr "✗ vault locked — run 'mise run bw:unlock'"
+    exit 1
+  }
 
-if ! bw status 2>/dev/null | jq -e '.status == "unlocked"' >/dev/null; then
-  echo "✗ vault locked — run 'mise run bw:unlock'" >&2
-  exit 1
-fi
+  try { ^bw sync | ignore }
 
-bw sync >/dev/null 2>&1 || true
+  if $dry {
+    print "=== DRY RUN — no changes ==="
+  } else {
+    print "=== sync NodeWarden → keychain ==="
+  }
 
-[ "$DRY_RUN" = "1" ] && echo "=== DRY RUN — no changes ===" || echo "=== sync NodeWarden → keychain ==="
+  let items = (^bw list items | from json | where type == 1)
+  mut updated = 0
+  mut same = 0
+  mut skipped = 0
+  mut empty = 0
 
-updated=0; same=0; skipped=0; empty=0
+  for it in $items {
+    let name = $it.name
+    let pw = ($it.login.password? | default "")
+    if $name in $skip_list {
+      $skipped = ($skipped + 1)
+      continue
+    }
+    if ($pw | is-empty) {
+      print $"  ⤬ ($name) (empty in NodeWarden)"
+      $empty = ($empty + 1)
+      continue
+    }
+    let cur = (try { ^fnox get $name | str trim } catch { "" })
+    if $cur == $pw {
+      $same = ($same + 1)
+    } else {
+      if ($cur | is-empty) {
+        print $"  + ($name) (new in keychain)"
+      } else {
+        print $"  ↻ ($name) (keychain differs from NodeWarden — would update)"
+      }
+      if not $dry {
+        $pw | ^fnox set --global -p keychain $name | ignore
+      }
+      $updated = ($updated + 1)
+    }
+  }
 
-while IFS=$'\t' read -r NAME PW; do
-  [ -z "$NAME" ] && continue
-  if is_skipped "$NAME"; then
-    skipped=$((skipped + 1))
-    continue
-  fi
-  if [ -z "$PW" ]; then
-    echo "  ⤬ $NAME (empty in NodeWarden)"
-    empty=$((empty + 1))
-    continue
-  fi
-  CUR=$(fnox get "$NAME" 2>/dev/null || true)
-  if [ "$CUR" = "$PW" ]; then
-    same=$((same + 1))
-  else
-    if [ -z "$CUR" ]; then
-      echo "  + $NAME (new in keychain)"
-    else
-      echo "  ↻ $NAME (keychain differs from NodeWarden — would update)"
-    fi
-    if [ "$DRY_RUN" = "0" ]; then
-      printf '%s' "$PW" | fnox set --global -p keychain "$NAME" >/dev/null
-    fi
-    updated=$((updated + 1))
-  fi
-done < <(bw list items 2>/dev/null | jq -r '.[] | select(.type==1) | [.name, (.login.password // "")] | @tsv')
-
-echo
-[ "$DRY_RUN" = "1" ] && echo "=== DRY RUN summary ===" || echo "=== sync complete ==="
-printf "  %d updated / %d already-in-sync / %d skipped / %d empty\n" \
-  "$updated" "$same" "$skipped" "$empty"
+  print ""
+  if $dry {
+    print "=== DRY RUN summary ==="
+  } else {
+    print "=== sync complete ==="
+  }
+  print $"  ($updated) updated / ($same) already-in-sync / ($skipped) skipped / ($empty) empty"
+}

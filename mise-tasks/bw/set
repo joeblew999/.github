@@ -1,47 +1,62 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nu
 #MISE description="Write-through: hidden-input prompt → set NodeWarden item + mirror to keychain. Use to rotate a secret on Mac (kept consistent in both stores in one shot)."
-#USAGE arg "<name>" help="secret name (e.g. GITHUB_TOKEN)"
-set -euo pipefail
 
-unset FNOX_AGE_KEY
+# usage: mise run bw:set -- <NAME>
+def main [name?: string] {
+  let n = ($name | default "")
+  if ($n | is-empty) {
+    print --stderr "usage: mise run bw:set -- <NAME>"
+    exit 1
+  }
 
-NAME="${usage_name:-${1:-}}"
-[ -z "$NAME" ] && { echo "usage: mise run bw:set -- <NAME>" >&2; exit 1; }
+  let session = (try { ^fnox get BW_SESSION | str trim } catch { "" })
+  if ($session | is-empty) {
+    print --stderr "✗ no BW_SESSION — run 'mise run bw:bootstrap'"
+    exit 1
+  }
+  $env.BW_SESSION = $session
 
-BW_SESSION=$(fnox get BW_SESSION 2>/dev/null || true)
-[ -z "$BW_SESSION" ] && { echo "✗ no BW_SESSION — run 'mise run bw:bootstrap'" >&2; exit 1; }
-export BW_SESSION
+  let s = (try { ^bw status | from json } catch { {status: "error"} })
+  if ($s.status? != "unlocked") {
+    print --stderr "✗ vault locked — run 'mise run bw:unlock'"
+    exit 1
+  }
 
-if ! bw status 2>/dev/null | jq -e '.status == "unlocked"' >/dev/null; then
-  echo "✗ vault locked — run 'mise run bw:unlock'" >&2
-  exit 1
-fi
+  let val = (input --suppress-output $"value for ($n) (hidden): ")
+  print ""
+  if ($val | is-empty) {
+    print --stderr "✗ empty value — aborting"
+    exit 1
+  }
 
-read -r -s -p "value for $NAME (hidden): " VAL; echo
-[ -z "$VAL" ] && { echo "✗ empty value — aborting"; exit 1; }
+  try { ^bw sync | ignore }
 
-bw sync >/dev/null 2>&1 || true
+  let existing = (
+    try { ^bw list items --search $n | from json } catch { [] }
+    | where { |it| $it.type? == 1 and $it.name? == $n }
+  )
 
-EXISTING_ID=$(bw list items --search "$NAME" 2>/dev/null \
-  | jq -r --arg n "$NAME" '.[] | select(.type==1 and .name==$n) | .id' \
-  | head -1)
+  if (($existing | length) > 0) {
+    let id = ($existing | first | get id)
+    print $"→ updating NodeWarden item ($n) (($id))"
+    let updated = (^bw get item $id | from json | upsert login.password $val | to json)
+    $updated | ^bw encode | ^bw edit item $id | ignore
+  } else {
+    print $"→ creating new NodeWarden item ($n)"
+    let new_item = {
+      type: 1
+      name: $n
+      notes: "managed by fnox+bw; rotate via mise run bw:set"
+      login: {username: "", password: $val, uris: []}
+      fields: []
+      favorite: false
+      reprompt: 0
+    }
+    $new_item | to json | ^bw encode | ^bw create item | ignore
+  }
 
-if [ -n "$EXISTING_ID" ]; then
-  echo "→ updating NodeWarden item $NAME ($EXISTING_ID)"
-  bw get item "$EXISTING_ID" \
-    | jq --arg pw "$VAL" '.login.password = $pw' \
-    | bw encode \
-    | bw edit item "$EXISTING_ID" >/dev/null
-else
-  echo "→ creating new NodeWarden item $NAME"
-  jq -n --arg name "$NAME" --arg pw "$VAL" \
-    '{type: 1, name: $name, notes: "managed by fnox+bw; rotate via mise run bw:set", login: {username: "", password: $pw, uris: []}, fields: [], favorite: false, reprompt: 0}' \
-    | bw encode \
-    | bw create item >/dev/null
-fi
+  print "→ mirroring to keychain"
+  $val | ^fnox set --global -p keychain $n | ignore
 
-echo "→ mirroring to keychain"
-printf '%s' "$VAL" | fnox set --global -p keychain "$NAME" >/dev/null
-unset VAL
-
-echo "✓ $NAME set in NodeWarden + keychain"
+  print $"✓ ($n) set in NodeWarden + keychain"
+}

@@ -1,16 +1,19 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nu
 #MISE description="Show bw login status against NodeWarden (server URL, lock state, email). Reads BW_SESSION from fnox keychain."
-set -euo pipefail
 
-unset FNOX_AGE_KEY
-
-if ! command -v bw >/dev/null 2>&1; then
-  echo "✗ bw CLI not found — run 'mise install' in a repo that declares it" >&2
+if (which bw | is-empty) {
+  print --stderr "✗ bw CLI not found — run 'mise install' in a repo that declares it"
   exit 1
-fi
+}
 
-SESSION=$(fnox get BW_SESSION 2>/dev/null || true)
-[ -z "$SESSION" ] && { echo "✗ no BW_SESSION in fnox — run 'mise run bw:bootstrap'" >&2; exit 1; }
+let session = (try { ^fnox get BW_SESSION | str trim } catch { "" })
+if ($session | is-empty) {
+  print --stderr "✗ no BW_SESSION in fnox — run 'mise run bw:bootstrap'"
+  exit 1
+}
+$env.BW_SESSION = $session
 
-BW_SESSION="$SESSION" bw status 2>&1 \
-  | jq -r '"  status:    \(.status)\n  serverUrl: \(.serverUrl)\n  userEmail: \(.userEmail // "?")"'
+let s = (^bw status | from json)
+print $"  status:    ($s.status)"
+print $"  serverUrl: ($s.serverUrl)"
+print $"  userEmail: ($s.userEmail? | default '?')"
