@@ -79,7 +79,14 @@ unset SESSION
 echo
 for k in BW_CLIENTID BW_CLIENTSECRET BW_SESSION; do
   V=$(fnox get "$k" 2>/dev/null || true)
-  [ -n "$V" ] && echo "  ✓ $k (${#V} chars)" || echo "  ✗ $k missing"
+  if [ -n "$V" ]; then
+    # Tera template engine (mise) treats {# as a comment block opener, so
+    # bash's ${#V} length syntax is forbidden in mise-task scripts. Use wc -c.
+    LEN=$(printf '%s' "$V" | wc -c | tr -d ' ')
+    echo "  ✓ $k ($LEN chars)"
+  else
+    echo "  ✗ $k missing"
+  fi
 done
 echo
 echo "============================================================"

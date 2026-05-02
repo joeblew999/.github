@@ -37,24 +37,47 @@ jobs:
               echo "✗ not executable: $f"
               fail=1
             fi
-            if ! head -1 "$f" | grep -q '^#!/usr/bin/env bash'; then
-              echo "✗ missing shebang: $f"
-              fail=1
-            fi
-            if ! grep -q '^#MISE description=' "$f"; then
-              echo "✗ missing #MISE description= header: $f"
-              fail=1
-            fi
-          done < <(find mise-tasks -type f ! -name "README.md")
+            # Accept either bash or nu shebang (nushell migration in progress —
+            # see project_nushell_migration.md). Files under _proof/ are
+            # cross-platform smoke tests, not invokable mise tasks.
+            shebang=$(head -1 "$f")
+            case "$shebang" in
+              '#!/usr/bin/env bash'|'#!/usr/bin/env nu') : ;;
+              *) echo "✗ unsupported shebang ($shebang): $f"; fail=1 ;;
+            esac
+            # Tasks (not _proof smoke tests) must have a #MISE description= header
+            case "$f" in
+              mise-tasks/_proof/*) : ;;
+              *)
+                if ! grep -q '^#MISE description=' "$f"; then
+                  echo "✗ missing #MISE description= header: $f"
+                  fail=1
+                fi
+                ;;
+            esac
+          done < <(find mise-tasks -type f ! -name "README.md" ! -name "*.md")
           [ "$fail" -eq 0 ] && echo "✓ all task files are executable and well-formed"
           exit "$fail"
 
-      - name: Check for Tera-breaking syntax
+      - name: Check for Tera-breaking syntax (bash files only)
         shell: bash
         run: |
-          if grep -rn '\${#' mise-tasks/ 2>/dev/null | grep -v README; then
-            echo "✗ found \${# syntax — Tera template engine treats {# as a comment block opener"
-            echo "  Use wc -c / wc -l / printf instead of \${#VAR} / \${#ARRAY[@]}"
+          # Tera treats {# as a comment opener. Only bash uses ${#VAR}; nu has
+          # different length syntax (str length / length).
+          if find mise-tasks -type f -name '*.sh' -o -type f ! -name '*.nu' ! -name '*.md' \
+               | xargs grep -l '\${#' 2>/dev/null | grep -v README; then
+            echo "✗ found \${# syntax in a bash file — use wc -c / printf instead"
             exit 1
           fi
           echo "✓ no Tera-breaking syntax found"
+
+      # Cross-platform proof: install nu via mise, run the proof script.
+      # If this passes on all 3 OS legs, the nushell migration plan is
+      # CI-validated for the joeblew999 org.
+      - name: Install nushell via mise (ad-hoc — not committed to repo mise.toml)
+        shell: bash
+        run: mise use --global github:nushell/nushell@latest
+
+      - name: Run nu cross-platform proof script
+        shell: bash
+        run: mise exec -- nu mise-tasks/_proof/nu-cross-platform.nu
