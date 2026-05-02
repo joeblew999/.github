@@ -160,62 +160,60 @@ jobs:
       # Why negative-path: positive paths require real CF tokens / bw vault /
       # gh secrets — those are integration tests for a separate workflow.
       # Negative paths are pure self-test.
+      # Use nu itself for this step — dogfood the SSOT story in CI.
+      # Bypasses macOS bash 3.2 limits (no declare -A, etc.) and demonstrates
+      # 'shell: nu' working on every runner.
       - name: Negative-path execution test (every task, every OS)
-        shell: bash
+        shell: 'mise exec -- nu --no-newline {0}'
         env:
-          # Wipe anything that might let a task escape its guard
           CLOUDFLARE_API_TOKEN: ""
           BW_SESSION: ""
           FNOX_SYNC_KEYS: ""
           MISE_ENV: __nonexistent__
         run: |
-          set -eu
-          fail=0
-          # Expected error per task — varies because some tasks check for
-          # the bw CLI before checking fnox state. .github CI doesn't have bw
-          # in [tools] (it's only required by repos that use bw:* tasks),
-          # so bw-checking tasks fail at "bw CLI not found".
-          declare -A expected_substr=(
-            [bw/list]="no BW_SESSION"
-            [bw/status]="bw CLI not found"
-            [bw/diff]="no BW_SESSION"
-            [bw/sync]="no BW_SESSION"
-            [bw/migrate-from-keychain]="no BW_SESSION"
-            [bw/unlock]="bw CLI not found"
-            [bw/bootstrap]="bw CLI not found"
-            [cf/token-check]="not set and not in fnox"
-            [secrets/sync-github]="FNOX_SYNC_KEYS not set"
-            [env/resolve]="not found"
-            [release]="usage: mise run release"
-            [rust/wasm-pack]="usage: mise run rust:wasm-pack"
-          )
+          # Ensure fnox config exists on every OS (Linux skipped the keychain
+          # step). Idempotent.
+          try { ^mise exec -- fnox init --global } catch { }
+          for k in ["BW_SESSION", "CLOUDFLARE_API_TOKEN"] {
+            try { ^mise exec -- fnox remove $k --global } catch { }
+          }
 
-          # Ensure fnox global config exists on every OS — Linux skipped the
-          # keychain round-trip step above, so config may not be initialized.
-          mise exec -- fnox init --global 2>/dev/null || true
+          # Expected error message per task — first guard each script hits
+          # under empty env. Some bw scripts check the bw binary first
+          # (.github CI doesn't have bw in [tools]); others check fnox first.
+          let cases = [
+            { task: "bw/list",                  want: "no BW_SESSION" },
+            { task: "bw/status",                want: "bw CLI not found" },
+            { task: "bw/diff",                  want: "no BW_SESSION" },
+            { task: "bw/sync",                  want: "no BW_SESSION" },
+            { task: "bw/migrate-from-keychain", want: "no BW_SESSION" },
+            { task: "bw/unlock",                want: "bw CLI not found" },
+            { task: "bw/bootstrap",             want: "bw CLI not found" },
+            { task: "cf/token-check",           want: "not set and not in fnox" },
+            { task: "secrets/sync-github",      want: "FNOX_SYNC_KEYS not set" },
+            { task: "env/resolve",              want: "not found" },
+            { task: "release",                  want: "usage: mise run release" },
+            { task: "rust/wasm-pack",           want: "usage: mise run rust:wasm-pack" },
+          ]
 
-          # Make sure no fnox secrets exist that would let bw:* tasks past
-          # the guard. The keychain round-trip step above may have left
-          # a clean state; double-check.
-          for k in BW_SESSION CLOUDFLARE_API_TOKEN; do
-            mise exec -- fnox remove "$k" --global 2>/dev/null || true
-          done
+          mut fail = 0
+          for c in $cases {
+            print $"→ ($c.task)  \(expect exit≠0 + '($c.want)' in output\)"
+            let result = (^mise exec -- nu $"mise-tasks/($c.task)" | complete)
+            let combined = $"($result.stdout)($result.stderr)"
+            if ($combined | str contains $c.want) and ($result.exit_code != 0) {
+              print $"  ✓ exit=($result.exit_code)"
+            } else {
+              print $"  ✗ FAIL  exit=($result.exit_code)"
+              print $"    got: ($combined | str substring 0..200)"
+              $fail = 1
+            }
+          }
 
-          for task in "${!expected_substr[@]}"; do
-            want="${expected_substr[$task]}"
-            echo
-            echo "→ $task  (expect exit≠0 + '$want' in output)"
-            actual=$(mise exec -- nu "mise-tasks/$task" 2>&1 || true)
-            ec=$(mise exec -- nu "mise-tasks/$task" >/dev/null 2>&1; echo $?)
-
-            if echo "$actual" | grep -qF "$want" && [ "$ec" != "0" ]; then
-              echo "  ✓ exit=$ec, message contains '$want'"
-            else
-              echo "  ✗ FAIL  exit=$ec"
-              echo "    got: $(echo "$actual" | head -3)"
-              fail=1
-            fi
-          done
-
-          [ "$fail" -eq 0 ] && echo "" && echo "✓ all negative-path tests passed on $(uname -s)"
-          exit "$fail"
+          if $fail == 0 {
+            print ""
+            let host = (sys host | get name)
+            print $"✓ all negative-path tests passed on ($host)"
+          } else {
+            exit 1
+          }
