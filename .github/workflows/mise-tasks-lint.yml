@@ -72,6 +72,12 @@ jobs:
         run: |
           # Tera treats {# as a comment opener. Only bash uses ${#VAR};
           # nu has its own length syntax (str length / length).
+          # Skip files whose shebang is nu — they don't have bash semantics.
+          def is-bash-file [path: string] {
+            let head = (open --raw $path | lines | first)
+            ($head != "#!/usr/bin/env nu")
+          }
+
           let bad = (
             ls **/*
             | where type == file
@@ -80,10 +86,7 @@ jobs:
                 ($p | str starts-with "mise-tasks/")
                 and (not ($p | str ends-with ".md"))
                 and (not ($p | str ends-with ".nu"))
-                and (
-                  let head = (open --raw $p | lines | first)
-                  $head != "#!/usr/bin/env nu"
-                )
+                and (is-bash-file $p)
               }
             | where { |p| open --raw $p | str contains '${#' }
           )
