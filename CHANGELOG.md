@@ -3,6 +3,46 @@
 All notable changes to the shared mise task library. Bump consumer repos'
 `[task_config].includes` pin when adopting a new release.
 
+## v0.12.0 — 2026-05-05
+
+### Added
+
+- **`cf:access-revoke`** — new task. Revokes active Cloudflare Access
+  sessions for one or more emails without modifying the allow policy.
+  Useful when you want to kick someone out *right now* rather than wait
+  for their session cookie (24h default) to expire. Usage:
+
+  ```bash
+  mise run cf:access-revoke -- user@example.com
+  mise run cf:access-revoke -- a@x.com b@y.com
+  ```
+
+  Calls `POST /accounts/{id}/access/organizations/revoke_user` per email.
+  Does NOT touch `OPERATOR_EMAIL` or the policy — pair with
+  `cf:access-setup` (after editing the env file) for permanent removal.
+
+### Changed
+
+- **`cf:access-setup`** — auto-revokes dropped users. When a re-run shrinks
+  the allow set (i.e. an email present in the existing policy is missing
+  from `OPERATOR_EMAIL`), the script now POSTs `revoke_user` for each
+  removed email immediately after the policy PUT succeeds. Closes the
+  window where a user removed from the env file kept their existing
+  session cookie until it timed out. No-op on adds or no-changes.
+
+### Migration notes
+
+Pure additive — bump the include pin, no caller-side changes:
+
+```diff
+- includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.11.0"]
++ includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.12.0"]
+```
+
+If you've already removed someone via `cf:access-setup` on v0.11.0 and
+their session is still active, run `mise run cf:access-revoke -- their@email`
+once on v0.12.0 to evict them.
+
 ## v0.11.0 — 2026-05-05
 
 ### Fixed

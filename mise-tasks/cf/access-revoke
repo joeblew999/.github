@@ -1,0 +1,42 @@
+#!/usr/bin/env nu
+#MISE description="Revoke active CF Access sessions for one or more emails. Independent of the policy file — useful for emergency revocation without re-running cf:access-setup. Usage: mise run cf:access-revoke -- user@example.com [user2@example.com ...]"
+
+# Calls POST /accounts/{account_id}/access/organizations/revoke_user for each
+# email. The user can no longer use any active session cookie immediately;
+# the next request hits the Access login page. Does NOT modify the allow
+# policy — if the email is still in OPERATOR_EMAIL, the user can simply
+# re-authenticate. Pair with cf:access-setup (after editing the env file)
+# to permanently remove someone.
+
+def main [...emails: string] {
+  if ($emails | is-empty) {
+    print --stderr "usage: mise run cf:access-revoke -- <email> [email...]"
+    exit 1
+  }
+
+  let token = (^fnox get CLOUDFLARE_API_TOKEN | str trim)
+  let account = (^fnox get CLOUDFLARE_ACCOUNT_ID | str trim)
+  let api = $"https://api.cloudflare.com/client/v4/accounts/($account)"
+  let auth_hdr = $"Authorization: Bearer ($token)"
+  let json_hdr = "Content-Type: application/json"
+
+  print $"→ Revoking active CF Access sessions for ($emails | length) user\(s\)"
+  mut failed = 0
+  for email in $emails {
+    let body = { email: $email } | to json
+    let resp = (^curl -sS -X POST -H $auth_hdr -H $json_hdr -d $body $"($api)/access/organizations/revoke_user" | from json)
+    if ($resp.success? | default false) {
+      print $"  ✓ revoked ($email)"
+    } else {
+      let msg = ($resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+      print $"  ⚠ revoke failed for ($email): ($msg)"
+      $failed = $failed + 1
+    }
+  }
+
+  if ($failed > 0) {
+    print --stderr $"($failed) of ($emails | length) revocations failed"
+    exit 1
+  }
+  print "✓ done"
+}
