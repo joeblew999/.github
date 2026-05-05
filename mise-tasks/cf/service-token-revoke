@@ -61,36 +61,47 @@ def main [] {
   let apps_resp = (^curl -sS -H $auth_hdr $"($api)/access/apps" | from json)
   let app = ($apps_resp.result? | default [] | where domain == $app_domain | first)
 
-  # ── Step 1: scrub the policy include (if any) ────────────────────────────
-  if (not ($app | is-empty)) and (not ($token | is-empty)) {
+  # ── Step 1: delete the dedicated service-token-only policy ───────────────
+  # Also scrub any stale v0.13.0 includes from the operator-only policy in
+  # case an old setup left them there.
+  if not ($app | is-empty) {
     let policies_resp = (^curl -sS -H $auth_hdr $"($api)/access/apps/($app.id)/policies" | from json)
-    let operator = ($policies_resp.result? | default [] | where decision == "allow" and name == "operator-only" | first)
-    if not ($operator | is-empty) {
-      let has_include = (
-        $operator.include?
-        | default []
-        | any { |i| ($i.service_token?.token_id?) == $token.id }
-      )
-      if $has_include {
-        print $"→ Removing service_token include from operator-only policy"
-        let new_includes = (
-          $operator.include
-          | where { |i| ($i.service_token?.token_id?) != $token.id }
-        )
-        let pbody = {
-          name: $operator.name,
-          decision: $operator.decision,
-          include: $new_includes
-        } | to json
-        let upd = (^curl -sS -X PUT -H $auth_hdr -H $json_hdr -d $pbody $"($api)/access/apps/($app.id)/policies/($operator.id)" | from json)
-        if ($upd.success? | default false) {
-          print $"  ✓ policy updated"
-        } else {
-          let msg = ($upd.errors? | default [] | each {|e| $e.message?} | str join ", ")
-          print --stderr $"  ⚠ policy update failed: ($msg)"
-        }
+    let policies = ($policies_resp.result | default [])
+
+    # Delete the service-token-only policy entirely
+    let st_policy = ($policies | where name == "service-token-only" | first)
+    if not ($st_policy | is-empty) {
+      print $"→ Deleting service-token-only policy id=($st_policy.id)"
+      let resp = (^curl -sS -X DELETE -H $auth_hdr $"($api)/access/apps/($app.id)/policies/($st_policy.id)" | from json)
+      if ($resp.success? | default false) {
+        print $"  ✓ deleted"
       } else {
-        print $"  ✓ policy already excludes the token (nothing to scrub)"
+        let msg = ($resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+        print --stderr $"  ⚠ delete failed: ($msg)"
+      }
+    } else {
+      print $"  ✓ no service-token-only policy (nothing to delete)"
+    }
+
+    # Cleanup: scrub stale token includes from any allow-decision policy.
+    if not ($token | is-empty) {
+      for p in ($policies | where decision == "allow") {
+        let has_include = (
+          $p.include? | default [] | any { |i| ($i.service_token?.token_id?) == $token.id }
+        )
+        if $has_include {
+          print $"→ Scrubbing stale token from allow-policy '($p.name)'"
+          let cleaned = (
+            $p.include | where { |i| ($i.service_token?.token_id?) != $token.id }
+          )
+          let pbody = {
+            name: $p.name,
+            decision: $p.decision,
+            include: $cleaned
+          } | to json
+          let upd = (^curl -sS -X PUT -H $auth_hdr -H $json_hdr -d $pbody $"($api)/access/apps/($app.id)/policies/($p.id)" | from json)
+          if ($upd.success? | default false) { print $"  ✓ cleaned" }
+        }
       }
     }
   }

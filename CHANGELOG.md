@@ -3,6 +3,36 @@
 All notable changes to the shared mise task library. Bump consumer repos'
 `[task_config].includes` pin when adopting a new release.
 
+## v0.13.1 — 2026-05-05
+
+### Fixed
+
+- **`cf:service-token-setup`** — service tokens now correctly bypass the
+  OAuth flow. v0.13.0 added the service-token "Include" rule to the existing
+  `operator-only` policy whose `decision` is `allow` — but `allow` requires
+  identity verification, so service-token-headed requests still got
+  redirected through CF Access OAuth (`auth_status: NONE` → 302 to login,
+  causing redirect loops in `wrangler dev` with `remote=true` AI bindings).
+
+  v0.13.1 creates a **separate `service-token-only` policy** with
+  `decision: "non_identity"`, which is the CF Access primitive that bypasses
+  OAuth when valid service-token headers are present. The two policies coexist
+  on the same Access App:
+
+  ```
+  operator-only        decision=allow         include=[email1, email2, ...]
+  service-token-only   decision=non_identity  include=[service_token: <uuid>]
+  ```
+
+  The setup task also auto-scrubs any stale v0.13.0 includes left over in
+  the operator-only policy. Re-run `cf:service-token-setup` after upgrading
+  to migrate cleanly.
+
+- **`cf:service-token-revoke`** — now deletes the `service-token-only` policy
+  entirely instead of trying to scrub it from `operator-only`. Falls back to
+  cleaning any stale allow-policy includes for full backward compatibility
+  with v0.13.0 deployments.
+
 ## v0.13.0 — 2026-05-05
 
 ### Added
