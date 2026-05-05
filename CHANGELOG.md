@@ -7,28 +7,36 @@ All notable changes to the shared mise task library. Bump consumer repos'
 
 ### Added
 
-- **`cf:access-revoke`** — new task. Revokes active Cloudflare Access
-  sessions for one or more emails without modifying the allow policy.
-  Useful when you want to kick someone out *right now* rather than wait
-  for their session cookie (24h default) to expire. Usage:
+- **`cf:access-revoke`** — new task. Revokes ALL active Cloudflare Access
+  sessions for the Worker (kicks everyone out — they re-login if still
+  allowlisted). Useful when you want to evict someone *right now* rather
+  than wait for their session cookie (24h default) to expire. Usage:
 
   ```bash
-  mise run cf:access-revoke -- user@example.com
-  mise run cf:access-revoke -- a@x.com b@y.com
+  mise run cf:access-revoke
   ```
 
-  Calls `POST /accounts/{id}/access/organizations/revoke_user` per email.
-  Does NOT touch `OPERATOR_EMAIL` or the policy — pair with
-  `cf:access-setup` (after editing the env file) for permanent removal.
+  Calls `POST /accounts/{id}/access/apps/{app_id}/revoke_tokens`. Reads
+  `WORKER_NAME` + `CF_SUBDOMAIN` from `config/<env>.env` to find the
+  Access App. Does NOT touch the allow policy — pair with `cf:access-setup`
+  (after editing `OPERATOR_EMAIL`) for permanent removal.
+
+  Why app-wide and not per-user? The per-email endpoint
+  (`organizations/revoke_user`) requires the broader scope "Access:
+  Organizations, Identity Providers, and Groups: Edit" which the
+  standard `cf:access-setup` token shape doesn't carry. The app-level
+  endpoint works with the same `Access: Apps and Policies: Edit` scope
+  that policy management already needs. Trade-off: any other
+  allowlisted user is also evicted and must re-login (5s OAuth flow).
 
 ### Changed
 
-- **`cf:access-setup`** — auto-revokes dropped users. When a re-run shrinks
-  the allow set (i.e. an email present in the existing policy is missing
-  from `OPERATOR_EMAIL`), the script now POSTs `revoke_user` for each
-  removed email immediately after the policy PUT succeeds. Closes the
-  window where a user removed from the env file kept their existing
-  session cookie until it timed out. No-op on adds or no-changes.
+- **`cf:access-setup`** — auto-revokes active sessions when the allow
+  set shrinks. When a re-run drops one or more emails from the existing
+  policy, the script now POSTs `apps/{id}/revoke_tokens` after the
+  policy PUT succeeds. Closes the window where a removed user kept
+  their existing session cookie until it timed out. No-op on adds or
+  no-changes.
 
 ### Migration notes
 
@@ -39,9 +47,9 @@ Pure additive — bump the include pin, no caller-side changes:
 + includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.12.0"]
 ```
 
-If you've already removed someone via `cf:access-setup` on v0.11.0 and
-their session is still active, run `mise run cf:access-revoke -- their@email`
-once on v0.12.0 to evict them.
+If someone you removed via `cf:access-setup` on v0.11.0 still has an
+active session, run `mise run cf:access-revoke` once on v0.12.0 to
+evict them (and re-login yourself).
 
 ## v0.11.0 — 2026-05-05
 

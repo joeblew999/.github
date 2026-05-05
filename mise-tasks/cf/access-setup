@@ -1,11 +1,16 @@
 #!/usr/bin/env nu
 #MISE description="One-shot CF Access setup: ensure GitHub IdP + Access App for this Worker exist; write TEAM_DOMAIN + the per-app POLICY_AUD to fnox. Auto-revokes sessions for emails dropped from OPERATOR_EMAIL. Idempotent. Requires CLOUDFLARE_API_TOKEN with Access:Edit + Access:Organizations:Read + Account.Settings:Read."
 
-# v0.12.0 — auto-revoke removed users. When OPERATOR_EMAIL drops an email
-# (i.e. the policy update is shrinking the allow set), the script now POSTs
-# /access/organizations/revoke_user for each removed address right after the
-# policy PUT succeeds, so an existing 24h session cookie can't outlive the
-# policy change. No-op on adds or no-changes — only fires on real removals.
+# v0.12.0 — auto-revoke active sessions when OPERATOR_EMAIL shrinks. After
+# the policy PUT succeeds, if any emails were dropped from the allow set,
+# the script POSTs /access/apps/<id>/revoke_tokens to kill every active
+# session for this Worker. Why app-wide and not per-email? The per-email
+# endpoint (organizations/revoke_user) needs the broader "Access: Orgs,
+# IdPs, and Groups: Edit" scope which most consumer tokens don't carry;
+# the app-level endpoint works with the same "Access: Apps and Policies:
+# Edit" scope that policy management already needs. The remaining
+# allowlisted users just re-login (5s OAuth round-trip). Only fires when
+# the allow set actually shrinks — no-op on adds or no-changes.
 #
 # v0.11.0 — fixed allow-policy idempotency. Older versions (≤ v0.10.0)
 # created a NEW policy on every re-run because the dedupe check compared
@@ -182,21 +187,24 @@ def main [] {
         let resp = (^curl -sS -X PUT -H $auth_hdr -H $json_hdr -d $pbody $"($api)/access/apps/($app_info.id)/policies/($existing.id)" | from json)
         if ($resp.success? | default false) {
           print $"  ✓ updated allow policy"
-          # Revoke active sessions for any email dropped from the allow list.
-          # Without this, a user removed from OPERATOR_EMAIL keeps any cookie
-          # they already minted (24h default session) until it expires.
+          # When emails are dropped from the allow list, immediately revoke any
+          # active session cookie they already minted (default 24h lifetime).
+          # We use the app-level revoke_tokens endpoint (kicks all users for
+          # this one Worker) instead of the per-email org/revoke_user endpoint
+          # because the latter needs a broader scope ("Access: Organizations,
+          # IdPs, and Groups: Edit") that isn't in the standard token shape.
+          # Trade-off: any other allowlisted user is also kicked and must
+          # re-login. Acceptable because (a) re-login is a 5s OAuth flow and
+          # (b) this only runs when OPERATOR_EMAIL actually shrinks.
           let removed = ($existing_emails | where { |e| not ($e in $target_emails) })
           if not ($removed | is-empty) {
-            print $"  → revoking active sessions for ($removed | str join ', ')"
-            for email in $removed {
-              let rbody = { email: $email } | to json
-              let rresp = (^curl -sS -X POST -H $auth_hdr -H $json_hdr -d $rbody $"($api)/access/organizations/revoke_user" | from json)
-              if ($rresp.success? | default false) {
-                print $"    ✓ revoked ($email)"
-              } else {
-                let msg = ($rresp.errors? | default [] | each {|e| $e.message?} | str join ", ")
-                print $"    ⚠ revoke failed for ($email): ($msg)"
-              }
+            print $"  → revoking all active sessions for this Worker \(removed: ($removed | str join ', ')\)"
+            let rresp = (^curl -sS -X POST -H $auth_hdr $"($api)/access/apps/($app_info.id)/revoke_tokens" | from json)
+            if ($rresp.success? | default false) {
+              print $"    ✓ revoked — remaining allowlisted users must re-authenticate"
+            } else {
+              let msg = ($rresp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+              print $"    ⚠ revoke failed: ($msg)"
             }
           }
         } else {

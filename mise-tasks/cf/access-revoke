@@ -1,42 +1,78 @@
 #!/usr/bin/env nu
-#MISE description="Revoke active CF Access sessions for one or more emails. Independent of the policy file — useful for emergency revocation without re-running cf:access-setup. Usage: mise run cf:access-revoke -- user@example.com [user2@example.com ...]"
+#MISE description="Revoke ALL active CF Access sessions for the Worker (kicks everyone out — they can re-login if still on the allowlist). Reads WORKER_NAME + CF_SUBDOMAIN from config/<env>.env. Requires CLOUDFLARE_API_TOKEN with Access: Apps and Policies: Edit (same scope as cf:access-setup)."
 
-# Calls POST /accounts/{account_id}/access/organizations/revoke_user for each
-# email. The user can no longer use any active session cookie immediately;
-# the next request hits the Access login page. Does NOT modify the allow
-# policy — if the email is still in OPERATOR_EMAIL, the user can simply
-# re-authenticate. Pair with cf:access-setup (after editing the env file)
-# to permanently remove someone.
+# Two CF revoke endpoints exist:
+#
+#   POST /accounts/{id}/access/organizations/revoke_user   { "email": "..." }
+#     → revokes one user across the org. Precise. BUT requires the
+#       broader scope "Access: Organizations, Identity Providers, and
+#       Groups: Edit" which is NOT part of the standard cf:access-setup
+#       token scopes — so this endpoint fails with "Authentication
+#       error" on most setups.
+#
+#   POST /accounts/{id}/access/apps/{app_id}/revoke_tokens
+#     → revokes ALL active tokens for one Access App (one Worker).
+#       Less precise (kicks everyone), but works with the same scope
+#       cf:access-setup already needs ("Access: Apps and Policies: Edit").
+#
+# This task uses the second endpoint because it actually works with the
+# token shape consumers already have. The blast radius is one Worker:
+# anyone still on OPERATOR_EMAIL just re-logs-in. To target one user
+# precisely, first remove their email from OPERATOR_EMAIL and re-run
+# cf:access-setup (which will block their next login attempt) — then
+# run this task to invalidate any session they already minted.
 
-def main [...emails: string] {
-  if ($emails | is-empty) {
-    print --stderr "usage: mise run cf:access-revoke -- <email> [email...]"
+def main [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let env_file = $"config/($env_name).env"
+  if not ($env_file | path exists) {
+    print --stderr $"ERROR: ($env_file) not found."
     exit 1
   }
+  let cfg = (
+    open --raw $env_file
+    | lines
+    | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+    | reduce -f {} {|line, acc|
+        let parts = ($line | split row -n 2 "=")
+        $acc | upsert ($parts | get 0) (($parts | get 1) | str trim --char '"')
+      }
+  )
+
+  let worker = ($cfg.WORKER_NAME? | default "")
+  let subdomain = ($cfg.CF_SUBDOMAIN? | default "")
+  if ($worker | is-empty) or ($subdomain | is-empty) {
+    print --stderr $"WORKER_NAME and CF_SUBDOMAIN must both be set in ($env_file)"
+    exit 1
+  }
+  let app_domain = $"($worker).($subdomain).workers.dev"
 
   let token = (^fnox get CLOUDFLARE_API_TOKEN | str trim)
   let account = (^fnox get CLOUDFLARE_ACCOUNT_ID | str trim)
   let api = $"https://api.cloudflare.com/client/v4/accounts/($account)"
   let auth_hdr = $"Authorization: Bearer ($token)"
-  let json_hdr = "Content-Type: application/json"
 
-  print $"→ Revoking active CF Access sessions for ($emails | length) user\(s\)"
-  mut failed = 0
-  for email in $emails {
-    let body = { email: $email } | to json
-    let resp = (^curl -sS -X POST -H $auth_hdr -H $json_hdr -d $body $"($api)/access/organizations/revoke_user" | from json)
-    if ($resp.success? | default false) {
-      print $"  ✓ revoked ($email)"
-    } else {
-      let msg = ($resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
-      print $"  ⚠ revoke failed for ($email): ($msg)"
-      $failed = $failed + 1
-    }
-  }
-
-  if ($failed > 0) {
-    print --stderr $"($failed) of ($emails | length) revocations failed"
+  print $"→ Looking up Access App for ($app_domain)"
+  let apps_resp = (^curl -sS -H $auth_hdr $"($api)/access/apps" | from json)
+  if not ($apps_resp.success? | default false) {
+    let msg = ($apps_resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+    print --stderr $"✗ apps list failed: ($msg)"
     exit 1
   }
-  print "✓ done"
+  let app = ($apps_resp.result | default [] | where domain == $app_domain | first)
+  if ($app | is-empty) {
+    print --stderr $"✗ no Access App found for ($app_domain) — run cf:access-setup first"
+    exit 1
+  }
+  print $"  app_id = ($app.id)"
+
+  print $"→ Revoking ALL active sessions for ($app_domain)"
+  let resp = (^curl -sS -X POST -H $auth_hdr $"($api)/access/apps/($app.id)/revoke_tokens" | from json)
+  if ($resp.success? | default false) {
+    print $"  ✓ all active sessions revoked — users on the allowlist must re-authenticate"
+  } else {
+    let msg = ($resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+    print --stderr $"✗ revoke failed: ($msg)"
+    exit 1
+  }
 }
