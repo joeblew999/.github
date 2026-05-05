@@ -1,6 +1,15 @@
 #!/usr/bin/env nu
 #MISE description="One-shot CF Access setup: ensure GitHub IdP + Access App for this Worker exist; write TEAM_DOMAIN + the per-app POLICY_AUD to fnox. Idempotent. Requires CLOUDFLARE_API_TOKEN with Access:Edit + Access:Organizations:Read + Account.Settings:Read."
 
+# v0.11.0 — fixed allow-policy idempotency. Older versions (≤ v0.10.0)
+# created a NEW policy on every re-run because the dedupe check compared
+# the literal "a@x.com,b@y.com" string against a list of individual emails
+# (never matched). If you upgrade from v0.10.0 and you have multiple
+# "operator-only" policies on an Access App, this script will use the
+# first one and warn you about the others — clean them up via the CF
+# dashboard or DELETE them via the API. Existing single-policy apps
+# upgrade silently.
+
 def main [] {
   let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
   let env_file = $"config/($env_name).env"
@@ -114,36 +123,63 @@ def main [] {
     {id: $existing_app.id, aud: $existing_app.aud}
   }
 
-  # ── Allow policy: idempotent per email ──
+  # ── Allow policy: set-based ensure ──
+  # Find the existing "operator-only" allow policy (by name); if it exists
+  # and its include emails match OPERATOR_EMAIL exactly, do nothing. If
+  # emails differ, PUT-update the existing policy so it has the correct
+  # set. Only POST a new policy when none exists. This avoids the v0.10.0
+  # bug where every re-run created a duplicate policy because the dedupe
+  # check compared the comma-string against a list of emails.
   let operator_email = ($cfg.OPERATOR_EMAIL? | default "")
   if not ($operator_email | is-empty) {
-    print $"→ Ensuring allow policy for ($operator_email)"
+    let target_emails = ($operator_email | split row "," | each { |e| $e | str trim } | sort)
+    print $"→ Ensuring allow policy for ($target_emails | str join ', ')"
     let policies_resp = (^curl -sS -H $auth_hdr $"($api)/access/apps/($app_info.id)/policies" | from json)
-    let existing_emails = (
+    let operator_policies = (
       $policies_resp.result
       | default []
-      | where decision == "allow"
-      | each { |p| $p.include? | default [] }
-      | flatten
-      | each { |i| $i.email?.email? }
-      | compact
+      | where decision == "allow" and name == "operator-only"
     )
-    if ($operator_email in $existing_emails) {
-      print $"  ✓ allow-by-email policy for ($operator_email) already present"
-    } else {
-      let emails = ($operator_email | split row "," | each { |e| $e | str trim })
-      let includes = ($emails | each { |e| {email: {email: $e}} })
-      let pbody = {
-        name: "operator-only",
-        decision: "allow",
-        include: $includes
-      } | to json
+    let policy_count = ($operator_policies | length)
+    if ($policy_count > 1) {
+      print $"  ⚠ found ($policy_count) policies named 'operator-only' — using first; please delete duplicates via CF dashboard or API"
+    }
+
+    let pbody = {
+      name: "operator-only",
+      decision: "allow",
+      include: ($target_emails | each { |e| {email: {email: $e}} })
+    } | to json
+
+    if ($policy_count == 0) {
+      print "  → no existing policy, creating"
       let resp = (^curl -sS -X POST -H $auth_hdr -H $json_hdr -d $pbody $"($api)/access/apps/($app_info.id)/policies" | from json)
       if ($resp.success? | default false) {
-        print $"  ✓ created allow policy for ($operator_email)"
+        print $"  ✓ created allow policy with ($target_emails | length) email\(s\)"
       } else {
         let msg = ($resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
         print $"  ⚠ policy create failed: ($msg)"
+      }
+    } else {
+      let existing = ($operator_policies | first)
+      let existing_emails = (
+        $existing.include?
+        | default []
+        | each { |i| $i.email?.email? }
+        | compact
+        | sort
+      )
+      if ($existing_emails == $target_emails) {
+        print $"  ✓ policy already matches \(($target_emails | length) email\(s\)\)"
+      } else {
+        print $"  → updating policy ($existing.id): ($existing_emails | str join ', ') → ($target_emails | str join ', ')"
+        let resp = (^curl -sS -X PUT -H $auth_hdr -H $json_hdr -d $pbody $"($api)/access/apps/($app_info.id)/policies/($existing.id)" | from json)
+        if ($resp.success? | default false) {
+          print $"  ✓ updated allow policy"
+        } else {
+          let msg = ($resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+          print $"  ⚠ policy update failed: ($msg)"
+        }
       }
     }
   } else {

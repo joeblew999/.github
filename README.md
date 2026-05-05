@@ -7,6 +7,7 @@ Meta-repository for the `joeblew999` GitHub organisation.
 | Path | Purpose |
 |---|---|
 | `mise-tasks/` | Shared mise task library — consumed by all repos via `[task_config].includes` |
+| `CHANGELOG.md` | Per-release notes — read before bumping a consumer repo's `?ref=` pin |
 | `profile/` | Org profile page shown at [github.com/joeblew999](https://github.com/joeblew999) |
 | `.claude/` | Claude Code skills and agents shared across projects |
 | `.github/` | Org-level GitHub config (CODEOWNERS, issue templates, dependabot, welcome workflow) |
