@@ -3,6 +3,62 @@
 All notable changes to the shared mise task library. Bump consumer repos'
 `[task_config].includes` pin when adopting a new release.
 
+## v0.13.0 — 2026-05-05
+
+### Added
+
+- **`cf:service-token-setup`** — new task. Provisions a CF Access service
+  token so wrangler dev (with `remote = true` bindings), Playwright
+  automation, CI, and any other non-interactive client can authenticate
+  past the Access wall. Without one, `mise run dev` errors with:
+
+  > The domain "X.workers.dev" is behind Cloudflare Access, but no Access
+  > Service Token credentials were found and the current environment is
+  > non-interactive…
+
+  Usage (one-time per repo):
+
+  ```bash
+  mise run cf:service-token-setup
+  ```
+
+  Steps it performs:
+
+  1. POSTs `/accounts/{id}/access/service_tokens` to create
+     `<WORKER_NAME>-automation` (skipped if fnox already has the creds).
+  2. Stores `client_id` + `client_secret` in fnox keychain under canonical
+     names `CLOUDFLARE_ACCESS_CLIENT_ID` and `CLOUDFLARE_ACCESS_CLIENT_SECRET`
+     — matches the env vars wrangler/vite-plugin look up automatically.
+  3. PUTs the operator-only policy with a new `service_token` include rule
+     so requests carrying these headers are allowed alongside the existing
+     email allowlist.
+
+  Idempotent. fnox is the source of truth: re-runs are no-ops once the
+  creds are stored. If the CF-side token is deleted but fnox still has
+  values, the task aborts with guidance (rotate or recreate).
+
+- **`cf:service-token-revoke`** — companion task. Deletes the token at CF,
+  scrubs its include rule from the operator-only policy, and clears the
+  fnox keychain entries. Use to rotate (revoke + setup again), kill a
+  leaked secret, or decommission. Idempotent — safe when nothing exists.
+
+  ```bash
+  mise run cf:service-token-revoke
+  ```
+
+  Order of operations: policy include → token delete → fnox clear. An
+  in-flight request might still complete during teardown but will fail at
+  the policy-check step on its next call, which is the correct failure
+  mode for "revoked".
+
+### Why this complements v0.12.0
+
+`cf:access-setup` + `cf:access-revoke` cover the **human OAuth path**
+(GitHub IdP, email allowlist, browser cookies). The two new tasks cover
+the **machine-to-machine path** (service token via Client ID + Secret
+headers). Same Access App, same operator-only policy — both auth modes
+coexist as separate "Include" rules. Pick whichever your client supports.
+
 ## v0.12.0 — 2026-05-05
 
 ### Added
