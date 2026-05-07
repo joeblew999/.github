@@ -325,3 +325,48 @@ jobs:
             exit 1
           }
           print "✓ secrets:sync-github failed cleanly"
+
+      # ── Real-file validation: mobile.toml ───────────────────────────────
+      # Discovery only — we don't actually run any mobile:* task here.
+      # mobile:android-setup would trigger a Temurin JDK install (~200 MB)
+      # and similar for ruby/cocoapods on the iOS side; not worth burning
+      # CI minutes when discovery + parse-validation catches the regressions
+      # we care about (TOML syntax errors, wrong tool spec format, missing
+      # `tools = {}` block etc).
+      - name: Real mobile.toml — discovery only (no execution; java/ruby installs are slow)
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          let root = ($env.RUNNER_TEMP | path join "mobile-consumer")
+          if ($root | path exists) { rm -rf $root }
+          mkdir $root
+
+          let mobile_toml = ($env.GITHUB_WORKSPACE | path join "tasks" "mobile.toml")
+          let root_toml = $"[task_config]
+          includes = ['($mobile_toml)']
+
+          [tools]
+          \"github:nushell/nushell\" = \"0.112\"
+          "
+          $root_toml | save --force ($root | path join "mise.toml")
+
+          cd $root
+          ^mise trust
+          let listing = (^mise tasks ls | complete)
+          print $listing.stdout
+          let expected = [
+            "mobile:android-setup",
+            "mobile:ios-setup",
+            "mobile:tauri-android-init",
+            "mobile:tauri-android-dev",
+            "mobile:tauri-android-build",
+            "mobile:tauri-ios-init",
+            "mobile:tauri-ios-dev",
+            "mobile:tauri-ios-build",
+          ]
+          for t in $expected {
+            if not ($listing.stdout | str contains $t) {
+              print --stderr $"✗ ($t) not discovered from real tasks/mobile.toml"
+              exit 1
+            }
+          }
+          print "✓ all 8 mobile:* tasks discovered from real tasks/mobile.toml"
