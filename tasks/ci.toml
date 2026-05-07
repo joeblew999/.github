@@ -15,6 +15,192 @@
 # Tool pin policy: track the same versions as joeblew999/.github's own
 # mise.toml [tools] block. Bump them together when the lib version is bumped.
 
+# ── ci:check-toml-tasks ──────────────────────────────────────────────────────
+# Parse-check every inline `run = '''...'''` body in tasks/*.toml of the
+# current repo. Spawns `nu --ide-check 1` on each extracted body — same
+# parser nu's LSP uses — and reports any severity:Error diagnostics.
+#
+# Catches nu syntax errors in TOML-task bodies that would otherwise only
+# surface at runtime when the task is invoked. Sister task to
+# ci:parse-check (which scans standalone .nu files in mise-tasks/).
+#
+# Use as a local pre-push lint AND in CI. Self-hosted: this very task
+# parse-checks itself when run against joeblew999/.github's own tasks/.
+["ci:check-toml-tasks"]
+description = "Parse-check every inline `run = '''...'''` body in tasks/*.toml via `nu --ide-check`"
+tools = { "github:nushell/nushell" = "0.112" }
+run = '''
+#!/usr/bin/env nu
+
+def main [
+  --dir (-d): string = "tasks"   # directory containing tasks/*.toml
+] {
+  let project_root = ($env.MISE_PROJECT_ROOT? | default (pwd))
+  cd $project_root
+
+  # Handle both absolute and relative --dir; absolute → use verbatim,
+  # relative → prepend project_root.
+  let scan_dir = (if ($dir | str starts-with "/") { $dir } else { $"($project_root)/($dir)" })
+
+  if not ($scan_dir | path exists) {
+    print $"\(no ($scan_dir)/ — nothing to check\)"
+    return
+  }
+
+  # Forward-slash glob — path join uses backslash on Windows which the
+  # glob parser rejects.
+  let glob_pat = ($"($scan_dir)/*.toml" | str replace --all "\\" "/")
+  let tomls = (glob $glob_pat)
+
+  if ($tomls | length) == 0 {
+    print $"\(no *.toml files under ($scan_dir)/ — nothing to check\)"
+    return
+  }
+
+  let work = ($env.RUNNER_TEMP? | default "/tmp" | path join "ci-check-toml-tasks")
+  if ($work | path exists) { rm -rf $work }
+  mkdir $work
+
+  # Pattern: quoted top-level key (namespace:task) + `run = '<TQ>...<TQ>'`.
+  # Triple-single-quote (<TQ>) built from \u{27} so this script's body
+  # can itself be wrapped in a TOML `run = '<TQ>...<TQ>'` block without
+  # the inner closing the outer.
+  let q3 = (['\u{27}', '\u{27}', '\u{27}'] | str join)
+  let pattern = ("(?s)\\[\"([^\"]+)\"\\][^\\[]*?run\\s*=\\s*" + $q3 + "(.*?)" + $q3)
+
+  mut total = 0
+  mut failed = []
+
+  for t in $tomls {
+    let raw = (open --raw $t)
+    let bodies = ($raw | parse --regex $pattern | rename task body)
+    for entry in $bodies {
+      $total = $total + 1
+      let safe = ($entry.task | str replace --all ":" "_")
+      let tmp = ($work | path join $"($safe).nu")
+      $entry.body | save --force $tmp
+      let r = (do { ^nu --ide-check 1 $tmp } | complete)
+      if ($r.stdout | str contains "severity\":\"Error") {
+        let first_diag = ($r.stdout | lines | first | default "")
+        $failed = ($failed | append {task: $entry.task, error: $first_diag})
+      }
+    }
+  }
+
+  let toml_count = ($tomls | length)
+  print $"→ parse-checked ($total) inline run bodies across ($toml_count) tasks/*.toml files"
+  if ($failed | length) > 0 {
+    let fail_count = ($failed | length)
+    print --stderr ""
+    print --stderr $"✗ ($fail_count) task\(s\) with parse errors:"
+    for f in $failed {
+      print --stderr $"  - ($f.task): ($f.error)"
+    }
+    exit 1
+  }
+  print "✓ all inline run bodies parse-clean"
+}
+'''
+
+# ── ci:check-workflow-nu ─────────────────────────────────────────────────────
+# Parse-check every embedded nu block in .github/workflows/*.yml. Walks the
+# parsed YAML structure (jobs.<job>.steps[]) and finds every step whose
+# `shell:` mentions nu, extracts the `run:` body, and runs it through
+# `nu --ide-check 1`.
+#
+# Catches the class of bugs where a workflow YAML edits an inline nu
+# block and ships it without ever running nu against it locally — leading
+# to a CI failure that takes 60-90s per iteration to feedback.
+["ci:check-workflow-nu"]
+description = "Parse-check every embedded nu block in .github/workflows/*.yml via `nu --ide-check`"
+tools = { "github:nushell/nushell" = "0.112" }
+run = '''
+#!/usr/bin/env nu
+
+def main [
+  --dir (-d): string = ".github/workflows"
+] {
+  let project_root = ($env.MISE_PROJECT_ROOT? | default (pwd))
+  cd $project_root
+
+  # Handle both absolute and relative --dir.
+  let scan_dir = (if ($dir | str starts-with "/") { $dir } else { $"($project_root)/($dir)" })
+
+  if not ($scan_dir | path exists) {
+    print $"\(no ($scan_dir)/ — nothing to check\)"
+    return
+  }
+
+  let glob_pat = ($"($scan_dir)/*.yml" | str replace --all "\\" "/")
+  let yml_files = (glob $glob_pat)
+
+  if ($yml_files | length) == 0 {
+    print $"\(no *.yml files under ($scan_dir)/ — nothing to check\)"
+    return
+  }
+
+  let work = ($env.RUNNER_TEMP? | default "/tmp" | path join "ci-check-workflow-nu")
+  if ($work | path exists) { rm -rf $work }
+  mkdir $work
+
+  mut total = 0
+  mut failed = []
+
+  for f in $yml_files {
+    let yaml = (try { open $f } catch { null })
+    if ($yaml == null) { continue }
+    if (not ($yaml | columns | "jobs" in $in)) { continue }
+
+    let jobs = $yaml.jobs
+    let job_names = ($jobs | columns)
+    for job_name in $job_names {
+      let job = ($jobs | get $job_name)
+      let steps = ($job.steps? | default [])
+      mut step_idx = 0
+      for step in $steps {
+        $step_idx = $step_idx + 1
+        let shell_str = ($step.shell? | default "")
+        # Only check steps whose `shell:` mentions nu.
+        if not ($shell_str | str contains "nu") { continue }
+        let body = ($step.run? | default "")
+        if ($body | is-empty) { continue }
+
+        $total = $total + 1
+        let yml_basename = ($f | path basename | str replace ".yml" "")
+        let safe = ($"($yml_basename)-($job_name)-($step_idx)" | str replace --all ":" "_")
+        let tmp = ($work | path join $"($safe).nu")
+        $body | save --force $tmp
+        let r = (do { ^nu --ide-check 1 $tmp } | complete)
+        if ($r.stdout | str contains "severity\":\"Error") {
+          let first_diag = ($r.stdout | lines | first | default "")
+          $failed = ($failed | append {
+            file: ($f | path basename),
+            job: $job_name,
+            step: $step_idx,
+            step_name: ($step.name? | default "—"),
+            error: $first_diag,
+          })
+        }
+      }
+    }
+  }
+
+  let yml_count = ($yml_files | length)
+  print $"→ parse-checked ($total) embedded nu blocks across ($yml_count) workflow files"
+  if ($failed | length) > 0 {
+    let fail_count = ($failed | length)
+    print --stderr ""
+    print --stderr $"✗ ($fail_count) block\(s\) with parse errors:"
+    for f in $failed {
+      print --stderr $"  - ($f.file) :: ($f.job) :: step ($f.step) \(($f.step_name)\)"
+      print --stderr $"      ($f.error)"
+    }
+    exit 1
+  }
+  print "✓ all embedded nu blocks parse-clean"
+}
+'''
+
 # ── ci:parse-check ───────────────────────────────────────────────────────────
 # Generic parse-checker for nu task files. Globs the consumer's mise-tasks/
 # (recursive), filters to files whose first line is the nu shebang, runs
