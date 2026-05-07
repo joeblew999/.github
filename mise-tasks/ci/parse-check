@@ -1,0 +1,44 @@
+#!/usr/bin/env nu
+#MISE description="Parse-check every nu task file in mise-tasks/ (fails if any has a syntax error)"
+
+# Generic — globs mise-tasks/ + any nested subdirs in the consuming repo,
+# runs `nu --ide-check 1` on each. Uses MISE_PROJECT_ROOT to find the
+# consumer's mise-tasks/ regardless of where this shared task lives.
+
+def main [
+  --dir (-d): string = "mise-tasks"   # directory to scan; default: mise-tasks
+] {
+  let project_root = ($env.MISE_PROJECT_ROOT? | default (pwd))
+  cd $project_root
+
+  if not ($dir | path exists) {
+    print $"\(no ($dir)/ in this repo — nothing to check)"
+    return
+  }
+
+  # Recursive glob — picks up subdirs like mise-tasks/cf/foo too.
+  let files = (
+    glob $"($dir)/**/*"
+    | where { |p| ($p | path type) == "file" }
+  )
+
+  if ($files | length) == 0 {
+    print $"\(no files in ($dir)/)"
+    return
+  }
+
+  mut errors = []
+  for f in $files {
+    let result = (do { ^nu --ide-check 1 $f } | complete)
+    if ($result.stdout | str contains 'severity":"Error"') {
+      $errors = ($errors | append $f)
+      print --stderr $"✗ ($f | path basename)"
+      print --stderr ($result.stdout | lines | where { |l| ($l | str contains 'severity":"Error"') } | first)
+    }
+  }
+  if ($errors | length) > 0 {
+    print --stderr $"\n✗ ($errors | length) file\(s\) with parse errors"
+    exit 1
+  }
+  print $"✓ ($files | length) nu task files parse-clean"
+}
