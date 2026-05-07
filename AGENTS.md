@@ -2,23 +2,48 @@
 
 This repo is a **shared mise task library** for all `joeblew999` projects, plus GitHub org config.
 
-## ⚠ Read this first if you're picking up the consolidation work
+## ⚠ Read this first
 
-After v0.10.0 (full nushell port, 33 primitives, 9 consumer repos rolled out)
-the next architectural move is **a composition layer above the primitives**, not
-more primitives. See [`mise-tasks/CONSOLIDATION.md`](./mise-tasks/CONSOLIDATION.md)
-for the plan, the per-phase roadmap, and the "don't do" list. Read it before
-adding a new task — chances are what you want is composition, not another
-primitive.
+Two architectural directions, in order of priority:
 
-## Current state (2026-05-02)
+1. **TOML-task migration (v0.16.x — in flight).** New tasks (and ports of
+   existing ones) go in `tasks/<ns>.toml` with per-task `tools = { ... }`,
+   not in `mise-tasks/<ns>/<name>` as file-tasks. Per-task tools auto-install
+   when the task runs and stay scoped — consumers no longer have to pin
+   gh/jq/ruby/cocoapods/java/etc. just because a shared task uses them.
+   See "TOML-task vs file-task" section below.
 
-- **v0.10.0** — full nushell migration, all 33 mise-tasks are nu (no bash)
-- **9 consumer repos** on v0.10.0: nodewarden, auth-service, kv-manager,
-  d1-manager, agentic-inbox, saasmail, ifc-lite, mon-house, utm-dev-cli
-- **CI proof on every push** (mise-tasks-lint workflow): parse-check on 3 OS
-  + fnox-keychain round-trip on Mac+Windows GHA + 12-task real-execution test
-  under `shell: nu`. Roughly 30 sec, all green.
+2. **Composition layer (CONSOLIDATION.md).** Top-level verbs that chain
+   primitives via `depends = [...]`. Lives in *each consumer's* mise.toml,
+   not here. See [`mise-tasks/CONSOLIDATION.md`](./mise-tasks/CONSOLIDATION.md)
+   for the plan. Orthogonal to (1) — both can advance.
+
+Before adding a new task, ask: should this be a TOML-task with per-task
+tools (almost always yes for new shared tasks), or a file-task (only if
+the body is too large to comfortably inline as a TOML string)?
+
+## Current state (2026-05-07)
+
+- **v0.16.2** — TOML-task pattern shipped + first three namespaces ported.
+  - `tasks/ci.toml` — `ci:parse-check`, `ci:watch`, `ci:clean` (per-task: nu, fnox, gh)
+  - `tasks/cf.toml` — `cf:token-check` (per-task: nu, fnox)
+  - `tasks/secrets.toml` — `secrets:sync-github` (per-task: nu, fnox, gh)
+  - `tasks/mobile.toml` — 8 mobile:* tasks (per-task: nu + java/ruby/cocoapods/cargo:tauri-cli)
+- **Legacy v0.10.0 file-tasks** in `mise-tasks/` still ship and work. Removal
+  blocked on full consumer migration to TOML-task includes.
+- **gsv** is on v0.16.0 and was the migration test bed. CI green on 3 OS
+  including Windows (after fixing a separate 1-deps glob bug + skipping
+  test-gateway on Windows due to upstream Cloudflare workerd instability).
+- **Other 7 consumer repos** still pin `?ref=v0.10.0` — pending mechanical
+  migration to v0.16.x TOML-task includes.
+- **Two CI canaries** on every push:
+  - `tasks-toml-proof.yml` — TOML-task mechanism + each shipped `tasks/*.toml`,
+    on linux+macos+windows (~25s)
+  - `mise-tasks-lint.yml` — parse-check + fnox keychain + negative-path
+    execution for legacy file-tasks, same 3 OS (~30s)
+- **`monorepo-root-proof.yml`** — kept as documentation of an alternative
+  we evaluated and rejected; lets us re-examine if mise drops the
+  experimental flag from `experimental_monorepo_root`.
 - **Rust port** (`joeblew999/secrets-manager`) is the long-term destination
   but not started; nu is the bridge.
 
@@ -26,11 +51,15 @@ primitive.
 
 | Path | Purpose |
 |---|---|
-| `mise-tasks/` | Shared mise tasks (33 nu, organized under `<namespace>/`) — consumed via `[task_config].includes` |
-| [`mise-tasks/CONSOLIDATION.md`](./mise-tasks/CONSOLIDATION.md) | **Read first** — the plan for the next phase |
-| `mise-tasks/_proof/nu-cross-platform.nu` | Cross-platform syntax smoke test (asserted in CI on every push) |
-| `mise-tasks/README.md` | Per-namespace task reference (currently inventory-style; planned: user-flow-first refresh) |
-| `.github/workflows/mise-tasks-lint.yml` | CI lint matrix on macOS/Linux/Windows |
+| `tasks/<ns>.toml` | **New (v0.16+)** — TOML-task definitions with per-task `tools = { ... }`. Consumed remotely via `task_config.includes = ["git::....toml?ref=v0.16.x"]`. **Preferred for new tasks.** |
+| `mise-tasks/<ns>/<name>` | Legacy nu file-tasks (~33 of them). Consumed via `task_config.includes` pointed at the directory. Still work; will be retired as namespaces are ported to `tasks/*.toml`. |
+| [`mise-tasks/CONSOLIDATION.md`](./mise-tasks/CONSOLIDATION.md) | Plan for the *composition layer* (consumer-side, orthogonal to TOML-task work) |
+| `mise-tasks/_proof/nu-cross-platform.nu` | Cross-platform nu syntax smoke test |
+| `mise-tasks/README.md` | Per-namespace task reference |
+| `.github/workflows/tasks-toml-proof.yml` | **CI canary for TOML-tasks** — discovery + per-task tool install + scoping + real-file validation per shipped `tasks/*.toml`. 3 OS. |
+| `.github/workflows/mise-tasks-lint.yml` | CI lint matrix for legacy file-tasks. 3 OS. |
+| `.github/workflows/monorepo-root-proof.yml` | Reference: the experimental alternative we evaluated & rejected. Kept as documentation. |
+| `.github/workflows/reusable-mise-ci.yml` / `reusable-mise-upgrade.yml` | Reusable workflows consumers `uses:` |
 | `profile/` | GitHub org profile page (github.com/joeblew999) |
 | `.claude/` | Claude Code skills and agents |
 
@@ -168,29 +197,68 @@ When changing inputs in these workflows, treat them as a public API:
 - **Removing** or **renaming** an input = breaking = major bump.
 - **Changing default values** = consumers will see behavior change = at minimum a CHANGELOG note.
 
+## TOML-task vs file-task — when to use which
+
+| | TOML-task (`tasks/<ns>.toml`) | File-task (`mise-tasks/<ns>/<name>`) |
+|---|---|---|
+| Per-task `tools = { ... }` propagates through remote `git::` includes | ✓ | ✗ (discussion #5267 — silently ignored) |
+| Body limit | inline `run = '''...'''` (TOML triple-quoted; >300 lines feels cramped) | unlimited (separate file) |
+| Args/flags | `def main [--flag]` works inside `run = '''#!/usr/bin/env nu...'''` | same |
+| Discovery in consumer | explicit `git::....toml?ref=vX.Y.Z` URL per file | one URL for the whole `mise-tasks/` directory |
+| Renovate-bumpable | yes (URL pin) | yes (URL pin) |
+| Right answer for | new tasks; existing tasks getting per-task tools | only when body is too long to inline |
+
+**Default to TOML-task.** File-tasks are legacy; we're porting them as we touch them.
+
+When porting a file-task → TOML-task:
+1. Take the existing nu script body verbatim, drop into `run = '''...'''`
+2. Add the `#!/usr/bin/env nu` shebang as the first line of the run body
+3. Declare per-task tools the script needs: `tools = { "github:nushell/nushell" = "0.112", ... }`
+4. Quote namespaced keys: `["bw:list"]`, not `[bw:list]`
+5. Add a step in `tasks-toml-proof.yml` to verify discovery + (cheap) negative path
+6. Leave the legacy file-task in `mise-tasks/` until all consumers migrate
+
 ## Release workflow
 
 ```bash
-mise run release -- v0.10.0
+mise run release -- v0.16.x
 ```
 
-Then in each consuming repo that wants the new tasks:
+Tag pushed → consumer repos can opt in by bumping their `?ref=` URLs.
+
+Cache invalidation if a consumer pulled the OLD ref already:
+```bash
+rm -rf ~/Library/Caches/mise/remote-git-tasks-cache/*   # macOS
+mise tasks ls
+```
+
+## Consuming repo wiring
+
+### Modern (v0.16.x — TOML-task includes, recommended)
+
 ```toml
 [task_config]
-includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.10.0"]
+includes = [
+  "mise-tasks",  # local file-tasks (auto-discovered)
+  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.16.2",
+  "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.16.2",
+  "git::https://github.com/joeblew999/.github.git//tasks/secrets.toml?ref=v0.16.2",
+  # add tasks/mobile.toml if the consumer needs mobile:* tasks
+]
 
 [tools]
-"github:nushell/nushell" = "0.112"   # required by v0.10.0+ (every shared task is nu)
-"github:jdx/fnox"        = "1.23"
-```
-```bash
-mise cache clear
-mise tasks ls   # verify
+# Pin only what the consumer's OWN tasks use. Tools needed by shared
+# tasks (gh, jq, ruby, cocoapods, java, tauri-cli, etc.) come along
+# automatically with each task's `tools = { ... }`.
+"github:nushell/nushell" = "0.112"
+"github:jdx/fnox"        = "1.24"   # if consumer's local tasks call ^fnox
+
+[env]
+FNOX_SYNC_KEYS = "CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID,..."
 ```
 
-## Consuming repo wiring (copy-paste, current at v0.10.0)
+### Legacy (v0.10.0–v0.15.x — directory include, file-tasks)
 
-**CI/CD only** (Cloudflare Workers, secrets, Rust/WASM):
 ```toml
 [task_config]
 includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.10.0"]
@@ -198,31 +266,21 @@ includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.1
 [tools]
 "github:nushell/nushell" = "0.112"
 "github:jdx/fnox"        = "1.23"
-"aqua:cli/cli"           = "2"
-"aqua:jqlang/jq"         = "1"
+"aqua:cli/cli"           = "2"      # gh — needed because file-tasks don't propagate per-task tools
+"aqua:jqlang/jq"         = "1"      # same
 
 [env]
-FNOX_SYNC_KEYS = "CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID,..."
+FNOX_SYNC_KEYS = "..."
 ```
 
-**Repo using bw:* (Bitwarden ↔ NodeWarden hybrid):** also add
-```toml
-"npm:@bitwarden/cli" = "latest"
-```
+Both forms can coexist in the same consumer (e.g. mix v0.10.0 directory
+include for not-yet-ported namespaces with v0.16.x TOML-task includes
+for ci/cf/secrets/mobile).
 
-**CI/CD + cross-platform local builds** (Tauri apps — adds Windows 11 / Linux VMs):
-```toml
-[task_config]
-includes = [
-  "git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.10.0",
-  "git::https://github.com/joeblew999/utm-dev.git//.mise/tasks?ref=v2.1.0",
-]
-```
+mise does **not** chain `git::` includes, so each library must be listed
+explicitly.
 
 Each repo pins its own ref and bumps deliberately — no forced upgrades.
-
-mise does **not** chain `git::` includes, so both libraries must be listed
-explicitly.
 
 ## Secrets model
 
