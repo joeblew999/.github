@@ -443,6 +443,54 @@ jobs:
           }
           print "✓ wrangler:gen fails cleanly"
 
+      # ── Real-file validation: prove.toml (v0.17.2+) ────────────────────
+      - name: Real prove.toml — discovery + negative paths
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          let root = ($env.RUNNER_TEMP | path join "prove-consumer")
+          if ($root | path exists) { rm -rf $root }
+          mkdir $root
+
+          let prove_toml = ($env.GITHUB_WORKSPACE | path join "tasks" "prove.toml")
+          let root_toml = $"[task_config]
+          includes = ['($prove_toml)']
+
+          [tools]
+          \"github:nushell/nushell\" = \"0.112\"
+          "
+          $root_toml | save --force ($root | path join "mise.toml")
+
+          cd $root
+          ^mise trust
+          let listing = (^mise tasks ls | complete)
+          print $listing.stdout
+          for t in ["prove:access-policy", "prove:bindings", "prove:deployed", "prove:secrets"] {
+            if not ($listing.stdout | str contains $t) {
+              print --stderr $"✗ ($t) not discovered"
+              exit 1
+            }
+          }
+          print "✓ all 4 prove:* tasks discovered"
+
+          # 2 tasks read config/<env>.env first — both fail-cleanly with
+          # the "config/production.env not found" message. The other two
+          # (prove:bindings + prove:secrets) call ^wrangler immediately
+          # which would need a real auth context to test meaningfully —
+          # skip those in CI.
+          for t in ["prove:deployed", "prove:access-policy"] {
+            let r = (^mise run $t | complete)
+            if $r.exit_code == 0 {
+              print --stderr $"✗ ($t) should have failed"
+              exit 1
+            }
+            if not (($r.stdout + $r.stderr) | str contains "config/production.env not found") {
+              print --stderr $"✗ ($t) wrong error: ($r.stderr)"
+              exit 1
+            }
+            print $"  ✓ ($t) failed cleanly"
+          }
+          print "✓ prove:* config-reading tasks fire expected error"
+
       # ── Real-file validation: mobile.toml ───────────────────────────────
       # Discovery only — we don't actually run any mobile:* task here.
       # mobile:android-setup would trigger a Temurin JDK install (~200 MB)

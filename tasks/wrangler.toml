@@ -47,7 +47,7 @@ def main [...args] {
 # Note: this task does NOT call wrangler — it's pure nu template
 # substitution. So no npm:wrangler in tools.
 ["wrangler:gen"]
-description = "Generate wrangler.{toml,jsonc} from wrangler.{toml,jsonc}.template + config/<env>.env via bash native substitution. Auto-detects which template format the fork uses. Per-fork values are interpolated; the result is gitignored."
+description = "Generate wrangler.{toml,jsonc} from wrangler.{toml,jsonc}.template + config/<env>.env via nushell template substitution. Auto-detects which template format the fork uses. Per-fork values are interpolated; the result is gitignored."
 tools = { "github:nushell/nushell" = "0.112" }
 run = '''
 #!/usr/bin/env nu
