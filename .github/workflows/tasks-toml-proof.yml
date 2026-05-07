@@ -154,3 +154,97 @@ jobs:
             exit 1
           }
           print "✓ confirmed: per-task tools stay scoped to their task"
+
+      # ── Real-file validation ────────────────────────────────────────────
+      # The synthetic fixture above proves the mechanism. This second section
+      # proves the REAL tasks/*.toml files we ship to consumers actually load,
+      # discover their tasks, and the negative paths still fire correctly
+      # (no token / no git repo). Catches breakage if a future edit to a
+      # real tasks/<ns>.toml introduces a syntax error or wrong tool pin.
+      - name: Real tasks/ci.toml — construct consumer that includes it
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          let root = ($env.RUNNER_TEMP | path join "real-consumer")
+          if ($root | path exists) { rm -rf $root }
+          mkdir $root
+          mkdir ($root | path join "mise-tasks")
+
+          # Use the checked-out repo's tasks/ci.toml directly via absolute path
+          let ci_toml = ($env.GITHUB_WORKSPACE | path join "tasks" "ci.toml")
+
+          let root_toml = $"[task_config]
+          includes = [\"($ci_toml)\"]
+
+          [tools]
+          \"github:nushell/nushell\" = \"0.112\"
+          "
+          $root_toml | save --force ($root | path join "mise.toml")
+
+          # Add a sample nu task so ci:parse-check has something to chew on
+          let sample = '#!/usr/bin/env nu
+          #MISE description="sample nu task"
+          print "hello"
+          '
+          $sample | save --force ($root | path join "mise-tasks" "sample")
+          chmod +x ($root | path join "mise-tasks" "sample")
+
+      - name: Real tasks/ci.toml — trust + discovery
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          cd ($env.RUNNER_TEMP | path join "real-consumer")
+          ^mise trust
+          let listing = (^mise tasks ls | complete)
+          print $listing.stdout
+          for t in ["ci:parse-check", "ci:watch", "ci:clean"] {
+            if not ($listing.stdout | str contains $t) {
+              print --stderr $"✗ ($t) not discovered from real tasks/ci.toml"
+              exit 1
+            }
+          }
+          print "✓ all three ci:* tasks discovered from real tasks/ci.toml"
+
+      - name: Real tasks/ci.toml — ci:parse-check runs cleanly
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          cd ($env.RUNNER_TEMP | path join "real-consumer")
+          ^mise run "ci:parse-check"
+
+      # Negative: ci:watch + ci:clean must fail with "no GitHub token" when
+      # run with empty env. Locks the contract consumers' CI relies on.
+      - name: Real tasks/ci.toml — ci:watch fails cleanly with no token
+        shell: 'mise exec -- nu --no-newline {0}'
+        env:
+          GH_TOKEN: ""
+          GITHUB_TOKEN: ""
+          MISE_GITHUB_TOKEN: ""
+        run: |
+          cd ($env.RUNNER_TEMP | path join "real-consumer")
+          let r = (^mise run "ci:watch" | complete)
+          if $r.exit_code == 0 {
+            print --stderr "✗ ci:watch should have failed with no token"
+            exit 1
+          }
+          if not (($r.stdout + $r.stderr) | str contains "no GitHub token") {
+            print --stderr $"✗ wrong error: ($r.stderr)"
+            exit 1
+          }
+          print "✓ ci:watch failed cleanly with 'no GitHub token'"
+
+      - name: Real tasks/ci.toml — ci:clean fails cleanly with no token
+        shell: 'mise exec -- nu --no-newline {0}'
+        env:
+          GH_TOKEN: ""
+          GITHUB_TOKEN: ""
+          MISE_GITHUB_TOKEN: ""
+        run: |
+          cd ($env.RUNNER_TEMP | path join "real-consumer")
+          let r = (^mise run "ci:clean" | complete)
+          if $r.exit_code == 0 {
+            print --stderr "✗ ci:clean should have failed with no token"
+            exit 1
+          }
+          if not (($r.stdout + $r.stderr) | str contains "no GitHub token") {
+            print --stderr $"✗ wrong error: ($r.stderr)"
+            exit 1
+          }
+          print "✓ ci:clean failed cleanly with 'no GitHub token'"
