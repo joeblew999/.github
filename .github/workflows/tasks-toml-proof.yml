@@ -566,23 +566,21 @@ jobs:
           mut total = 0
           mut failed = []
 
+          # Pattern: capture quoted top-level key (namespace:task) + the
+          # `run = '''<body>'''` block. Double-quoted nu string for proper
+          # escapes — `\\` → `\`, `\"` → `"`, single quotes literal.
+          let pattern = "(?s)\\[\"([^\"]+)\"\\][^\\[]*?run\\s*=\\s*'''(.*?)'''"
+
           for t in $tomls {
             let raw = (open --raw $t)
-            # Extract each `run = '''...'''` block. Nu's regex supports lookahead
-            # via `parse --regex` — capture body between triple-single-quotes.
-            let bodies = (
-              $raw
-              | parse --regex "(?s)\\[\"([^\"]+)\"\\][^[]*?run\\s*=\\s*'''(.*?)'''"
-              | rename task body
-            )
+            let bodies = ($raw | parse --regex $pattern | rename task body)
             for entry in $bodies {
               $total = $total + 1
-              let tmp = ($work | path join $"($entry.task | str replace --all \":\" \"_\").nu")
+              let safe = ($entry.task | str replace --all ":" "_")
+              let tmp = ($work | path join $"($safe).nu")
               $entry.body | save --force $tmp
               let r = (do { ^nu --ide-check 1 $tmp } | complete)
-              # ide-check emits diagnostics as JSON-per-line; non-empty stdout
-              # with severity=Error means a real parse error.
-              if ($r.stdout | str contains '"severity":"Error"') {
+              if ($r.stdout | str contains "severity\":\"Error") {
                 $failed = ($failed | append {task: $entry.task, error: ($r.stdout | lines | first)})
               }
             }
