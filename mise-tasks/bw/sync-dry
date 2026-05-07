@@ -3,5 +3,5 @@
 
 # Delegate to ./sync --dry-run. path self gives the directory of this script
 # so we don't depend on $PWD.
-let here = (path self | path dirname)
+const here = (path self | path dirname)
 ^$"($here)/sync" --dry-run

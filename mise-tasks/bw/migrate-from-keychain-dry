@@ -1,5 +1,5 @@
 #!/usr/bin/env nu
 #MISE description="DRY RUN of bw:migrate-from-keychain (preview, no changes)."
 
-let here = (path self | path dirname)
+const here = (path self | path dirname)
 ^$"($here)/migrate-from-keychain" --dry-run
