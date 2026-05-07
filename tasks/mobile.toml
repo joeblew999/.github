@@ -1,0 +1,236 @@
+# tasks/mobile.toml — TOML-task definitions for the mobile:* namespace.
+#
+# Each task brings its own mobile toolchain via per-task `tools = { ... }`.
+# Adopting consumers no longer need ruby/cocoapods/java pinned in their
+# user-global ~/.config/mise/config.toml — those auto-install only when
+# an actual mobile:* task runs.
+#
+# Consumer wiring:
+#   [task_config]
+#   includes = [
+#     "git::https://github.com/joeblew999/.github.git//tasks/mobile.toml?ref=v0.16.1",
+#   ]
+#
+# See tasks/ci.toml header for the broader context + cross-OS canary.
+
+# ── mobile:android-setup ─────────────────────────────────────────────────────
+# One-shot Android toolchain assertion. Verifies Java 17+, ANDROID_HOME,
+# and Android NDK; auto-detects ANDROID_HOME from common Android Studio
+# install paths; installs NDK 27 + platform 34 via sdkmanager if missing;
+# adds the four Rust Android cross-compile targets.
+#
+# Tools: nu (the script), java (the prereq the script asserts).
+# Rust + rustup are NOT pinned here — consumers pin those in their own
+# mise.toml (every joeblew999 Rust project does); this task just adds
+# Android targets to whatever rust the consumer has.
+["mobile:android-setup"]
+description = "Assert Android toolchain: Java 17+, ANDROID_HOME, NDK. Run once per machine."
+tools = { "github:nushell/nushell" = "0.112", java = "temurin-17.0.18+8" }
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  if (which java | is-empty) {
+    print --stderr "✗ java not found — should be auto-installed by per-task tools pin"
+    exit 1
+  }
+  let ver_raw = (^java -version | complete | get stderr | lines | first)
+  let java_ver = ($ver_raw | parse --regex '"([0-9]+)' | get capture0?.0? | default "0" | into int)
+  if $java_ver < 17 {
+    print --stderr $"✗ Java 17+ required, found: ($ver_raw)"
+    exit 1
+  }
+  print $"✓ Java ($java_ver)"
+
+  mut android_home = ($env.ANDROID_HOME? | default "")
+  if ($android_home | is-empty) {
+    let mac_default = $"($env.HOME)/Library/Android/sdk"
+    let linux_default = $"($env.HOME)/Android/Sdk"
+    if ($mac_default | path exists) {
+      $android_home = $mac_default
+      print $"→ auto-detected ANDROID_HOME=($android_home) \(Android Studio default\)"
+      print $"  Add to .mise.toml [env]: ANDROID_HOME = \"($android_home)\""
+    } else if ($linux_default | path exists) {
+      $android_home = $linux_default
+      print $"→ auto-detected ANDROID_HOME=($android_home)"
+    } else {
+      print --stderr "✗ ANDROID_HOME not set and no SDK found at default paths."
+      print --stderr "  Install Android Studio, or set ANDROID_HOME in .mise.toml [env]."
+      exit 1
+    }
+    $env.ANDROID_HOME = $android_home
+  }
+  print $"✓ ANDROID_HOME=($android_home)"
+
+  let ndk_base = $"($android_home)/ndk"
+  if ($ndk_base | path exists) and (ls $ndk_base | length) > 0 {
+    let ndk_ver = (ls $ndk_base | get name | each { |p| $p | path basename } | sort | last)
+    let ndk_dir = $"($ndk_base)/($ndk_ver)"
+    print $"✓ NDK ($ndk_ver) \(($ndk_dir)\)"
+    $env.ANDROID_NDK_HOME = $ndk_dir
+  } else {
+    let sdkmgr = $"($android_home)/cmdline-tools/latest/bin/sdkmanager"
+    if not ($sdkmgr | path exists) {
+      print --stderr $"✗ sdkmanager not found at ($sdkmgr)"
+      print --stderr "  Install 'Command-line tools' from Android Studio → SDK Manager → SDK Tools."
+      exit 1
+    }
+    print "→ installing NDK 27 + platform 34 via sdkmanager..."
+    ^$sdkmgr --install "ndk;27.0.12077973" "platforms;android-34" "build-tools;34.0.0"
+    $env.ANDROID_NDK_HOME = $"($ndk_base)/27.0.12077973"
+    print $"✓ NDK installed: ($env.ANDROID_NDK_HOME)"
+  }
+
+  print "→ adding Rust Android targets..."
+  ^rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+
+  print ""
+  print "✓ Android toolchain ready."
+  print "  Next: mise run init:android   (first time only)"
+  print "        mise run dev:android    (requires device or emulator)"
+}
+'''
+
+# ── mobile:ios-setup ─────────────────────────────────────────────────────────
+# One-shot iOS toolchain assertion. macOS-only (Xcode is macOS-only).
+# Verifies Xcode CLI tools, installs CocoaPods if missing, adds Rust iOS
+# cross-compile targets.
+#
+# Tools: nu, ruby (3.3 — cocoapods needs ruby), cocoapods (gem itself).
+# Pinning cocoapods at "latest" matches the long-standing user-global
+# convention and avoids version drift between machines.
+["mobile:ios-setup"]
+description = "Assert iOS toolchain: macOS + Xcode CLI tools + CocoaPods. Run once per machine."
+tools = { "github:nushell/nushell" = "0.112", ruby = "3.3", cocoapods = "latest" }
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  if $nu.os-info.name != "macos" {
+    print --stderr "✗ iOS builds require macOS (Xcode is macOS-only)"
+    exit 1
+  }
+
+  let xcode_check = (^xcode-select -p | complete)
+  if $xcode_check.exit_code != 0 {
+    print --stderr "✗ Xcode CLI tools not installed."
+    print --stderr "  Run: xcode-select --install"
+    print --stderr "  Or install Xcode from the App Store (includes CLI tools)."
+    exit 1
+  }
+  let xcode_path = ($xcode_check.stdout | str trim)
+  print $"✓ Xcode: ($xcode_path)"
+
+  if ($xcode_path | str contains "CommandLineTools") {
+    print --stderr "⚠  CLI tools only — iOS simulator builds need full Xcode."
+    print --stderr "   Install Xcode from the App Store, then: sudo xcode-select -s /Applications/Xcode.app"
+  }
+
+  let pod_ver = (^pod --version | str trim)
+  print $"✓ CocoaPods ($pod_ver)"
+
+  print "→ adding Rust iOS targets..."
+  ^rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+
+  print ""
+  print "✓ iOS toolchain ready."
+  print "  Next: mise run init:ios   (first time only)"
+  print "        mise run dev:ios    (requires connected device or simulator)"
+}
+'''
+
+# ── mobile:tauri-android-init ────────────────────────────────────────────────
+# Generate the Android project. Run once per clone of a Tauri app.
+["mobile:tauri-android-init"]
+description = "tauri android init — generate the Android project (run once per clone)"
+tools = { "github:nushell/nushell" = "0.112", "cargo:tauri-cli" = "2", java = "temurin-17.0.18+8" }
+run = '''
+#!/usr/bin/env nu
+
+def main [...args] {
+  let cmd = ($env.TAURI_CMD? | default "tauri")
+  ^$cmd android init ...$args
+}
+'''
+
+# ── mobile:tauri-android-dev ─────────────────────────────────────────────────
+# Hot-reload Tauri Android dev build on a connected device or emulator.
+["mobile:tauri-android-dev"]
+description = "tauri android dev — hot-reload on connected device or emulator"
+tools = { "github:nushell/nushell" = "0.112", "cargo:tauri-cli" = "2", java = "temurin-17.0.18+8" }
+run = '''
+#!/usr/bin/env nu
+
+def main [...args] {
+  let cmd = ($env.TAURI_CMD? | default "tauri")
+  ^$cmd android dev ...$args
+}
+'''
+
+# ── mobile:tauri-android-build ───────────────────────────────────────────────
+# Release Tauri Android APK/AAB build.
+["mobile:tauri-android-build"]
+description = "tauri android build — release APK/AAB"
+tools = { "github:nushell/nushell" = "0.112", "cargo:tauri-cli" = "2", java = "temurin-17.0.18+8" }
+run = '''
+#!/usr/bin/env nu
+
+def main [...args] {
+  let cmd = ($env.TAURI_CMD? | default "tauri")
+  ^$cmd android build ...$args
+}
+'''
+
+# ── mobile:tauri-ios-init ────────────────────────────────────────────────────
+# Generate the Xcode project. macOS-only.
+["mobile:tauri-ios-init"]
+description = "tauri ios init — generate the Xcode project (macOS only, run once per clone)"
+tools = { "github:nushell/nushell" = "0.112", "cargo:tauri-cli" = "2", ruby = "3.3", cocoapods = "latest" }
+run = '''
+#!/usr/bin/env nu
+
+def main [...args] {
+  if $nu.os-info.name != "macos" {
+    print --stderr "✗ iOS builds require macOS"
+    exit 1
+  }
+  let cmd = ($env.TAURI_CMD? | default "tauri")
+  ^$cmd ios init ...$args
+}
+'''
+
+# ── mobile:tauri-ios-dev ─────────────────────────────────────────────────────
+# Hot-reload Tauri iOS on connected device or simulator. macOS-only.
+["mobile:tauri-ios-dev"]
+description = "tauri ios dev — hot-reload on connected device or simulator (macOS only)"
+tools = { "github:nushell/nushell" = "0.112", "cargo:tauri-cli" = "2", ruby = "3.3", cocoapods = "latest" }
+run = '''
+#!/usr/bin/env nu
+
+def main [...args] {
+  if $nu.os-info.name != "macos" {
+    print --stderr "✗ iOS builds require macOS"
+    exit 1
+  }
+  let cmd = ($env.TAURI_CMD? | default "tauri")
+  ^$cmd ios dev ...$args
+}
+'''
+
+# ── mobile:tauri-ios-build ───────────────────────────────────────────────────
+# Release Tauri IPA build. macOS-only.
+["mobile:tauri-ios-build"]
+description = "tauri ios build — release IPA (macOS only)"
+tools = { "github:nushell/nushell" = "0.112", "cargo:tauri-cli" = "2", ruby = "3.3", cocoapods = "latest" }
+run = '''
+#!/usr/bin/env nu
+
+def main [...args] {
+  if $nu.os-info.name != "macos" {
+    print --stderr "✗ iOS builds require macOS"
+    exit 1
+  }
+  let cmd = ($env.TAURI_CMD? | default "tauri")
+  ^$cmd ios build ...$args
+}
+'''
