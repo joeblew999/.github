@@ -550,6 +550,44 @@ jobs:
           }
           print "✓ rust:wasm-pack fires usage error cleanly"
 
+      # ── ci:check-toml-tasks + ci:check-workflow-nu (v0.17.5+) ─────────
+      # Self-hosting parse-check: invoke the brand-new shared tasks against
+      # joeblew999/.github's OWN tasks/ + .github/workflows/ files. Catches
+      # nu syntax errors in inline TOML run bodies AND in embedded workflow
+      # nu blocks — same coverage that ci:parse-check provides for legacy
+      # standalone .nu files in mise-tasks/.
+      #
+      # Consumers can add the same one-liner to their own CI:
+      #   mise run ci:check-toml-tasks
+      #   mise run ci:check-workflow-nu
+      - name: ci:check-toml-tasks (self-host)
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          let root = ($env.RUNNER_TEMP | path join "selfcheck-consumer")
+          if ($root | path exists) { rm -rf $root }
+          mkdir $root
+
+          let ci_toml = ($env.GITHUB_WORKSPACE | path join "tasks" "ci.toml")
+          let root_toml = $"[task_config]
+          includes = ['($ci_toml)']
+
+          [tools]
+          \"github:nushell/nushell\" = \"0.112\"
+          "
+          $root_toml | save --force ($root | path join "mise.toml")
+
+          cd $root
+          ^mise trust
+          let tasks_dir = ($env.GITHUB_WORKSPACE | path join "tasks")
+          ^mise run "ci:check-toml-tasks" -- --dir $tasks_dir
+
+      - name: ci:check-workflow-nu (self-host)
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          cd ($env.RUNNER_TEMP | path join "selfcheck-consumer")
+          let workflows_dir = ($env.GITHUB_WORKSPACE | path join ".github" "workflows")
+          ^mise run "ci:check-workflow-nu" -- --dir $workflows_dir
+
       # ── Real-file validation: prove.toml (v0.17.2+) ────────────────────
       - name: Real prove.toml — discovery + negative paths
         shell: 'mise exec -- nu --no-newline {0}'
