@@ -508,6 +508,97 @@ jobs:
           }
           print "✓ bw:set fails cleanly with usage hint when no NAME passed"
 
+      # ── Real-file validation: rust.toml + mise.toml (v0.17.4+) ────────
+      - name: Real rust.toml + mise.toml — discovery + cheap negative path
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          let root = ($env.RUNNER_TEMP | path join "rust-mise-consumer")
+          if ($root | path exists) { rm -rf $root }
+          mkdir $root
+
+          let r_toml = ($env.GITHUB_WORKSPACE | path join "tasks" "rust.toml")
+          let m_toml = ($env.GITHUB_WORKSPACE | path join "tasks" "mise.toml")
+          let root_toml = $"[task_config]
+          includes = ['($r_toml)', '($m_toml)']
+
+          [tools]
+          \"github:nushell/nushell\" = \"0.112\"
+          "
+          $root_toml | save --force ($root | path join "mise.toml")
+
+          cd $root
+          ^mise trust
+          let listing = (^mise tasks ls | complete)
+          print $listing.stdout
+          for t in ["rust:build", "rust:test", "rust:wasm-pack", "mise:upgrade"] {
+            if not ($listing.stdout | str contains $t) {
+              print --stderr $"✗ ($t) not discovered"
+              exit 1
+            }
+          }
+          print "✓ rust:* + mise:upgrade discovered"
+
+          # rust:wasm-pack with no arg fires usage error via mise's `usage` spec
+          let r = (^mise run "rust:wasm-pack" | complete)
+          if $r.exit_code == 0 {
+            print --stderr "✗ rust:wasm-pack should have failed without crate-dir"
+            exit 1
+          }
+          if not (($r.stdout + $r.stderr) | str contains "<crate-dir>") {
+            print --stderr $"✗ rust:wasm-pack wrong error: ($r.stderr)"
+            exit 1
+          }
+          print "✓ rust:wasm-pack fires usage error cleanly"
+
+      # ── Inline run-body parse-check (v0.17.4+) ─────────────────────────
+      # Extract each TOML-task's run body and ide-check it with nu. Catches
+      # nu syntax errors that would only surface at runtime — same coverage
+      # the legacy ci:parse-check provides for file-tasks, applied to inline
+      # TOML bodies.
+      - name: Inline run-body ide-check across every tasks/*.toml
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          let work = ($env.RUNNER_TEMP | path join "ide-check")
+          if ($work | path exists) { rm -rf $work }
+          mkdir $work
+
+          let tomls = (glob ($env.GITHUB_WORKSPACE | path join "tasks" "*.toml"))
+          mut total = 0
+          mut failed = []
+
+          for t in $tomls {
+            let raw = (open --raw $t)
+            # Extract each `run = '''...'''` block. Nu's regex supports lookahead
+            # via `parse --regex` — capture body between triple-single-quotes.
+            let bodies = (
+              $raw
+              | parse --regex "(?s)\\[\"([^\"]+)\"\\][^[]*?run\\s*=\\s*'''(.*?)'''"
+              | rename task body
+            )
+            for entry in $bodies {
+              $total = $total + 1
+              let tmp = ($work | path join $"($entry.task | str replace --all \":\" \"_\").nu")
+              $entry.body | save --force $tmp
+              let r = (do { ^nu --ide-check 1 $tmp } | complete)
+              # ide-check emits diagnostics as JSON-per-line; non-empty stdout
+              # with severity=Error means a real parse error.
+              if ($r.stdout | str contains '"severity":"Error"') {
+                $failed = ($failed | append {task: $entry.task, error: ($r.stdout | lines | first)})
+              }
+            }
+          }
+
+          print $"→ parse-checked ($total) inline run bodies across (\($tomls | length\)) tasks/*.toml files"
+          if ($failed | length) > 0 {
+            print --stderr ""
+            print --stderr $"✗ ($failed | length) task\(s\) with parse errors:"
+            for f in $failed {
+              print --stderr $"  - ($f.task): ($f.error)"
+            }
+            exit 1
+          }
+          print "✓ all inline run bodies parse-clean"
+
       # ── Real-file validation: prove.toml (v0.17.2+) ────────────────────
       - name: Real prove.toml — discovery + negative paths
         shell: 'mise exec -- nu --no-newline {0}'

@@ -1,0 +1,66 @@
+# tasks/rust.toml — TOML-task definitions for the rust:* namespace.
+#
+# Thin wrappers around cargo + wasm-pack. Consumer must pin `rust` in
+# its own mise.toml; these tasks don't bring rust along (rust install
+# is ~500 MB and consumers always pin it themselves anyway).
+#
+# Consumer wiring:
+#   [task_config]
+#   includes = [
+#     "git::https://github.com/joeblew999/.github.git//tasks/rust.toml?ref=v0.17.4",
+#   ]
+
+# ── rust:build ───────────────────────────────────────────────────────────────
+# cargo build --all-targets, with RUST_BACKTRACE=1 for better diagnostics.
+["rust:build"]
+description = "cargo build (all targets)"
+tools = { "github:nushell/nushell" = "0.112" }
+env = { RUST_BACKTRACE = "1" }
+run = '''
+#!/usr/bin/env nu
+
+def main [...args] {
+  ^cargo build --all-targets ...$args
+}
+'''
+
+# ── rust:test ────────────────────────────────────────────────────────────────
+# cargo test --all-targets.
+["rust:test"]
+description = "cargo test (all targets)"
+tools = { "github:nushell/nushell" = "0.112" }
+env = { RUST_BACKTRACE = "1" }
+run = '''
+#!/usr/bin/env nu
+
+def main [...args] {
+  ^cargo test --all-targets ...$args
+}
+'''
+
+# ── rust:wasm-pack ───────────────────────────────────────────────────────────
+# Compile a Rust crate to WASM via wasm-pack. Pins wasm-pack per-task
+# (consumers don't have to install it globally).
+["rust:wasm-pack"]
+description = "compile a Rust crate to WASM via wasm-pack"
+tools = { "github:nushell/nushell" = "0.112", "cargo:wasm-pack" = "latest" }
+usage = '''
+arg "<crate-dir>" help="path to the crate directory to compile"
+'''
+run = '''
+#!/usr/bin/env nu
+
+def main [crate_dir?: string, ...args] {
+  let crate = ($crate_dir | default "")
+  if ($crate | is-empty) {
+    print --stderr "✗ usage: mise run rust:wasm-pack <crate-dir>"
+    exit 1
+  }
+  if not ($crate | path exists) {
+    print --stderr $"✗ directory not found: ($crate)"
+    exit 1
+  }
+  cd $crate
+  ^wasm-pack build --target web --out-dir pkg ...$args
+}
+'''

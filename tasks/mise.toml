@@ -1,0 +1,49 @@
+# tasks/mise.toml — TOML-task definitions for the mise:* namespace.
+#
+# Currently a single task: mise:upgrade — a thin wrapper around
+# `mise upgrade --bump --local` that's safer than the bare command
+# (won't accidentally bump the user's global config).
+#
+# Consumer wiring:
+#   [task_config]
+#   includes = [
+#     "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref=v0.17.4",
+#   ]
+
+# ── mise:upgrade ─────────────────────────────────────────────────────────────
+# Bump pinned tool versions in this repo's mise.toml. The `--local` flag
+# is critical: without it, mise upgrade leaks bumps into the user's
+# global ~/.config/mise/config.toml.
+["mise:upgrade"]
+description = "Bump pinned tool versions in this repo's mise.toml via `mise upgrade --bump --local`. Idempotent."
+tools = { "github:nushell/nushell" = "0.112" }
+run = '''
+#!/usr/bin/env nu
+
+def main [
+  --dry-run          # show what would change without writing
+] {
+  if $dry_run {
+    print "→ mise upgrade --bump --local --dry-run"
+    ^mise upgrade --bump --local --dry-run
+    return
+  }
+
+  let project_root = ($env.MISE_PROJECT_ROOT? | default (pwd))
+  cd $project_root
+
+  let before = (open --raw mise.toml)
+  print "→ mise upgrade --bump --local"
+  ^mise upgrade --bump --local
+
+  let after = (open --raw mise.toml)
+  if $before == $after {
+    print "✓ nothing to upgrade — mise.toml unchanged"
+    return
+  }
+
+  print ""
+  print "✓ mise.toml bumped:"
+  ^git --no-pager diff -- mise.toml
+}
+'''
