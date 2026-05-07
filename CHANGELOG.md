@@ -3,6 +3,192 @@
 All notable changes to the shared mise task library. Bump consumer repos'
 `[task_config].includes` pin when adopting a new release.
 
+## v0.19.1 — 2026-05-07
+
+### Added
+
+- **`ci:audit-lib-refs`** — scans every `mise config ls --tracked-configs`
+  for `?ref=v…` URLs pointing at the lib and warns if any are not on the
+  latest tag. Closes the gap that `mise outdated` doesn't see git URLs in
+  `[task_config].includes`. Run from anywhere on the machine — it walks
+  *all* tracked mise configs, not just the current repo.
+
+## v0.19.0 — 2026-05-07
+
+### Fixed (Gemini Code Assist feedback bundle)
+
+- **`tasks/secrets.toml`** — `secrets:_base` block was nested inside
+  `secrets:sync-github`'s comment header at the top of the file. mise
+  parsed it correctly (the `["secrets:_base"]` table header restarted
+  the section), but it read as a maintenance hazard. Moved to the top
+  of the file with its own `── secrets:_base ──` banner.
+- **`ci:check-toml-tasks`** — regex now handles BOTH `'''…'''` and
+  `"""…"""` body forms. Previous version silently skipped any task body
+  authored with triple-double-quotes.
+- **`ci:check-toml-tasks`** — diagnostic filter now requires both
+  `"type":"diagnostic"` AND `"severity":"Error"`. Was matching warnings
+  and treating them as failures.
+- **`ci:audit-lib-refs --dir`** (preview) — handles absolute paths
+  correctly (was producing `/abs//rel/…` when an absolute path was
+  passed).
+
+### Changed
+
+- **`.github` self-hosts** — root `mise.toml` now explicitly includes
+  every `tasks/*.toml`, so the library runs its own `ci:check-toml-tasks`
+  and `ci:check-workflow-nu` against itself. Catches drift inside the lib
+  before consumers see it.
+
+## v0.18.0 — 2026-05-07
+
+### Changed
+
+- **Extends-based per-task tools dedup** — every namespace now has a
+  hidden `<ns>:_base` task that pins shared tools (always nu, sometimes
+  fnox/gh/etc.). Each child task `extends = "<ns>:_base"` and only declares
+  its delta. mise MERGES tools from base + child, so `nu` and other
+  shared pins live in one place per namespace instead of being repeated
+  across every task. ~80% reduction in `tools = { … }` block duplication
+  across `tasks/`.
+
+  Requires `[settings].experimental = true` in consumer mise.toml (the
+  `extends` key is still flagged experimental; behaviour is stable).
+
+## v0.17.5 — 2026-05-07
+
+### Added
+
+- **`ci:check-toml-tasks`** — lints every `run = '''…'''` body in
+  `tasks/*.toml` by extracting it to a temp file and running
+  `nu --ide-check 1`. Sub-second feedback locally vs. waiting on Actions.
+- **`ci:check-workflow-nu`** — same idea for nu blocks embedded in
+  `.github/workflows/*.yml`.
+
+Both shared so consumers can wire them into a local `[tasks.check]`
+aggregator. The lib runs them on itself in CI.
+
+## v0.17.4 — 2026-05-07
+
+### Added
+
+- **`rust:build`**, **`rust:test`**, **`rust:wasm-pack`** — full `rust:*`
+  namespace ported to TOML-tasks. `rust:wasm-pack` pins
+  `cargo:wasm-pack = "0.13"` per-task (consumers don't pre-install).
+- **`mise:upgrade`** — TOML port; bumps the lib include `?ref=` pin in
+  the calling repo's mise.toml.
+
+## v0.17.3 — 2026-05-07
+
+### Added
+
+- Final namespace ports to TOML: **`secrets:*`**, **`fnox:*`**, **`bw:*`**.
+  Tools (fnox, bw, gh) propagate per-task — consumers no longer pin them
+  globally.
+
+## v0.17.2 — 2026-05-07
+
+### Added
+
+- **`prove:*`** namespace ported to TOML.
+
+### Fixed
+
+- **`wrangler:gen`** description corrected.
+
+## v0.17.1 — 2026-05-07
+
+### Added
+
+- **`env:resolve`** ported to TOML.
+- **`wrangler:*`** namespace ported to TOML with per-task `wrangler` pin.
+
+## v0.17.0 — 2026-05-07
+
+### Added
+
+- Full **`cf:*`** namespace ported to TOML-tasks. Per-task tool pins
+  (gh, jq, fnox, etc.) propagate via `git::` includes — consumers no
+  longer need a global `[tools]` block.
+
+## v0.16.2 — 2026-05-07
+
+### Fixed
+
+- **`mobile:rustup-target-add`** — defensive guard when `rustup` is not
+  on PATH. Skips with a friendly message rather than blowing up with a
+  command-not-found error.
+
+## v0.16.1 — 2026-05-07
+
+### Added
+
+- **`mobile:*`** namespace ported to TOML-tasks (first non-cf port after
+  v0.16.0).
+
+## v0.16.0 — 2026-05-07
+
+### Added
+
+- **TOML-tasks with per-task tools** — new `tasks/*.toml` library
+  alongside the legacy `mise-tasks/` file-tasks. Per-task `tools = { … }`
+  blocks let each task pin its own dependencies (nu, gh, fnox, jq, …),
+  so consumers no longer need a one-size-fits-all `[tools]` block in
+  every mise.toml. Tools come along for the ride through the `git::`
+  include URL.
+
+  See [`mise-tasks/DEPRECATED.md`](mise-tasks/DEPRECATED.md) for the
+  migration table and consumer wiring guide.
+
+## v0.15.3 — 2026-05-07
+
+### Fixed
+
+- **`bw:*`**, **`secrets:*`** — `const here = (path self …)` was
+  declared as `let` in earlier shipped tasks, which broke at runtime
+  in nu (path self resolves at parse time, but `let` requires runtime
+  context). Switched to `const`.
+
+## v0.15.2 — 2026-05-07
+
+### Changed
+
+- README + AGENTS + CLAUDE drift cleanup. `mise-tasks-lint.yml` now
+  covers `ci:*` tasks too.
+
+## v0.15.1 — 2026-05-07
+
+### Fixed
+
+- **`ci:parse-check`** — only inspects files with a `#!/usr/bin/env nu`
+  shebang. Previous version tripped on README.md and other plain text.
+
+## v0.15.0 — 2026-05-07
+
+### Added
+
+- **Reusable workflows** at `.github/workflows/`:
+  - `reusable-mise-ci.yml` — drop-in CI workflow callable via
+    `uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@vX.Y.Z`.
+  - `reusable-mise-upgrade.yml` — automated weekly bump of the lib
+    `?ref=` pin via `mise:upgrade`.
+
+## v0.14.1 — 2026-05-07
+
+### Added
+
+- **`ci:parse-check`** — generic nu file parse-checker. Walks a path,
+  runs `nu --ide-check 1` against every nu source file, exits non-zero
+  on any parse error. Used by every consumer's local `check` task.
+
+## v0.14.0 — 2026-05-07
+
+### Added
+
+- **`ci:watch`**, **`ci:clean`**, **`mise:upgrade`** — convenience
+  tasks. `ci:watch` polls `gh run list` until the latest run on the
+  current branch finishes; `ci:clean` cancels in-flight runs;
+  `mise:upgrade` bumps the lib pin to the latest tag.
+
 ## v0.13.1 — 2026-05-05
 
 ### Fixed

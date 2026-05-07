@@ -1,8 +1,25 @@
 # mise-tasks consolidation plan
 
-Author note: written 2026-05-02 at the end of a long migration day, so a
-future session (or contributor) can pick up where we stopped without
-re-deriving context.
+> **STATUS 2026-05-07 — partial.** The TOML-task migration (v0.16+) reshaped
+> the problem; most of this doc is preserved as historical context. Current
+> state of each phase:
+>
+> - **Phase 1 (composition verbs)** — adopted ad-hoc in some consumers
+>   (e.g. `1-setup`/`2-provision`); never standardised across all repos.
+>   Still a worthwhile cleanup.
+> - **Phase 2 (hide primitives)** — explicitly dropped; flat namespace stays.
+> - **Phase 3 (`prove:` → `cf-access:` rename)** — not done. Likely defer
+>   indefinitely; cost > value.
+> - **Phase 4 (README rewrite)** — superseded by [`tasks/`](../tasks/) +
+>   per-namespace files; the legacy `mise-tasks/README.md` is now a
+>   deprecation pointer.
+> - **Phase 5 (Rust port to `joeblew999/secrets-manager`)** — not started.
+>   Still the long-term endgame; the empty repo still exists.
+>
+> Author note (2026-05-02): written at the end of a long migration day so a
+> future session could pick up without re-deriving context. Kept verbatim
+> below because the rationale is still sound; only the implementation plan
+> is partially out of date.
 
 ## The problem
 

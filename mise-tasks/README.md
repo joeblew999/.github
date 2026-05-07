@@ -1,18 +1,27 @@
-# mise-tasks
+# mise-tasks (LEGACY — see [DEPRECATED.md](DEPRECATED.md))
 
-Reusable mise task library for joeblew999 projects.
+> **As of v0.16+, new consumers should use [`tasks/*.toml`](../tasks/) instead.**
+> This directory holds the legacy file-task implementations and is preserved
+> for backwards-compat with consumers pinned at `?ref=v0.10.0–v0.15.x`. No
+> new tasks land here. See [DEPRECATED.md](DEPRECATED.md) for the migration
+> table and rationale.
 
-## Usage
-
-Add to your project's `mise.toml`:
+## Usage (legacy — for repos still pinned to v0.10–v0.15.x)
 
 ```toml
-[tools]
-"cargo:utm-dev" = { git = "https://github.com/joeblew999/utm-dev-cli.git" }
-
 [task_config]
 includes = [
-  "git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.15.1"
+  "git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.15.3"
+]
+```
+
+Migrate at your convenience to per-file TOML-task includes:
+
+```toml
+[task_config]
+includes = [
+  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.19.1",
+  # ...whichever namespaces you need
 ]
 ```
 
