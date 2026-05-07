@@ -118,23 +118,55 @@ let parsed = ($origin_url | parse --regex '.*[:/](?<owner>[^/]+)/(?<name>[^/]+?)
 Note `[^/]+?` (allows dots) — repos like `joeblew999/.github` start with a
 dot. The previous regex used `[^/.]+?` and broke on those.
 
-## Adding a new shared task
+## Adding a new shared task — checklist (no drift)
 
-1. Read [`mise-tasks/CONSOLIDATION.md`](./mise-tasks/CONSOLIDATION.md) — is this a
-   primitive that belongs here, or composition that belongs in a consumer repo?
-2. If it's a primitive: create `mise-tasks/<namespace>/<task-name>`
-3. Add the shebang + MISE description header (nu):
+This repo is the org's shared system. Every new task MUST be:
+
+1. **Right place.** Read [`mise-tasks/CONSOLIDATION.md`](./mise-tasks/CONSOLIDATION.md) — primitive (here) vs composition (consumer repo)?
+2. **Right path.** `mise-tasks/<namespace>/<task-name>` (subdirs become `namespace:` prefixes — e.g. `cf/token-check` → `cf:token-check`).
+3. **Right header.**
    ```nu
    #!/usr/bin/env nu
    #MISE description="one-line description"
    ```
-4. `chmod +x mise-tasks/<namespace>/<task-name>`
-5. Local parse-check: `mise exec -- nu --ide-check 1 mise-tasks/<namespace>/<task-name>`
-6. Local smoke run with empty env: `mise exec -- nu mise-tasks/<namespace>/<task-name>`
-   — should hit a friendly error path, not crash with parse/runtime errors
-7. Commit, push to `main`, then release: `mise run release -- vX.Y.Z`
-8. Update `mise-tasks/README.md`
-9. Tell consuming repos to bump `?ref=vX.Y.Z`
+4. **Executable.** `chmod +x mise-tasks/<namespace>/<task-name>` (mise silently skips non-executables).
+5. **Parse-clean.** `mise run ci:parse-check` — fails if any nu file has a syntax error.
+6. **Negative-path execution test.** If the task fails gracefully on missing prereq (no token, no env var, etc.), **add it to the `cases` array in [`.github/workflows/mise-tasks-lint.yml`](./.github/workflows/mise-tasks-lint.yml)**. This proves the friendly error path holds on every OS. Tasks with no missing-prereq failure mode (idempotent ones like `mise:upgrade`, `release` with arg) can skip this.
+7. **README.md updated.** Add a row in the right namespace section of [`mise-tasks/README.md`](./mise-tasks/README.md). If it's a new namespace, add a section.
+8. **Commit, push to `main`, then `mise run release -- vX.Y.Z`.**
+9. **Bump `?ref=vX.Y.Z`** in consumer repos when they pull the new task.
+
+## "Keep this repo clean" — invariants that must always hold
+
+This repo is the SSOT for every joeblew999 project's tooling. Drift here breaks every consumer.
+
+- **Every task file has shebang + `#MISE description=`.** Verified by `mise-tasks-lint.yml` on every push.
+- **Every task is parse-clean on linux/macos/windows.** `mise run ci:parse-check` (locally) + the workflow assertion.
+- **Every task that fails on missing prereqs has a negative-path test entry.** Catches runtime nu bugs that parse-check misses.
+- **README.md lists every namespace.** When you add a new namespace (rare), add a section. When you add a task to an existing namespace, add a row.
+- **Reusable workflows** (`reusable-mise-ci.yml`, `reusable-mise-upgrade.yml`) are versioned. Consumers reference by tag (`@v0.15.1`). Don't break the input contract without a major bump.
+- **`?ref=` example version in README.md** stays current with the latest tag.
+- **The local `mise tasks ls` count** matches expectations (currently ~50). A surprise drop = mise auto-discovery missed something (probably a missing `chmod +x`).
+- **No `${#array[@]}` in bash files** (Tera template engine eats `{#…#}` blocks). Flagged by the lint workflow; nu files are immune.
+
+## Reusable workflows (added v0.15.0)
+
+`.github/workflows/reusable-mise-ci.yml` and `.github/workflows/reusable-mise-upgrade.yml` are GH Actions reusable workflows that any joeblew999 repo can invoke via `uses:`:
+
+```yaml
+# in <repo>/.github/workflows/ci.yml
+jobs:
+  ci:
+    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@v0.15.1
+    with:
+      task: check         # the mise task to run
+      cargo-lock-path: cli/Cargo.lock   # for sccache cache key
+```
+
+When changing inputs in these workflows, treat them as a public API:
+- **Adding** an input with a default = backward-compat = patch/minor bump.
+- **Removing** or **renaming** an input = breaking = major bump.
+- **Changing default values** = consumers will see behavior change = at minimum a CHANGELOG note.
 
 ## Release workflow
 

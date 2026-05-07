@@ -12,7 +12,7 @@ Add to your project's `mise.toml`:
 
 [task_config]
 includes = [
-  "git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.7.0"
+  "git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.15.1"
 ]
 ```
 
@@ -33,6 +33,36 @@ Until then the git source is used; add a commit SHA after `?rev=` to pin exactly
 | Task | Description |
 |------|-------------|
 | `release` | Tag and push a new semver release — `mise run release -- v0.4.0` |
+
+### CI tooling (`ci:*`)
+
+| Task | Description |
+|------|-------------|
+| `ci:parse-check` | Parse-check every nu task file in `mise-tasks/` (skips non-nu files via shebang filter) |
+| `ci:watch` | Watch the latest CI run on this branch — streams per-job + per-step transitions, dumps failed-step logs |
+| `ci:clean` | Delete CI runs (default: failed/cancelled only; `--all` to nuke; `--dry-run` to preview) |
+
+REPO derived from `git remote get-url origin`. Token from `GH_TOKEN` env or fnox `GITHUB_TOKEN`.
+
+### mise self-management (`mise:*`)
+
+| Task | Description |
+|------|-------------|
+| `mise:upgrade [--dry-run]` | Bump pinned tool versions in this repo's `mise.toml` via `mise upgrade --bump --local`. Idempotent. |
+
+### Reusable GitHub Actions workflows
+
+`.github/workflows/reusable-mise-ci.yml` and `.github/workflows/reusable-mise-upgrade.yml` are reusable workflows. Consume from your repo's `.github/workflows/ci.yml`:
+
+```yaml
+jobs:
+  ci:
+    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@v0.15.1
+    with:
+      task: ci   # name of the mise task to run; default: ci
+```
+
+For the weekly tool-bump cron, see `reusable-mise-upgrade.yml` — handles cron + workflow_dispatch + opens PR on diff.
 
 ### Build / dev / deploy
 

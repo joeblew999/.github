@@ -197,6 +197,8 @@ jobs:
             { task: "env/resolve",              want: "not found" },
             { task: "release",                  want: "usage: mise run release" },
             { task: "rust/wasm-pack",           want: "usage: mise run rust:wasm-pack" },
+            { task: "ci/watch",                 want: "no GitHub token" },
+            { task: "ci/clean",                 want: "no GitHub token" },
           ]
 
           mut fail = 0
