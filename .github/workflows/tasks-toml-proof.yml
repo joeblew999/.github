@@ -169,11 +169,15 @@ jobs:
           mkdir $root
           mkdir ($root | path join "mise-tasks")
 
-          # Use the checked-out repo's tasks/ci.toml directly via absolute path
+          # Use the checked-out repo's tasks/ci.toml directly via absolute path.
+          # On Windows, GITHUB_WORKSPACE has backslashes which break TOML
+          # double-quoted strings (treated as escape sequences). Wrap in TOML
+          # *literal* strings (single quotes) — no escape processing — so
+          # backslash paths pass through verbatim.
           let ci_toml = ($env.GITHUB_WORKSPACE | path join "tasks" "ci.toml")
 
           let root_toml = $"[task_config]
-          includes = [\"($ci_toml)\"]
+          includes = ['($ci_toml)']
 
           [tools]
           \"github:nushell/nushell\" = \"0.112\"
