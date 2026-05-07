@@ -13,11 +13,18 @@
 # All wrangler:* tasks pin npm:wrangler per-task; consumers don't have to
 # pin wrangler globally just because a deploy/dev/tail task uses it.
 
+# ── wrangler:_base ──
+# Hidden base task — every wrangler:* extends this for shared nu pin.
+["wrangler:_base"]
+hide = true
+tools = { "github:nushell/nushell" = "0.112" }
+
 # ── wrangler:deploy ──────────────────────────────────────────────────────────
 # Pass-through to `wrangler deploy`. Forwards all args verbatim.
 ["wrangler:deploy"]
+extends = "wrangler:_base"
 description = "deploy to Cloudflare Workers"
-tools = { "github:nushell/nushell" = "0.112", "npm:wrangler" = "4" }
+tools = { "npm:wrangler" = "4" }
 run = '''
 #!/usr/bin/env nu
 
@@ -29,8 +36,9 @@ def main [...args] {
 # ── wrangler:dev ─────────────────────────────────────────────────────────────
 # Pass-through to `wrangler dev` for local multi-worker development.
 ["wrangler:dev"]
+extends = "wrangler:_base"
 description = "wrangler local dev (multi-worker)"
-tools = { "github:nushell/nushell" = "0.112", "npm:wrangler" = "4" }
+tools = { "npm:wrangler" = "4" }
 run = '''
 #!/usr/bin/env nu
 
@@ -47,8 +55,9 @@ def main [...args] {
 # Note: this task does NOT call wrangler — it's pure nu template
 # substitution. So no npm:wrangler in tools.
 ["wrangler:gen"]
+extends = "wrangler:_base"
 description = "Generate wrangler.{toml,jsonc} from wrangler.{toml,jsonc}.template + config/<env>.env via nushell template substitution. Auto-detects which template format the fork uses. Per-fork values are interpolated; the result is gitignored."
-tools = { "github:nushell/nushell" = "0.112" }
+
 run = '''
 #!/usr/bin/env nu
 
@@ -97,8 +106,9 @@ def main [] {
 # ── wrangler:secret-list ─────────────────────────────────────────────────────
 # List secrets set on a deployed Worker (values hidden).
 ["wrangler:secret-list"]
+extends = "wrangler:_base"
 description = "list secrets set on a deployed Worker (values hidden)"
-tools = { "github:nushell/nushell" = "0.112", "npm:wrangler" = "4" }
+tools = { "npm:wrangler" = "4" }
 usage = '''
 flag "--env <env>" help="Cloudflare environment" default="production"
 '''
@@ -116,8 +126,9 @@ def main [...args] {
 # Tail live logs from a deployed Worker. Defaults to production env;
 # pass --env <env> for staging/preview.
 ["wrangler:tail"]
+extends = "wrangler:_base"
 description = "tail live logs from a deployed Worker"
-tools = { "github:nushell/nushell" = "0.112", "npm:wrangler" = "4" }
+tools = { "npm:wrangler" = "4" }
 usage = '''
 flag "--env <env>" help="Cloudflare environment to tail" default="production"
 '''

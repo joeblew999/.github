@@ -11,13 +11,20 @@
 #     "git::https://github.com/joeblew999/.github.git//tasks/prove.toml?ref=v0.17.2",
 #   ]
 
+# ── prove:_base ──
+# Hidden base task — every prove:* extends this for shared nu pin.
+["prove:_base"]
+hide = true
+tools = { "github:nushell/nushell" = "0.112" }
+
 # ── prove:bindings ───────────────────────────────────────────────────────────
 # Confirm the deployed Worker's bindings via wrangler --dry-run (no upload).
 # Catches drift between wrangler.toml.template and the resources actually
 # created.
 ["prove:bindings"]
+extends = "prove:_base"
 description = "Confirm the deployed Worker's bindings via wrangler --dry-run (no upload). Catches drift between wrangler.toml.template and the resources actually created."
-tools = { "github:nushell/nushell" = "0.112", "npm:wrangler" = "4" }
+tools = { "npm:wrangler" = "4" }
 run = '''
 #!/usr/bin/env nu
 
@@ -37,8 +44,9 @@ def main [] {
 # List secrets on the deployed Worker, assert all 4 expected names are
 # present (ACCOUNT_ID, API_KEY, TEAM_DOMAIN, POLICY_AUD).
 ["prove:secrets"]
+extends = "prove:_base"
 description = "List secrets on the deployed Worker, assert all 4 expected names present (ACCOUNT_ID, API_KEY, TEAM_DOMAIN, POLICY_AUD)."
-tools = { "github:nushell/nushell" = "0.112", "npm:wrangler" = "4" }
+tools = { "npm:wrangler" = "4" }
 run = '''
 #!/usr/bin/env nu
 
@@ -62,8 +70,9 @@ def main [] {
 # Smoke-test the deployed Worker — expect 302 to CF Access challenge with
 # the AUD stored in fnox under APP_POLICY_AUD_FNOX_KEY.
 ["prove:deployed"]
+extends = "prove:_base"
 description = "Smoke-test the deployed Worker — expect 302 to CF Access challenge with the AUD stored in fnox under APP_POLICY_AUD_FNOX_KEY."
-tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24" }
+tools = { "github:jdx/fnox" = "1.24" }
 run = '''
 #!/usr/bin/env nu
 
@@ -131,8 +140,9 @@ def main [] {
 # Verify the CF Access App for this Worker has at least one allow policy.
 # Without one, login 403s after OAuth.
 ["prove:access-policy"]
+extends = "prove:_base"
 description = "Verify the CF Access App for this Worker has at least one allow policy. Without one, login 403s after OAuth."
-tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24" }
+tools = { "github:jdx/fnox" = "1.24" }
 run = '''
 #!/usr/bin/env nu
 

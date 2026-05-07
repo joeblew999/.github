@@ -13,6 +13,13 @@
 #
 # See tasks/ci.toml header for the broader context + cross-OS canary.
 
+# ── mobile:_base ──
+# Hidden base task — every mobile:* extends this for shared nu pin.
+# Per-task tools add platform stack (java, ruby+cocoapods, tauri-cli).
+["mobile:_base"]
+hide = true
+tools = { "github:nushell/nushell" = "0.112" }
+
 # ── mobile:android-setup ─────────────────────────────────────────────────────
 # One-shot Android toolchain assertion. Verifies Java 17+, ANDROID_HOME,
 # and Android NDK; auto-detects ANDROID_HOME from common Android Studio
@@ -24,8 +31,9 @@
 # mise.toml (every joeblew999 Rust project does); this task just adds
 # Android targets to whatever rust the consumer has.
 ["mobile:android-setup"]
+extends = "mobile:_base"
 description = "Assert Android toolchain: Java 17+, ANDROID_HOME, NDK. Run once per machine."
-tools = { "github:nushell/nushell" = "0.112", java = "temurin-17.0.18+8" }
+tools = { java = "temurin-17.0.18+8" }
 run = '''
 #!/usr/bin/env nu
 
@@ -108,8 +116,9 @@ def main [] {
 # Pinning cocoapods at "latest" matches the long-standing user-global
 # convention and avoids version drift between machines.
 ["mobile:ios-setup"]
+extends = "mobile:_base"
 description = "Assert iOS toolchain: macOS + Xcode CLI tools + CocoaPods. Run once per machine."
-tools = { "github:nushell/nushell" = "0.112", ruby = "3.3", cocoapods = "latest" }
+tools = { ruby = "3.3", cocoapods = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -157,8 +166,9 @@ def main [] {
 # ── mobile:tauri-android-init ────────────────────────────────────────────────
 # Generate the Android project. Run once per clone of a Tauri app.
 ["mobile:tauri-android-init"]
+extends = "mobile:_base"
 description = "tauri android init — generate the Android project (run once per clone)"
-tools = { "github:nushell/nushell" = "0.112", "cargo:tauri-cli" = "2", java = "temurin-17.0.18+8" }
+tools = { "cargo:tauri-cli" = "2", java = "temurin-17.0.18+8" }
 run = '''
 #!/usr/bin/env nu
 
@@ -171,8 +181,9 @@ def main [...args] {
 # ── mobile:tauri-android-dev ─────────────────────────────────────────────────
 # Hot-reload Tauri Android dev build on a connected device or emulator.
 ["mobile:tauri-android-dev"]
+extends = "mobile:_base"
 description = "tauri android dev — hot-reload on connected device or emulator"
-tools = { "github:nushell/nushell" = "0.112", "cargo:tauri-cli" = "2", java = "temurin-17.0.18+8" }
+tools = { "cargo:tauri-cli" = "2", java = "temurin-17.0.18+8" }
 run = '''
 #!/usr/bin/env nu
 
@@ -185,8 +196,9 @@ def main [...args] {
 # ── mobile:tauri-android-build ───────────────────────────────────────────────
 # Release Tauri Android APK/AAB build.
 ["mobile:tauri-android-build"]
+extends = "mobile:_base"
 description = "tauri android build — release APK/AAB"
-tools = { "github:nushell/nushell" = "0.112", "cargo:tauri-cli" = "2", java = "temurin-17.0.18+8" }
+tools = { "cargo:tauri-cli" = "2", java = "temurin-17.0.18+8" }
 run = '''
 #!/usr/bin/env nu
 
@@ -199,8 +211,9 @@ def main [...args] {
 # ── mobile:tauri-ios-init ────────────────────────────────────────────────────
 # Generate the Xcode project. macOS-only.
 ["mobile:tauri-ios-init"]
+extends = "mobile:_base"
 description = "tauri ios init — generate the Xcode project (macOS only, run once per clone)"
-tools = { "github:nushell/nushell" = "0.112", "cargo:tauri-cli" = "2", ruby = "3.3", cocoapods = "latest" }
+tools = { "cargo:tauri-cli" = "2", ruby = "3.3", cocoapods = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -217,8 +230,9 @@ def main [...args] {
 # ── mobile:tauri-ios-dev ─────────────────────────────────────────────────────
 # Hot-reload Tauri iOS on connected device or simulator. macOS-only.
 ["mobile:tauri-ios-dev"]
+extends = "mobile:_base"
 description = "tauri ios dev — hot-reload on connected device or simulator (macOS only)"
-tools = { "github:nushell/nushell" = "0.112", "cargo:tauri-cli" = "2", ruby = "3.3", cocoapods = "latest" }
+tools = { "cargo:tauri-cli" = "2", ruby = "3.3", cocoapods = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -235,8 +249,9 @@ def main [...args] {
 # ── mobile:tauri-ios-build ───────────────────────────────────────────────────
 # Release Tauri IPA build. macOS-only.
 ["mobile:tauri-ios-build"]
+extends = "mobile:_base"
 description = "tauri ios build — release IPA (macOS only)"
-tools = { "github:nushell/nushell" = "0.112", "cargo:tauri-cli" = "2", ruby = "3.3", cocoapods = "latest" }
+tools = { "cargo:tauri-cli" = "2", ruby = "3.3", cocoapods = "latest" }
 run = '''
 #!/usr/bin/env nu
 
