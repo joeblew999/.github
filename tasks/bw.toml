@@ -1,0 +1,617 @@
+# tasks/bw.toml — TOML-task definitions for the bw:* (Bitwarden /
+# NodeWarden) namespace.
+#
+# Hybrid keychain ↔ NodeWarden secret sync. Local secrets live in the
+# OS keychain via fnox; canonical/cloud copies live in self-hosted
+# NodeWarden (Bitwarden-compatible vault). bw:* tasks bridge the two.
+#
+# Consumer wiring:
+#   [task_config]
+#   includes = [
+#     "git::https://github.com/joeblew999/.github.git//tasks/bw.toml?ref=v0.17.3",
+#   ]
+#
+# Tool pin: every bw:* task pins npm:@bitwarden/cli per-task. The legacy
+# v0.10.0 file-tasks required consumers to declare it themselves; with
+# TOML-tasks it auto-installs only when a bw:* task runs.
+
+# ── bw:status ────────────────────────────────────────────────────────────────
+# Show bw login status against NodeWarden (server URL, lock state, email).
+# Reads BW_SESSION from fnox keychain. Fails-fast if bw is missing or
+# BW_SESSION is unset.
+["bw:status"]
+description = "Show bw login status against NodeWarden (server URL, lock state, email). Reads BW_SESSION from fnox keychain."
+tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24", "npm:@bitwarden/cli" = "latest" }
+run = '''
+#!/usr/bin/env nu
+
+if (which bw | is-empty) {
+  print --stderr "✗ bw CLI not found — run 'mise install' in a repo that declares it"
+  exit 1
+}
+
+let session = (try { ^fnox get BW_SESSION | str trim } catch { "" })
+if ($session | is-empty) {
+  print --stderr "✗ no BW_SESSION in fnox — run 'mise run bw:bootstrap'"
+  exit 1
+}
+$env.BW_SESSION = $session
+
+let s = (^bw status | from json)
+print $"  status:    ($s.status)"
+print $"  serverUrl: ($s.serverUrl)"
+print $"  userEmail: ($s.userEmail? | default '?')"
+'''
+
+# ── bw:unlock ────────────────────────────────────────────────────────────────
+# Refresh BW_SESSION (vault auto-locks after inactivity). Hidden prompt
+# for master password, stores new session in fnox keychain.
+["bw:unlock"]
+description = "Refresh BW_SESSION (vault auto-locks after inactivity). Hidden prompt for master password, stores new session in fnox keychain."
+tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24", "npm:@bitwarden/cli" = "latest" }
+run = '''
+#!/usr/bin/env nu
+
+if (which bw | is-empty) {
+  print --stderr "✗ bw CLI not found — run 'mise install' in a repo that declares it"
+  exit 1
+}
+
+let pw = (input --suppress-output "master password: ")
+print ""
+if ($pw | is-empty) {
+  print --stderr "✗ empty"
+  exit 1
+}
+
+# bw --passwordenv reads from env; export, run, then drop the env var.
+$env.BW_PASSWORD = $pw
+let new_session = (try { ^bw unlock --raw --passwordenv BW_PASSWORD | str trim } catch { "" })
+hide-env BW_PASSWORD
+
+if ($new_session | is-empty) {
+  print --stderr "✗ unlock failed"
+  exit 1
+}
+
+$new_session | ^fnox set --global -p keychain BW_SESSION
+print "✓ BW_SESSION refreshed in fnox keychain"
+'''
+
+# ── bw:list ──────────────────────────────────────────────────────────────────
+# List item names + sizes in your NodeWarden vault. Values are NOT shown.
+["bw:list"]
+description = "List item names + sizes in your NodeWarden vault. Values are NOT shown."
+tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24", "npm:@bitwarden/cli" = "latest" }
+run = '''
+#!/usr/bin/env nu
+
+let session_raw = (try { ^fnox get BW_SESSION } catch { "" })
+let session = ($session_raw | str trim)
+if ($session | is-empty) {
+  print --stderr "✗ no BW_SESSION — run 'mise run bw:bootstrap'"
+  exit 1
+}
+$env.BW_SESSION = $session
+
+let status = (try { ^bw status | from json } catch { {status: "error"} })
+if ($status.status? != "unlocked") {
+  print --stderr "✗ vault locked — run 'mise run bw:unlock'"
+  exit 1
+}
+
+^bw list items
+| from json
+| where type == 1
+| each {|it| { name: $it.name, bytes: ($it.login.password? | default "" | str length) } }
+| sort-by name
+| each {|r| $"  ($r.name)\t($r.bytes) bytes" }
+| str join "\n"
+| print
+'''
+
+# ── bw:diff ──────────────────────────────────────────────────────────────────
+# Show drift between keychain and NodeWarden — which keys are in each,
+# which match. Values are NOT revealed (only sha256 prefix comparison).
+["bw:diff"]
+description = "Show drift between keychain and NodeWarden — which keys are in each, which match. Values are NOT revealed (only sha256 prefix comparison)."
+tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24", "npm:@bitwarden/cli" = "latest" }
+run = '''
+#!/usr/bin/env nu
+
+let session = (try { ^fnox get BW_SESSION | str trim } catch { "" })
+if ($session | is-empty) {
+  print --stderr "✗ no BW_SESSION — run 'mise run bw:bootstrap'"
+  exit 1
+}
+$env.BW_SESSION = $session
+
+let s = (try { ^bw status | from json } catch { {status: "error"} })
+if ($s.status? != "unlocked") {
+  print --stderr "✗ vault locked — run 'mise run bw:unlock'"
+  exit 1
+}
+
+let config_path = (
+  ^fnox config-files
+  | lines
+  | where { |l| ($l | str trim) ends-with ".toml" }
+  | first
+  | str trim
+)
+
+let kc_keys = (
+  open --raw $config_path
+  | lines
+  | reduce -f { in_secrets: false, keys: [] } {|line, acc|
+      let trimmed = ($line | str trim)
+      if $trimmed == "[secrets]" {
+        $acc | upsert in_secrets true
+      } else if ($trimmed | str starts-with "[") {
+        $acc | upsert in_secrets false
+      } else if $acc.in_secrets and ($trimmed =~ '^[A-Z_][A-Z0-9_]*[[:space:]]*=') {
+        let name = ($trimmed | parse "{name}={rest}" | get name.0 | str trim)
+        $acc | upsert keys ($acc.keys | append $name)
+      } else {
+        $acc
+      }
+    }
+  | get keys
+  | sort | uniq
+)
+
+let bw_keys = (^bw list items | from json | where type == 1 | get name | sort | uniq)
+let all_keys = ([$kc_keys, $bw_keys] | flatten | sort | uniq)
+
+print "Name                                    keychain  NodeWarden  match"
+print "─────────────────────────────────────── ────────  ──────────  ─────"
+
+for k in $all_keys {
+  let in_kc = (if ($k in $kc_keys) { "✓" } else { "·" })
+  let in_bw = (if ($k in $bw_keys) { "✓" } else { "·" })
+  let match = if ($in_kc == "✓" and $in_bw == "✓") {
+    let kc_val = (try { ^fnox get $k | str trim } catch { "" })
+    let bw_val = (try { ^bw get password $k | str trim } catch { "" })
+    if ($kc_val == $bw_val) { "✓" } else { "✗ DIFFER" }
+  } else {
+    "—"
+  }
+  let line = $"($k | fill -w 39 -a l) ($in_kc | fill -w 9 -a l) ($in_bw | fill -w 11 -a l) ($match)"
+  print $line
+}
+'''
+
+# ── bw:set ───────────────────────────────────────────────────────────────────
+# Write-through: hidden-input prompt → set NodeWarden item + mirror to
+# keychain. Use to rotate a secret on Mac (kept consistent in both
+# stores in one shot).
+["bw:set"]
+description = "Write-through: hidden-input prompt → set NodeWarden item + mirror to keychain. Use to rotate a secret on Mac (kept consistent in both stores in one shot)."
+tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24", "npm:@bitwarden/cli" = "latest" }
+run = '''
+#!/usr/bin/env nu
+
+# usage: mise run bw:set -- <NAME>
+def main [name?: string] {
+  let n = ($name | default "")
+  if ($n | is-empty) {
+    print --stderr "usage: mise run bw:set -- <NAME>"
+    exit 1
+  }
+
+  let session = (try { ^fnox get BW_SESSION | str trim } catch { "" })
+  if ($session | is-empty) {
+    print --stderr "✗ no BW_SESSION — run 'mise run bw:bootstrap'"
+    exit 1
+  }
+  $env.BW_SESSION = $session
+
+  let s = (try { ^bw status | from json } catch { {status: "error"} })
+  if ($s.status? != "unlocked") {
+    print --stderr "✗ vault locked — run 'mise run bw:unlock'"
+    exit 1
+  }
+
+  let val = (input --suppress-output $"value for ($n) \(hidden\): ")
+  print ""
+  if ($val | is-empty) {
+    print --stderr "✗ empty value — aborting"
+    exit 1
+  }
+
+  try { ^bw sync | ignore }
+
+  let existing = (
+    try { ^bw list items --search $n | from json } catch { [] }
+    | where { |it| $it.type? == 1 and $it.name? == $n }
+  )
+
+  if (($existing | length) > 0) {
+    let id = ($existing | first | get id)
+    print $"→ updating NodeWarden item ($n) (($id))"
+    let updated = (^bw get item $id | from json | upsert login.password $val | to json)
+    $updated | ^bw encode | ^bw edit item $id | ignore
+  } else {
+    print $"→ creating new NodeWarden item ($n)"
+    let new_item = {
+      type: 1
+      name: $n
+      notes: "managed by fnox+bw; rotate via mise run bw:set"
+      login: {username: "", password: $val, uris: []}
+      fields: []
+      favorite: false
+      reprompt: 0
+    }
+    $new_item | to json | ^bw encode | ^bw create item | ignore
+  }
+
+  print "→ mirroring to keychain"
+  $val | ^fnox set --global -p keychain $n | ignore
+
+  print $"✓ ($n) set in NodeWarden + keychain"
+}
+'''
+
+# ── bw:sync ──────────────────────────────────────────────────────────────────
+# Pull all NodeWarden items → update keychain (idempotent). Run after
+# rotating a secret on iPhone or web vault.
+["bw:sync"]
+description = "Pull all NodeWarden items → update keychain (idempotent). Run after rotating a secret on iPhone or web vault. Skip list: BW_CLIENTID/BW_CLIENTSECRET/BW_SESSION (override via BW_SYNC_SKIP)."
+tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24", "npm:@bitwarden/cli" = "latest" }
+run = '''
+#!/usr/bin/env nu
+
+def main [--dry-run] {
+  let dry = $dry_run
+
+  let skip_str = ($env.BW_SYNC_SKIP? | default "BW_CLIENTID,BW_CLIENTSECRET,BW_SESSION")
+  let skip_list = ($skip_str | split row "," | each { |s| $s | str trim })
+
+  let session = (try { ^fnox get BW_SESSION | str trim } catch { "" })
+  if ($session | is-empty) {
+    print --stderr "✗ no BW_SESSION — run 'mise run bw:bootstrap'"
+    exit 1
+  }
+  $env.BW_SESSION = $session
+
+  let s = (try { ^bw status | from json } catch { {status: "error"} })
+  if ($s.status? != "unlocked") {
+    print --stderr "✗ vault locked — run 'mise run bw:unlock'"
+    exit 1
+  }
+
+  try { ^bw sync | ignore }
+
+  if $dry {
+    print "=== DRY RUN — no changes ==="
+  } else {
+    print "=== sync NodeWarden → keychain ==="
+  }
+
+  let items = (^bw list items | from json | where type == 1)
+  mut updated = 0
+  mut same = 0
+  mut skipped = 0
+  mut empty = 0
+
+  for it in $items {
+    let name = $it.name
+    let pw = ($it.login.password? | default "")
+    if $name in $skip_list {
+      $skipped = ($skipped + 1)
+      continue
+    }
+    if ($pw | is-empty) {
+      print $"  ⤬ ($name) \(empty in NodeWarden\)"
+      $empty = ($empty + 1)
+      continue
+    }
+    let cur = (try { ^fnox get $name | str trim } catch { "" })
+    if $cur == $pw {
+      $same = ($same + 1)
+    } else {
+      if ($cur | is-empty) {
+        print $"  + ($name) \(new in keychain\)"
+      } else {
+        print $"  ↻ ($name) \(keychain differs from NodeWarden — would update\)"
+      }
+      if not $dry {
+        $pw | ^fnox set --global -p keychain $name | ignore
+      }
+      $updated = ($updated + 1)
+    }
+  }
+
+  print ""
+  if $dry {
+    print "=== DRY RUN summary ==="
+  } else {
+    print "=== sync complete ==="
+  }
+  print $"  ($updated) updated / ($same) already-in-sync / ($skipped) skipped / ($empty) empty"
+}
+'''
+
+# ── bw:sync-dry ──────────────────────────────────────────────────────────────
+# Dry-run wrapper for bw:sync.
+["bw:sync-dry"]
+description = "DRY RUN of bw:sync (preview, no changes)."
+tools = { "github:nushell/nushell" = "0.112" }
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  ^mise run "bw:sync" -- --dry-run
+}
+'''
+
+# ── bw:migrate-from-keychain ────────────────────────────────────────────────
+# Push every keychain-backed fnox secret → matching NodeWarden item.
+# Idempotent. Skips BW_* (chicken/egg).
+["bw:migrate-from-keychain"]
+description = "Push every keychain-backed fnox secret → matching NodeWarden item. Idempotent. Skips BW_* (chicken/egg). Override skip list via BW_MIGRATE_SKIP env var (comma-separated)."
+tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24", "npm:@bitwarden/cli" = "latest" }
+run = '''
+#!/usr/bin/env nu
+
+def main [--dry-run] {
+  let dry = $dry_run
+  let skip_str = ($env.BW_MIGRATE_SKIP? | default "BW_CLIENTID,BW_CLIENTSECRET,BW_SESSION")
+  let skip_list = ($skip_str | split row "," | each { |s| $s | str trim })
+
+  let session = (try { ^fnox get BW_SESSION | str trim } catch { "" })
+  if ($session | is-empty) {
+    print --stderr "✗ no BW_SESSION in fnox — run 'mise run bw:bootstrap' first"
+    exit 1
+  }
+  $env.BW_SESSION = $session
+
+  let s = (try { ^bw status | from json } catch { {status: "error"} })
+  if ($s.status? != "unlocked") {
+    print --stderr "✗ vault locked — run 'mise run bw:unlock' to refresh BW_SESSION"
+    exit 1
+  }
+
+  try { ^bw sync | ignore }
+
+  let config_path = (
+    ^fnox config-files
+    | lines
+    | where { |l| ($l | str trim) ends-with ".toml" }
+    | first
+    | str trim
+  )
+  if not ($config_path | path exists) {
+    print --stderr $"✗ ($config_path) not found"
+    exit 1
+  }
+
+  let all_secrets = (
+    open --raw $config_path
+    | lines
+    | reduce -f { in_secrets: false, names: [] } {|line, acc|
+        let trimmed = ($line | str trim)
+        if $trimmed == "[secrets]" {
+          $acc | upsert in_secrets true
+        } else if ($trimmed | str starts-with "[") {
+          $acc | upsert in_secrets false
+        } else if $acc.in_secrets and ($trimmed =~ '^[A-Z_][A-Z0-9_]*[[:space:]]*=') {
+          let name = ($trimmed | parse "{n}={r}" | get n.0 | str trim)
+          $acc | upsert names ($acc.names | append $name)
+        } else {
+          $acc
+        }
+      }
+    | get names
+  )
+  let total = ($all_secrets | length)
+
+  let bw_items = (^bw list items | from json | where type == 1)
+
+  if $dry {
+    print "=== DRY RUN — no changes ==="
+  } else {
+    print "=== migration (real) ==="
+  }
+  print $"Skip list:    ($skip_str)"
+  print $"fnox secrets: ($total)"
+  print ""
+
+  mut create_count = 0
+  mut update_count = 0
+  mut skip_count = 0
+  mut same_count = 0
+  mut empty_count = 0
+
+  for name in $all_secrets {
+    if $name in $skip_list {
+      print $"  ⤬ ($name) \(in skip list\)"
+      $skip_count = ($skip_count + 1)
+      continue
+    }
+
+    let kc_val = (try { ^fnox get $name | str trim } catch { "" })
+    if ($kc_val | is-empty) {
+      print $"  ⤬ ($name) \(empty in keychain\)"
+      $empty_count = ($empty_count + 1)
+      continue
+    }
+
+    let existing = ($bw_items | where name == $name)
+    let existing_count = ($existing | length)
+    let existing_pw = if $existing_count > 0 { $existing | first | get login.password? | default "" } else { "" }
+    let existing_id = if $existing_count > 0 { $existing | first | get id } else { "" }
+
+    if ($existing_count > 0) and ($existing_pw == $kc_val) {
+      print $"  = ($name) \(already in NodeWarden, in sync\)"
+      $same_count = ($same_count + 1)
+      continue
+    }
+
+    let verb = if $dry { "would " } else { "" }
+
+    if $existing_count > 0 {
+      print $"  ↻ ($name) \(($verb)update existing item\)"
+      if not $dry {
+        let updated = (^bw get item $existing_id | from json | upsert login.password $kc_val | to json)
+        $updated | ^bw encode | ^bw edit item $existing_id | ignore
+      }
+      $update_count = ($update_count + 1)
+    } else {
+      print $"  + ($name) \(($verb)create new item\)"
+      if not $dry {
+        let new_item = {
+          type: 1
+          name: $name
+          notes: "managed by fnox+bw-migrate; rotate via mise run bw:set"
+          login: {username: "", password: $kc_val, uris: []}
+          fields: []
+          favorite: false
+          reprompt: 0
+        }
+        $new_item | to json | ^bw encode | ^bw create item | ignore
+      }
+      $create_count = ($create_count + 1)
+    }
+  }
+
+  print ""
+  if $dry {
+    print "=== DRY RUN summary ==="
+    print $"  ($create_count) would-create / ($update_count) would-update / ($same_count) already-in-sync / ($skip_count) skipped / ($empty_count) empty"
+    print ""
+    print "  Re-run with 'mise run bw:migrate-from-keychain' to apply."
+  } else {
+    print "=== migration complete ==="
+    print $"  ($create_count) created / ($update_count) updated / ($same_count) already-in-sync / ($skip_count) skipped / ($empty_count) empty"
+  }
+}
+'''
+
+# ── bw:migrate-from-keychain-dry ────────────────────────────────────────────
+# Dry-run wrapper for bw:migrate-from-keychain.
+["bw:migrate-from-keychain-dry"]
+description = "DRY RUN of bw:migrate-from-keychain (preview, no changes)."
+tools = { "github:nushell/nushell" = "0.112" }
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  ^mise run "bw:migrate-from-keychain" -- --dry-run
+}
+'''
+
+# ── bw:bootstrap ─────────────────────────────────────────────────────────────
+# One-shot Bitwarden CLI ↔ fnox bootstrap. Three hidden prompts
+# (client_id, client_secret, master password). Configures bw against
+# NODEWARDEN_URL, logs in via API key, unlocks vault, stores all three
+# creds in OS keychain via fnox, registers bitwarden provider in fnox
+# global config. Idempotent — re-run to refresh BW_SESSION.
+["bw:bootstrap"]
+description = "One-shot Bitwarden CLI ↔ fnox bootstrap. Three hidden prompts (client_id, client_secret, master password). Configures bw against NODEWARDEN_URL, logs in via API key, unlocks vault, stores all three creds in OS keychain via fnox, registers bitwarden provider in fnox global config. Idempotent — re-run to refresh BW_SESSION."
+tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24", "npm:@bitwarden/cli" = "latest" }
+run = '''
+#!/usr/bin/env nu
+
+let url = ($env.NODEWARDEN_URL? | default "https://nodewarden.gedw99.workers.dev")
+
+if (which bw | is-empty) {
+  print --stderr "✗ bw CLI not found — add 'npm:@bitwarden/cli' to your repo's [tools] in mise.toml, then 'mise install'"
+  exit 1
+}
+if (which fnox | is-empty) {
+  print --stderr "✗ fnox not found — add 'github:jdx/fnox' to your repo's [tools]"
+  exit 1
+}
+
+print $"=== Bitwarden CLI bootstrap → ($url) ==="
+print ""
+print "Three hidden prompts:"
+print "  1. Personal API client_id     ('user.<UUID>' from NodeWarden Settings → API Key)"
+print "  2. Personal API client_secret (random string from 'View API Key')"
+print "  3. Master password            (used to unlock; not stored)"
+print ""
+
+let client_id = (input --suppress-output "client_id: "); print ""
+let client_secret = (input --suppress-output "client_secret: "); print ""
+let master_pw = (input --suppress-output "master password: "); print ""
+print ""
+
+if ($client_id | is-empty)     { print --stderr "✗ client_id empty";     exit 1 }
+if ($client_secret | is-empty) { print --stderr "✗ client_secret empty"; exit 1 }
+if ($master_pw | is-empty)     { print --stderr "✗ master password empty"; exit 1 }
+
+print "→ ensuring bw is logged out (idempotent)"
+try { ^bw logout | ignore }
+
+print $"→ pointing bw at ($url)"
+^bw config server $url | ignore
+
+print "→ logging in via API key"
+$env.BW_CLIENTID = $client_id
+$env.BW_CLIENTSECRET = $client_secret
+^bw login --apikey
+
+print "→ unlocking vault → BW_SESSION"
+$env.BW_PASSWORD = $master_pw
+let session = (try { ^bw unlock --raw --passwordenv BW_PASSWORD | str trim } catch { "" })
+hide-env BW_PASSWORD
+
+if ($session | is-empty) {
+  print --stderr "✗ unlock failed — bad master password?"
+  exit 1
+}
+
+print "→ storing all three in fnox keychain (global config)"
+$client_id     | ^fnox set --global -p keychain BW_CLIENTID
+$client_secret | ^fnox set --global -p keychain BW_CLIENTSECRET
+$session       | ^fnox set --global -p keychain BW_SESSION
+
+let config_path = (
+  ^fnox config-files
+  | lines
+  | where { |l| ($l | str trim) ends-with ".toml" }
+  | first
+  | str trim
+)
+
+print $"→ adding bitwarden provider to ($config_path)"
+mkdir ($config_path | path dirname)
+if not ($config_path | path exists) {
+  "" | save -f $config_path
+}
+let existing = (open --raw $config_path)
+if ($existing | str contains "[providers.bitwarden]") {
+  print "  ✓ already present"
+} else {
+  $"($existing)\n[providers.bitwarden]\ntype = \"bitwarden\"\n" | save -f $config_path
+  print "  ✓ appended"
+}
+
+print ""
+print "=== verify ==="
+let recovered = (^fnox get BW_SESSION | str trim)
+$env.BW_SESSION = $recovered
+let s = (try { ^bw status | from json } catch { {status: "?"} })
+print $"  status:    ($s.status)"
+print $"  serverUrl: ($s.serverUrl?)"
+print $"  userEmail: ($s.userEmail? | default '?')"
+
+print ""
+for k in ["BW_CLIENTID", "BW_CLIENTSECRET", "BW_SESSION"] {
+  let v = (try { ^fnox get $k | str trim } catch { "" })
+  if ($v | is-empty) {
+    print $"  ✗ ($k) missing"
+  } else {
+    let len = ($v | str length)
+    print $"  ✓ ($k) \(($len) chars\)"
+  }
+}
+
+print ""
+print "============================================================"
+print "✓ bootstrap complete"
+print "  Next: 'mise run bw:migrate-from-keychain-dry' to preview"
+print "        which keychain secrets would be pushed to NodeWarden"
+print "============================================================"
+'''
