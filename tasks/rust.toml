@@ -52,7 +52,7 @@ def main [...args] {
 ["rust:wasm-pack"]
 extends = "rust:_base"
 description = "compile a Rust crate to WASM via wasm-pack"
-tools = { "cargo:wasm-pack" = "latest" }
+tools = { "cargo:wasm-pack" = "0.13" }
 usage = '''
 arg "<crate-dir>" help="path to the crate directory to compile"
 '''

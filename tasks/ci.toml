@@ -68,27 +68,41 @@ def main [
   if ($work | path exists) { rm -rf $work }
   mkdir $work
 
-  # Pattern: quoted top-level key (namespace:task) + `run = '<TQ>...<TQ>'`.
-  # Triple-single-quote (<TQ>) built from \u{27} so this script's body
-  # can itself be wrapped in a TOML `run = '<TQ>...<TQ>'` block without
-  # the inner closing the outer.
-  let q3 = (['\u{27}', '\u{27}', '\u{27}'] | str join)
-  let pattern = ("(?s)\\[\"([^\"]+)\"\\][^\\[]*?run\\s*=\\s*" + $q3 + "(.*?)" + $q3)
+  # Patterns: handle BOTH triple-single AND triple-double quoted run bodies.
+  # TOML allows both forms; previously only single-quote (TQS) was matched.
+  # Triple-quote markers built from char codes (\u{27}=apostrophe,
+  # \u{22}=quote) so this script's own body can be wrapped in a TOML
+  # triple-quoted block without the inner triples closing the outer.
+  let q3s = (['\u{27}', '\u{27}', '\u{27}'] | str join)
+  let q3d = (['\u{22}', '\u{22}', '\u{22}'] | str join)
+  let pat_single = ("(?s)\\[\"([^\"]+)\"\\][^\\[]*?run\\s*=\\s*" + $q3s + "(.*?)" + $q3s)
+  let pat_double = ("(?s)\\[\"([^\"]+)\"\\][^\\[]*?run\\s*=\\s*" + $q3d + "(.*?)" + $q3d)
 
   mut total = 0
   mut failed = []
 
   for t in $tomls {
     let raw = (open --raw $t)
-    let bodies = ($raw | parse --regex $pattern | rename task body)
+    let bodies = (
+      ($raw | parse --regex $pat_single | rename task body)
+      | append ($raw | parse --regex $pat_double | rename task body)
+    )
     for entry in $bodies {
       $total = $total + 1
       let safe = ($entry.task | str replace --all ":" "_")
       let tmp = ($work | path join $"($safe).nu")
       $entry.body | save --force $tmp
       let r = (do { ^nu --ide-check 1 $tmp } | complete)
-      if ($r.stdout | str contains "severity\":\"Error") {
-        let first_diag = ($r.stdout | lines | first | default "")
+      # Strict diagnostic match: require BOTH `"type":"diagnostic"` AND
+      # `"severity":"Error"` on the same line (not just a stray "Error"
+      # appearing somewhere in stdout).
+      let err_lines = (
+        $r.stdout
+        | lines
+        | where { |l| ($l | str contains "\"type\":\"diagnostic\"") and ($l | str contains "\"severity\":\"Error\"") }
+      )
+      if ($err_lines | length) > 0 {
+        let first_diag = ($err_lines | first | default "")
         $failed = ($failed | append {task: $entry.task, error: $first_diag})
       }
     }
