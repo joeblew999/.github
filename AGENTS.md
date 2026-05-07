@@ -173,24 +173,26 @@ This repo is the SSOT for every joeblew999 project's tooling. Drift here breaks 
 - **Every task is parse-clean on linux/macos/windows.** `mise run ci:parse-check` (locally) + the workflow assertion.
 - **Every task that fails on missing prereqs has a negative-path test entry.** Catches runtime nu bugs that parse-check misses.
 - **README.md lists every namespace.** When you add a new namespace (rare), add a section. When you add a task to an existing namespace, add a row.
-- **Reusable workflows** (`reusable-mise-ci.yml`, `reusable-mise-upgrade.yml`) are versioned. Consumers reference by tag (`@v0.15.1`). Don't break the input contract without a major bump.
+- **Reusable workflows** (`reusable-mise-ci.yml`, `reusable-mise-upgrade.yml`) ride the same tag stream as the task library — every release tag (currently `v0.19.1`) ships the workflow files alongside `tasks/` and `mise-tasks/`. Consumers reference by tag (`@vX.Y.Z`). Don't break the input contract without a major bump; safe to bump the `@vX.Y.Z` pin in lockstep with the `[task_config].includes` `?ref=`.
 - **`?ref=` example version in README.md** stays current with the latest tag.
 - **The local `mise tasks ls` count** matches expectations (currently ~50). A surprise drop = mise auto-discovery missed something (probably a missing `chmod +x`).
 - **No `${#array[@]}` in bash files** (Tera template engine eats `{#…#}` blocks). Flagged by the lint workflow; nu files are immune.
 
 ## Reusable workflows (added v0.15.0)
 
-`.github/workflows/reusable-mise-ci.yml` and `.github/workflows/reusable-mise-upgrade.yml` are GH Actions reusable workflows that any joeblew999 repo can invoke via `uses:`:
+`.github/workflows/reusable-mise-ci.yml` and `.github/workflows/reusable-mise-upgrade.yml` are GH Actions reusable workflows that any joeblew999 repo can invoke via `uses:`. They share the same tag stream as the task library — bump the `@vX.Y.Z` pin in lockstep with `[task_config].includes` `?ref=` (currently `v0.19.1`):
 
 ```yaml
 # in <repo>/.github/workflows/ci.yml
 jobs:
   ci:
-    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@v0.15.1
+    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@v0.19.1
     with:
       task: check         # the mise task to run
       cargo-lock-path: cli/Cargo.lock   # for sccache cache key
 ```
+
+The reusable workflow runs **one** mise task; that task's `depends` graph fans out the work. Every active consumer ships a `[tasks.check]` aggregator that depends on `ci:parse-check` + `ci:check-toml-tasks` + `ci:check-workflow-nu` (plus repo-specific build/test) — pair it with this workflow for a one-line CI definition.
 
 When changing inputs in these workflows, treat them as a public API:
 - **Adding** an input with a default = backward-compat = patch/minor bump.
