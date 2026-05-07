@@ -1,5 +1,30 @@
+[settings]
+# extends task-inheritance is mise experimental — joeblew999/.github
+# v0.18+ uses it for per-namespace tools dedup (cf:_base, bw:_base, etc).
+experimental = true
+
 [task_config]
-includes = ["mise-tasks"]
+# Self-hosting: include every tasks/*.toml file so the lib can run its
+# own ci:check-toml-tasks etc. against itself. mise doesn't auto-discover
+# tasks/ (only mise-tasks/, mise/tasks/, .mise/tasks/), so list explicitly.
+#
+# mise-tasks/ is kept (auto-discovered) for the legacy file-tasks
+# release + _proof until those are also ported (release stays for
+# maintainer use; _proof is referenced by mise-tasks-lint.yml).
+includes = [
+  "mise-tasks",
+  "tasks/bw.toml",
+  "tasks/cf.toml",
+  "tasks/ci.toml",
+  "tasks/env.toml",
+  "tasks/fnox.toml",
+  "tasks/mise.toml",
+  "tasks/mobile.toml",
+  "tasks/prove.toml",
+  "tasks/rust.toml",
+  "tasks/secrets.toml",
+  "tasks/wrangler.toml",
+]
 
 [tools]
 "github:jdx/fnox"        = "1.24"
@@ -7,5 +32,3 @@ includes = ["mise-tasks"]
 "aqua:cli/cli"           = "2"
 "aqua:jqlang/jq"         = "1"
 "cargo:usage-cli"        = "3"
-# utm-dev Rust CLI — add once utm-dev is rewritten as a Rust binary:
-# "cargo:utm-dev" = "3"
