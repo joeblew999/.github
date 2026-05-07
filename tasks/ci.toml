@@ -15,6 +15,12 @@
 # Tool pin policy: track the same versions as joeblew999/.github's own
 # mise.toml [tools] block. Bump them together when the lib version is bumped.
 
+# ── ci:_base ──
+# Hidden base task — every ci:* extends this for shared nu pin.
+["ci:_base"]
+hide = true
+tools = { "github:nushell/nushell" = "0.112" }
+
 # ── ci:check-toml-tasks ──────────────────────────────────────────────────────
 # Parse-check every inline `run = '''...'''` body in tasks/*.toml of the
 # current repo. Spawns `nu --ide-check 1` on each extracted body — same
@@ -27,8 +33,9 @@
 # Use as a local pre-push lint AND in CI. Self-hosted: this very task
 # parse-checks itself when run against joeblew999/.github's own tasks/.
 ["ci:check-toml-tasks"]
+extends = "ci:_base"
 description = "Parse-check every inline `run = '''...'''` body in tasks/*.toml via `nu --ide-check`"
-tools = { "github:nushell/nushell" = "0.112" }
+
 run = '''
 #!/usr/bin/env nu
 
@@ -112,8 +119,9 @@ def main [
 # block and ships it without ever running nu against it locally — leading
 # to a CI failure that takes 60-90s per iteration to feedback.
 ["ci:check-workflow-nu"]
+extends = "ci:_base"
 description = "Parse-check every embedded nu block in .github/workflows/*.yml via `nu --ide-check`"
-tools = { "github:nushell/nushell" = "0.112" }
+
 run = '''
 #!/usr/bin/env nu
 
@@ -207,8 +215,9 @@ def main [
 # `nu --ide-check 1` on each. Used by every consumer's local `check` bundle
 # as the cheap first-line-of-defense lint.
 ["ci:parse-check"]
+extends = "ci:_base"
 description = "Parse-check every nu task file in mise-tasks/ (fails if any has a syntax error)"
-tools = { "github:nushell/nushell" = "0.112" }
+
 run = '''
 #!/usr/bin/env nu
 
@@ -260,8 +269,9 @@ def main [
 # REPO is auto-derived from `git remote get-url origin`; works in any repo.
 # Token from GH_TOKEN/GITHUB_TOKEN env or `fnox get GITHUB_TOKEN`.
 ["ci:watch"]
+extends = "ci:_base"
 description = "Watch the latest CI run on this branch — streams per-job + per-step transitions, dumps failed-step logs via gh api"
-tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24", "aqua:cli/cli" = "2" }
+tools = { "github:jdx/fnox" = "1.24", "aqua:cli/cli" = "2" }
 run = '''
 #!/usr/bin/env nu
 
@@ -464,8 +474,9 @@ def main [
 # Delete CI runs (default: failed/cancelled only; --all to nuke every run;
 # --dry-run to preview). REPO from origin remote; token from env/fnox.
 ["ci:clean"]
+extends = "ci:_base"
 description = "Delete CI runs (default: failed/cancelled only; --all to nuke every run; --dry-run to preview)"
-tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24", "aqua:cli/cli" = "2" }
+tools = { "github:jdx/fnox" = "1.24", "aqua:cli/cli" = "2" }
 run = '''
 #!/usr/bin/env nu
 
