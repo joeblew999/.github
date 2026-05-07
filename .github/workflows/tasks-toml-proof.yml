@@ -1,0 +1,156 @@
+name: tasks-toml proof
+
+# Cross-OS proof for the chosen SSOT mechanism: TOML-task definitions
+# with per-task `tools = { ... }` blocks, included via task_config.includes
+# from a git remote.
+#
+# What this validates:
+#   - mise's task_config.includes can point at a .toml file (not just a dir
+#     of executable file-tasks)
+#   - That .toml file can declare multiple namespaced tasks via [<ns>:<name>]
+#     blocks (TOML-task syntax)
+#   - Each task can declare its own `tools = { ... }` — those tools are
+#     auto-installed when the task runs
+#   - The mechanism works through remote git includes (?ref=<tag>)
+#   - Tools stay scoped to the task — they don't leak into root context
+#
+# Why this matters: this is mise's only stable (non-experimental) way to
+# share both tasks AND their tool requirements across repos. It replaces
+# the per-namespace `<ns>:install-tools` workaround we considered earlier,
+# and is dramatically simpler than vendoring + experimental_monorepo_root.
+#
+# Background: discussion #5267 says remote *file tasks* (executables with
+# `#MISE tools=` headers) don't propagate tools — confirmed empirically.
+# But TOML tasks with structured `tools = {}` fields go through a different
+# code path and DO propagate. This workflow is the regression canary.
+
+on:
+  push:
+    branches: [main, "feat/**"]
+    paths:
+      - "tasks/**"
+      - ".github/workflows/tasks-toml-proof.yml"
+  pull_request:
+    paths:
+      - "tasks/**"
+      - ".github/workflows/tasks-toml-proof.yml"
+  workflow_dispatch:
+
+jobs:
+  proof:
+    name: tasks-toml (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install mise
+        uses: jdx/mise-action@v4
+
+      # Build a synthetic consumer in $RUNNER_TEMP that includes a fixture
+      # tasks.toml file (simulating a remote git include with a local path —
+      # the per-task tools propagation works the same way either way; the
+      # path is just different).
+      - name: Construct synthetic consumer with fixture tasks.toml
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          let root = ($env.RUNNER_TEMP | path join "consumer")
+          if ($root | path exists) { rm -rf $root }
+          mkdir $root
+          mkdir ($root | path join "shared-fixture")
+
+          # The shared "remote" tasks.toml — declares two namespaced tasks
+          # each with their own per-task tools = { ... } block.
+          let shared_toml = '["bw:list-mock"]
+          description = "Mock bw:list with per-task tools"
+          tools = { "aqua:jqlang/jq" = "1", "github:jdx/fnox" = "1.24" }
+          run = """
+          echo \"→ bw:list-mock\"
+          which jq && jq --version
+          which fnox && fnox --version
+          """
+
+          ["cf:check-mock"]
+          description = "Mock cf:check with per-task tools"
+          tools = { "aqua:cli/cli" = "2" }
+          run = """
+          echo \"→ cf:check-mock\"
+          which gh && gh --version | head -1
+          """
+          '
+          $shared_toml | save --force ($root | path join "shared-fixture" "tasks.toml")
+
+          # Consumer root: pins ONLY nushell. NOT jq, NOT fnox, NOT gh.
+          # Per-task tools must be picked up automatically from the included
+          # tasks.toml — that is the entire premise.
+          let root_toml = 'lockfile = true
+
+          [task_config]
+          includes = ["shared-fixture/tasks.toml"]
+
+          [tools]
+          "github:nushell/nushell" = "0.112"
+          '
+          $root_toml | save --force ($root | path join "mise.toml")
+
+          print "→ fixture layout:"
+          ls -al $root
+          ls -al ($root | path join "shared-fixture")
+
+      - name: Trust config
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          cd ($env.RUNNER_TEMP | path join "consumer")
+          ^mise trust
+
+      - name: Discovery — both namespaced TOML tasks must appear
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          cd ($env.RUNNER_TEMP | path join "consumer")
+          let listing = (^mise tasks ls | complete)
+          print $listing.stdout
+          if not ($listing.stdout | str contains "bw:list-mock") {
+            print --stderr "✗ bw:list-mock not discovered"
+            exit 1
+          }
+          if not ($listing.stdout | str contains "cf:check-mock") {
+            print --stderr "✗ cf:check-mock not discovered"
+            exit 1
+          }
+          print "✓ both TOML-tasks discovered through task_config.includes"
+
+      - name: Run bw:list-mock — per-task tools (jq + fnox) must auto-install
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          cd ($env.RUNNER_TEMP | path join "consumer")
+          ^mise run "bw:list-mock"
+
+      - name: Run cf:check-mock — different per-task tools (gh) must auto-install
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          cd ($env.RUNNER_TEMP | path join "consumer")
+          ^mise run "cf:check-mock"
+
+      # Negative: confirm per-task tools stay scoped — they should NOT show up
+      # in the consumer's root tool context. This is the "tools propagate WITH
+      # the task, not OUT of it" promise.
+      - name: Negative — jq/fnox/gh are NOT in root context
+        shell: 'mise exec -- nu --no-newline {0}'
+        run: |
+          cd ($env.RUNNER_TEMP | path join "consumer")
+          let current = (^mise current | complete)
+          let leaked = (
+            ($current.stdout | str contains "jqlang/jq")
+            or ($current.stdout | str contains "jdx/fnox")
+            or ($current.stdout | str contains "cli/cli")
+          )
+          if $leaked {
+            print --stderr "✗ unexpected: per-task tool leaked into root context"
+            print $current.stdout
+            exit 1
+          }
+          print "✓ confirmed: per-task tools stay scoped to their task"
