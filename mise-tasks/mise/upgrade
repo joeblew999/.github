@@ -1,0 +1,34 @@
+#!/usr/bin/env nu
+#MISE description="Bump pinned tool versions in this repo's mise.toml via `mise upgrade --bump --local`. Idempotent."
+
+# `--local` scopes the bump to this repo's mise.toml and ignores the
+# user's global ~/.config/mise/config.toml. Without it, mise would also
+# bump tools the user has pinned globally — leaking other projects'
+# versions into this repo's diff.
+
+def main [
+  --dry-run          # show what would change without writing
+] {
+  if $dry_run {
+    print "→ mise upgrade --bump --local --dry-run"
+    ^mise upgrade --bump --local --dry-run
+    return
+  }
+
+  let project_root = ($env.MISE_PROJECT_ROOT? | default (pwd))
+  cd $project_root
+
+  let before = (open --raw mise.toml)
+  print "→ mise upgrade --bump --local"
+  ^mise upgrade --bump --local
+
+  let after = (open --raw mise.toml)
+  if $before == $after {
+    print "✓ nothing to upgrade — mise.toml unchanged"
+    return
+  }
+
+  print ""
+  print "✓ mise.toml bumped:"
+  ^git --no-pager diff -- mise.toml
+}

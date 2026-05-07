@@ -1,0 +1,204 @@
+#!/usr/bin/env nu
+#MISE description="Watch the latest CI run on this branch — streams per-job + per-step transitions, dumps failed-step logs via gh api"
+
+# Polls GitHub Actions every interval seconds, prints transitions only.
+# Fetches a failed job's log via gh api as soon as the job completes —
+# works mid-run, unlike `gh run view --log` which waits for the whole run.
+#
+# REPO is auto-derived from `git remote get-url origin` so this works in
+# any consuming repo. Workflow filename defaults to mise.yml; override
+# with --workflow.
+
+def gh-token [] {
+  let env_tok = ($env.GH_TOKEN? | default ($env.GITHUB_TOKEN? | default ""))
+  if ($env_tok | is-not-empty) { return $env_tok }
+  try { ^fnox get GITHUB_TOKEN | str trim } catch { "" }
+}
+
+def origin-repo [] {
+  let url = (try { ^git remote get-url origin | str trim } catch { "" })
+  let parsed = ($url | parse --regex '.*[:/](?<owner>[^/]+)/(?<name>[^/]+?)(?:\.git)?$')
+  if ($parsed | length) == 0 { return "" }
+  let row = ($parsed | first)
+  $"($row.owner)/($row.name)"
+}
+
+def gh-run-view-retry [id: int, repo: string, token: string] {
+  mut attempts = 0
+  loop {
+    let r = (with-env {GH_TOKEN: $token} { do { ^gh run view $id --repo $repo --json status,conclusion,jobs } | complete })
+    if $r.exit_code == 0 { return ($r.stdout | from json) }
+    $attempts = $attempts + 1
+    if $attempts >= 5 {
+      print --stderr $"✗ gh api failed after 5 attempts: ($r.stderr | default '?' | str trim)"
+      exit 1
+    }
+    print $"  · gh api blip \(attempt ($attempts)/5\), retrying in 10s..."
+    sleep 10sec
+  }
+}
+
+def status-mark [status: string, conclusion: string] {
+  if $conclusion == "success" { "✓" }
+  else if $conclusion == "failure" { "✗" }
+  else if $conclusion == "cancelled" { "⊘" }
+  else if $conclusion == "skipped" { "·" }
+  else if $status == "in_progress" { "▶" }
+  else { "·" }
+}
+
+def job-duration [j: any, now: datetime] {
+  let started = ($j.startedAt? | default "")
+  if ($started | is-empty) { return "—" }
+  let s = ($started | into datetime)
+  let end = if ($j.status == "completed") {
+    ($j.completedAt? | default "" | into datetime)
+  } else { $now }
+  ($end - $s) | format duration sec
+}
+
+def step-duration [s: any, now: datetime] {
+  let started = ($s.startedAt? | default "")
+  if ($started | is-empty) { return "—" }
+  let st = ($started | into datetime)
+  let end = if ($s.status == "completed") {
+    ($s.completedAt? | default "" | into datetime)
+  } else { $now }
+  ($end - $st) | format duration sec
+}
+
+def main [
+  --run-id (-r): int          # specific run id (default: latest on --branch)
+  --branch (-b): string       # default: current branch from `git branch --show-current`
+  --workflow (-w): string = "mise.yml"
+  --interval (-i): int = 20    # seconds between polls
+] {
+  let token = (gh-token)
+  if ($token | is-empty) {
+    print --stderr "✗ no GitHub token: set GH_TOKEN, GITHUB_TOKEN, or fnox set GITHUB_TOKEN"
+    exit 1
+  }
+
+  let repo = (origin-repo)
+  if ($repo | is-empty) {
+    print --stderr "✗ couldn't parse repo from `git remote get-url origin`"
+    exit 1
+  }
+
+  let br = if $branch != null {
+    $branch
+  } else {
+    try { ^git branch --show-current | str trim } catch { "main" }
+  }
+
+  let id = if $run_id != null {
+    $run_id
+  } else {
+    let latest = (with-env {GH_TOKEN: $token} { ^gh run list --workflow $workflow --branch $br --limit 1 --repo $repo --json databaseId } | from json)
+    if ($latest | length) == 0 {
+      print --stderr $"✗ no runs found for ($workflow) on ($br) in ($repo)"
+      exit 1
+    }
+    ($latest | first | get databaseId)
+  }
+
+  let started = (date now)
+  print $"watching run ($id) on ($repo)  \(started ($started | format date '%H:%M:%S')\)"
+  mut seen = {}
+  mut failed_jobs = []
+
+  loop {
+    let detail = (gh-run-view-retry $id $repo $token)
+    let run_status = $detail.status
+    let run_conclusion = ($detail.conclusion | default "")
+    let now = (date now)
+
+    for j in $detail.jobs {
+      let job_id = ($j.databaseId | into string)
+      let job_cur = $"($j.status):($j.conclusion | default '')"
+      let job_prev = ($seen | get --optional $job_id | default "")
+      if $job_cur != $job_prev {
+        let mark = (status-mark $j.status ($j.conclusion | default ""))
+        let dur = (job-duration $j $now)
+        print $"  ($mark) ($j.name | fill -w 30 -a l) ($job_cur | fill -w 22 -a l) ($dur)"
+        $seen = ($seen | upsert $job_id $job_cur)
+        if $j.conclusion == "failure" and not ($job_id in $failed_jobs) {
+          $failed_jobs = ($failed_jobs | append $job_id)
+        }
+      }
+
+      for s in ($j.steps | default []) {
+        let key = $"($job_id):($s.number)"
+        let s_cur = $"($s.status):($s.conclusion | default '')"
+        let s_prev = ($seen | get --optional $key | default "")
+        if $s_cur != $s_prev {
+          let is_failure = ($s.conclusion == "failure")
+          let is_meaningful = (not (($s.name | str starts-with "Set up") or ($s.name | str starts-with "Post ") or ($s.name | str starts-with "Complete job") or ($s.name == "Pre run") or ($s.name == "Run actions/checkout@v5")))
+          if $is_failure or ($is_meaningful and ($s.conclusion != null and $s.conclusion != "")) {
+            let mark = (status-mark $s.status ($s.conclusion | default ""))
+            let dur = (step-duration $s $now)
+            print $"      ($mark) ($s.name | fill -w 36 -a l) ($s_cur | fill -w 22 -a l) ($dur)  [($j.name)]"
+          }
+          $seen = ($seen | upsert $key $s_cur)
+        }
+      }
+    }
+
+    if $run_status == "completed" {
+      let total = (((date now) - $started) | format duration sec)
+      print ""
+      print $"run ($id) → ($run_conclusion)  \(watcher ran ($total)\)"
+      break
+    }
+
+    let in_prog = ($detail.jobs | where { |j| $j.status == "in_progress" })
+    if ($in_prog | length) > 0 {
+      let elapsed = ((($now - $started) | format duration sec))
+      let summary = ($in_prog | each { |j| $"($j.name) [(job-duration $j $now)]" } | str join "  ")
+      print $"  · \(elapsed ($elapsed)\) running: ($summary)"
+    }
+
+    sleep ($interval * 1sec)
+  }
+
+  if ($failed_jobs | length) > 0 {
+    print ""
+    print "=== failed-job logs ==="
+    for jid in $failed_jobs {
+      print ""
+      print $"--- job ($jid) ---"
+      let log = (with-env {GH_TOKEN: $token} { do { ^gh api $"repos/($repo)/actions/jobs/($jid)/logs" } | complete })
+      let body = ($log.stdout | default "")
+      let lines = ($body | lines)
+      let markers = [
+        "task failed"
+        "Error: nu::"
+        "TypeError"
+        "AssertionError"
+        "##[error]"
+        "FAIL "
+        "error TS"
+        "error: "
+        "ERROR ["
+      ]
+      let hits = (
+        $lines
+        | enumerate
+        | where { |row| $markers | any { |m| ($row.item | str contains $m) } }
+        | get index
+      )
+      if ($hits | length) > 0 {
+        let printed = ($hits | each { |i|
+          let lo = if $i > 5 { $i - 5 } else { 0 }
+          let hi = if ($i + 3) < ($lines | length) { $i + 3 } else { ($lines | length) - 1 }
+          $lines | range $lo..$hi | str join "\n"
+        })
+        print ($printed | str join "\n  ---\n")
+      } else {
+        print "(no clear error markers; tail 40)"
+        print ($lines | last 40 | str join "\n")
+      }
+    }
+    exit 1
+  }
+}
