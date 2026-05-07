@@ -1,0 +1,153 @@
+name: monorepo-root proof
+
+# Cross-OS proof that mise's experimental_monorepo_root feature does what
+# we need for joeblew999 SSOT: a "shared" subdir's [tools] propagate
+# automatically when its tasks run, without the consumer's root mise.toml
+# pinning those tools itself.
+#
+# If this passes on linux + macos + windows, we can migrate consumer repos
+# (gsv, etc.) from `task_config.includes = ["git::..."]` to vendoring this
+# repo as a `.shared` subdir + `experimental_monorepo_root = true`.
+#
+# Background: jdx/mise discussion #4562 confirmed there's no native
+# cross-repo [tools] sharing. monorepo_root is the closest mise primitive,
+# but it's flagged experimental and the auto-discovery API was already
+# replaced once. This workflow is the gate before we depend on it org-wide.
+
+on:
+  push:
+    branches: [main, "feat/**"]
+    paths:
+      - "mise.toml"
+      - "mise-tasks/**"
+      - ".github/workflows/monorepo-root-proof.yml"
+  pull_request:
+    paths:
+      - "mise.toml"
+      - "mise-tasks/**"
+      - ".github/workflows/monorepo-root-proof.yml"
+  workflow_dispatch:
+
+jobs:
+  proof:
+    name: monorepo-root (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      MISE_EXPERIMENTAL: "1"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install mise
+        uses: jdx/mise-action@v4
+
+      # Build a synthetic consumer in $RUNNER_TEMP that vendors a fixture
+      # `.shared` subdir. We don't use this repo's real mise-tasks/ — we
+      # want to isolate the feature being tested (tool propagation through
+      # //path:task syntax) from any incidental task behavior.
+      - name: Construct synthetic consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="${RUNNER_TEMP}/consumer"
+          rm -rf "$ROOT"
+          mkdir -p "$ROOT/.shared/mise-tasks" "$ROOT/mise-tasks"
+
+          # .shared pins jq + fnox (NOT in consumer root)
+          cat > "$ROOT/.shared/mise.toml" <<'EOF'
+          [tools]
+          "aqua:jqlang/jq"   = "1"
+          "github:jdx/fnox"  = "1.24"
+          EOF
+
+          # Shared task: requires jq + fnox. Will only succeed if monorepo
+          # tool inheritance puts them on PATH for this task's execution.
+          cat > "$ROOT/.shared/mise-tasks/needs-shared-tools" <<'EOF'
+          #!/usr/bin/env bash
+          #MISE description="prove jq + fnox from .shared/mise.toml propagated"
+          set -euo pipefail
+          command -v jq   >/dev/null || { echo "✗ jq not on PATH"; exit 1; }
+          command -v fnox >/dev/null || { echo "✗ fnox not on PATH"; exit 1; }
+          jq --version
+          fnox --version
+          echo "✓ shared task ran with .shared/mise.toml [tools] resolved"
+          EOF
+          chmod +x "$ROOT/.shared/mise-tasks/needs-shared-tools"
+
+          # Consumer root: pins ONLY nushell. NOT jq, NOT fnox. The point
+          # is to prove the consumer doesn't need to know what its
+          # adopted-from-shared tasks need.
+          cat > "$ROOT/mise.toml" <<'EOF'
+          experimental_monorepo_root = true
+
+          [monorepo]
+          config_roots = [".shared"]
+
+          [task_config]
+          includes = ["mise-tasks"]
+
+          [tools]
+          "github:nushell/nushell" = "0.112"
+          EOF
+
+          # Local task with cross-root depends. mise must:
+          #   1. discover the //.shared:needs-shared-tools task
+          #   2. install + activate jq+fnox before running it
+          #   3. then run this local task with consumer's own context
+          cat > "$ROOT/mise-tasks/proves-tools-flow" <<'EOF'
+          #!/usr/bin/env bash
+          #MISE description="local task with cross-root depends — tools must flow"
+          #MISE depends=["//.shared:needs-shared-tools"]
+          set -euo pipefail
+          echo "✓ local task ran after shared dependency completed"
+          EOF
+          chmod +x "$ROOT/mise-tasks/proves-tools-flow"
+
+          echo "→ fixture layout:"
+          find "$ROOT" -type f | sort
+
+      - name: Trust both configs
+        shell: bash
+        run: |
+          cd "${RUNNER_TEMP}/consumer"
+          mise trust
+          mise trust .shared
+
+      - name: Discovery — //.shared:needs-shared-tools must appear
+        shell: bash
+        working-directory: ${{ runner.temp }}/consumer
+        run: |
+          set -euo pipefail
+          mise tasks ls --all
+          mise tasks ls --all | grep -q "//\.shared:needs-shared-tools" \
+            || { echo "✗ shared task not discovered"; exit 1; }
+          echo "✓ shared task discovered via monorepo config_root"
+
+      - name: Direct invocation — //.shared:needs-shared-tools resolves jq+fnox
+        shell: bash
+        working-directory: ${{ runner.temp }}/consumer
+        run: mise run "//.shared:needs-shared-tools"
+
+      - name: Cross-root depends — proves-tools-flow pulls in shared task
+        shell: bash
+        working-directory: ${{ runner.temp }}/consumer
+        run: mise run proves-tools-flow
+
+      # Negative: confirm jq is NOT on the consumer's root PATH outside of
+      # a //.shared: task. This is the "tools stay scoped" promise — the
+      # consumer's own tasks shouldn't see .shared's tools leak in.
+      - name: Negative — jq is NOT on root context PATH
+        shell: bash
+        working-directory: ${{ runner.temp }}/consumer
+        run: |
+          set -euo pipefail
+          if mise current | grep -q "jqlang/jq"; then
+            echo "✗ unexpected: jq is in root context"
+            mise current
+            exit 1
+          fi
+          echo "✓ confirmed: .shared tools stay scoped, no leak to root"
