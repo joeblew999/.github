@@ -1,0 +1,63 @@
+name: Reusable Mise upgrade
+
+# Reusable workflow — every joeblew999 repo can call this from its own
+# .github/workflows/<name>.yml via:
+#
+#   on:
+#     schedule: [{cron: '0 9 * * 1'}]   # Mondays 09:00 UTC
+#     workflow_dispatch:
+#   permissions:
+#     contents: write
+#     pull-requests: write
+#   jobs:
+#     upgrade:
+#       uses: joeblew999/.github/.github/workflows/reusable-mise-upgrade.yml@vX.Y.Z
+#
+# Calls `mise run mise:upgrade` (provided by joeblew999/.github mise-tasks
+# library) which runs `mise upgrade --bump --local` and prints a diff.
+# peter-evans/create-pull-request opens a PR if mise.toml changed.
+
+on:
+  workflow_call:
+    inputs:
+      mise-version:
+        description: 'mise binary version to install'
+        type: string
+        default: '2026.5.1'
+      pr-branch:
+        description: 'Name of the branch the PR is opened from'
+        type: string
+        default: 'mise-upgrade'
+
+jobs:
+  upgrade:
+    name: Upgrade pinned tools
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: jdx/mise-action@v4
+        with:
+          version: ${{ inputs.mise-version }}
+          install: false   # we don't need the consumer's tools, just mise itself
+
+      - name: mise run mise:upgrade
+        run: mise run mise:upgrade
+
+      - name: Open PR if mise.toml changed
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore(mise): bump pinned tool versions"
+          branch: ${{ inputs.pr-branch }}
+          delete-branch: true
+          title: "chore(mise): bump pinned tool versions"
+          body: |
+            Automated weekly bump produced by `mise run mise:upgrade`
+            (from joeblew999/.github reusable workflow).
+
+            Diff is whatever `mise upgrade --bump --local` produced for
+            `mise.toml`. Run the same thing locally:
+
+                mise run mise:upgrade --dry-run
+          add-paths: mise.toml
+          labels: dependencies, automated

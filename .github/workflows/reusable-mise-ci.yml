@@ -1,0 +1,71 @@
+name: Reusable Mise CI
+
+# Reusable workflow — every joeblew999 repo can call this from its own
+# .github/workflows/<name>.yml via:
+#
+#   jobs:
+#     ci:
+#       uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@vX.Y.Z
+#       with:
+#         task: ci                         # (default) name of the mise task to run
+#         os-matrix: '["ubuntu-latest", "macos-latest", "windows-latest"]'
+#         mise-version: 2026.5.1
+#         sccache: true                    # set false if no Rust crate
+#
+# The task itself (e.g. `mise run ci`) is defined in the consuming repo,
+# either inline in mise.toml or in mise-tasks/. SSOT: workflow runs ONE
+# task; that task's depends graph fans out the work.
+
+on:
+  workflow_call:
+    inputs:
+      task:
+        description: 'Name of the mise task to run'
+        type: string
+        default: 'ci'
+      os-matrix:
+        description: 'JSON array of GH runners (default linux/macos/windows)'
+        type: string
+        default: '["ubuntu-latest", "macos-latest", "windows-latest"]'
+      mise-version:
+        description: 'mise binary version to install'
+        type: string
+        default: '2026.5.1'
+      sccache:
+        description: 'Cache ~/.cache/sccache between runs (only useful for Rust)'
+        type: boolean
+        default: true
+      cargo-lock-path:
+        description: 'Path to the Cargo.lock used for cache key (when sccache=true)'
+        type: string
+        default: 'Cargo.lock'
+
+jobs:
+  run:
+    name: ${{ inputs.task }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.os-matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: jdx/mise-action@v4
+        with:
+          version: ${{ inputs.mise-version }}
+          install: true
+          cache: true
+          # Workaround for jdx/mise-action#382 — default cache key has
+          # prefix-match collisions. Custom key on (job, os, mise.toml hash).
+          cache_key: mise-${{ inputs.task }}-${{ matrix.os }}-${{ hashFiles('mise.toml') }}
+
+      - name: Cache sccache
+        if: ${{ inputs.sccache }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/sccache
+          key: sccache-${{ matrix.os }}-${{ hashFiles(inputs.cargo-lock-path) }}
+          restore-keys: sccache-${{ matrix.os }}-
+
+      - run: mise run ${{ inputs.task }}
