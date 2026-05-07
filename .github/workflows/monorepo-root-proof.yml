@@ -38,6 +38,11 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     env:
       MISE_EXPERIMENTAL: "1"
+      # Git Bash on Windows rewrites '//foo' → '/foo' (MSYS2 path translation)
+      # which mangles `//.shared:task` syntax. Disable the rewrite for this job.
+      # No-op on linux/macos.
+      MSYS_NO_PATHCONV: "1"
+      MSYS2_ARG_CONV_EXCL: "*"
 
     steps:
       - uses: actions/checkout@v6
