@@ -1,0 +1,46 @@
+# tasks/cf.toml — TOML-task definitions for the cf:* (Cloudflare) namespace.
+#
+# See tasks/ci.toml for the consumer wiring + tool pin policy.
+
+# ── cf:token-check ───────────────────────────────────────────────────────────
+# Verify CLOUDFLARE_API_TOKEN is valid — reads from env or fnox, calls the
+# Cloudflare /user/tokens/verify endpoint, prints token id+status on success.
+# Used by deploy/prove tasks as a precondition gate.
+["cf:token-check"]
+description = "verify CLOUDFLARE_API_TOKEN is valid — reads from env or fnox"
+tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24" }
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let token = (
+    if ($env.CLOUDFLARE_API_TOKEN? | default "" | is-not-empty) {
+      $env.CLOUDFLARE_API_TOKEN
+    } else {
+      try { ^fnox get CLOUDFLARE_API_TOKEN | str trim } catch { "" }
+    }
+  )
+  if ($token | is-empty) {
+    print --stderr "✗ CLOUDFLARE_API_TOKEN not set and not in fnox"
+    exit 1
+  }
+
+  let result = (
+    try {
+      ^curl -sS -H $"Authorization: Bearer ($token)" "https://api.cloudflare.com/client/v4/user/tokens/verify" | from json
+    } catch {
+      {success: false}
+    }
+  )
+
+  if ($result.success? | default false) {
+    let status = ($result.result.status? | default "?")
+    let id = ($result.result.id? | default "?")
+    print $"✓ token valid \(id=($id) status=($status)\)"
+  } else {
+    print "✗ token invalid or expired"
+    print ($result | to json)
+    exit 1
+  }
+}
+'''
