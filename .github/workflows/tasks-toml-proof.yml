@@ -562,7 +562,10 @@ jobs:
           if ($work | path exists) { rm -rf $work }
           mkdir $work
 
-          let tomls = (glob ($env.GITHUB_WORKSPACE | path join "tasks" "*.toml"))
+          # path join uses platform separator (backslash on Windows) — glob
+          # parser rejects backslash patterns. Build with string interp +
+          # final backslash sweep so the glob is always forward-slash.
+          let tomls = (glob ($"($env.GITHUB_WORKSPACE)/tasks/*.toml" | str replace --all "\\" "/"))
           mut total = 0
           mut failed = []
 
