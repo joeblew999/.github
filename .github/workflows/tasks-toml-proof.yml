@@ -586,7 +586,8 @@ jobs:
             }
           }
 
-          print $"→ parse-checked ($total) inline run bodies across (\($tomls | length\)) tasks/*.toml files"
+          let toml_count = ($tomls | length)
+          print $"→ parse-checked ($total) inline run bodies across ($toml_count) tasks/*.toml files"
           if ($failed | length) > 0 {
             print --stderr ""
             print --stderr $"✗ ($failed | length) task\(s\) with parse errors:"
