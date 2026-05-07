@@ -123,6 +123,73 @@ def main [
 }
 '''
 
+# ── ci:audit-lib-refs ────────────────────────────────────────────────────────
+# Cross-repo drift audit: scan every mise.toml on this machine that
+# references joeblew999/.github via git:: URL, compare each ?ref=v...
+# pin to the latest published tag, report anything stale.
+#
+# `mise outdated` only sees pinned TOOLS, not git URLs, so this fills
+# the gap. Run before bumping or as a periodic sanity check.
+#
+# Tools: gh (GitHub API for tags). Inherits nu from ci:_base.
+["ci:audit-lib-refs"]
+extends = "ci:_base"
+description = "Audit ?ref= drift across every tracked mise.toml that includes joeblew999/.github"
+tools = { "aqua:cli/cli" = "2" }
+run = '''
+#!/usr/bin/env nu
+
+def main [
+  --owner: string = "joeblew999"
+  --repo: string = ".github"
+] {
+  let tags_raw = (^gh api $"repos/($owner)/($repo)/tags?per_page=10" | from json)
+  if ($tags_raw | length) == 0 {
+    print --stderr $"✗ no tags on ($owner)/($repo)"
+    exit 1
+  }
+  let latest = ($tags_raw | first | get name)
+  print $"Latest tag on ($owner)/($repo): ($latest)"
+  print ""
+
+  let tracked = (^mise config ls --tracked-configs | lines | each { |l| $l | str trim } | where { |l| not ($l | is-empty) })
+
+  let lib_url = $"github.com/($owner)/($repo)"
+  mut findings = []
+
+  for cfg in $tracked {
+    if not ($cfg | path exists) { continue }
+    let raw = (try { open --raw $cfg } catch { "" })
+    if not ($raw | str contains $lib_url) { continue }
+    let refs = (
+      $raw
+      | parse --regex '\?ref=(v[0-9]+\.[0-9]+\.[0-9]+)'
+      | get capture0
+      | uniq
+    )
+    if ($refs | length) == 0 { continue }
+    for r in $refs {
+      if $r != $latest {
+        $findings = ($findings | append {config: $cfg, current: $r, latest: $latest})
+      }
+    }
+  }
+
+  if ($findings | length) == 0 {
+    print $"✓ all tracked configs at ($latest)"
+    return
+  }
+
+  let count = ($findings | length)
+  print $"⚠ ($count) stale ?ref= pin\(s\):"
+  print ""
+  $findings | print
+  print ""
+  print "To bump: edit each mise.toml's includes URLs."
+  exit 1
+}
+'''
+
 # ── ci:check-workflow-nu ─────────────────────────────────────────────────────
 # Parse-check every embedded nu block in .github/workflows/*.yml. Walks the
 # parsed YAML structure (jobs.<job>.steps[]) and finds every step whose
