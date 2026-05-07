@@ -3,6 +3,29 @@
 All notable changes to the shared mise task library. Bump consumer repos'
 `[task_config].includes` pin when adopting a new release.
 
+## v0.19.2 — 2026-05-07
+
+Docs + cleanup. No behaviour change for consumers — `?ref=` bump is
+optional, but recommended so `ci:audit-lib-refs` stops flagging.
+
+### Changed
+
+- **README + CONTRIBUTING + AGENTS.md** refreshed for v0.19.x reality.
+  README's `?ref=` example was on v0.3.0; CONTRIBUTING described the
+  legacy file-task authoring flow only; AGENTS.md status block was a
+  v0.16.x snapshot.
+- **`mise-tasks-lint.yml`** slimmed 238 → 124 lines. Negative-path
+  execution is fully covered by `tasks-toml-proof.yml`; the dead Tera
+  bash check (no bash files left after v0.10.0) is gone. Workflow is
+  now legacy-only as titled.
+- **`mise-tasks/README.md`** + **`mise-tasks/CONSOLIDATION.md`** got
+  deprecation/status banners pointing at `tasks/`.
+- **`.claude/agents/github-meta-repo-expert.md`** deleted — claimed
+  "Current release: v0.4.0", duplicated AGENTS.md content. `.claude/README.md`
+  now points at AGENTS.md as SSOT.
+- **Reusable workflows** clarified to ride the same tag stream as the
+  task library (`@vX.Y.Z` in lockstep with `?ref=`).
+
 ## v0.19.1 — 2026-05-07
 
 ### Added
