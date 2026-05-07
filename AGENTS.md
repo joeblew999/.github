@@ -4,46 +4,44 @@ This repo is a **shared mise task library** for all `joeblew999` projects, plus 
 
 ## ⚠ Read this first
 
-Two architectural directions, in order of priority:
+**Default to TOML-tasks under `tasks/<ns>.toml`** with per-task `tools = { ... }`.
+Per-task tools auto-install when the task runs and stay scoped — consumers
+no longer pin gh/jq/ruby/cocoapods/java/etc. globally just because a shared
+task uses them. See "TOML-task vs file-task" section below.
 
-1. **TOML-task migration (v0.16.x — in flight).** New tasks (and ports of
-   existing ones) go in `tasks/<ns>.toml` with per-task `tools = { ... }`,
-   not in `mise-tasks/<ns>/<name>` as file-tasks. Per-task tools auto-install
-   when the task runs and stay scoped — consumers no longer have to pin
-   gh/jq/ruby/cocoapods/java/etc. just because a shared task uses them.
-   See "TOML-task vs file-task" section below.
+The legacy file-task tree under `mise-tasks/` is [deprecated](./mise-tasks/DEPRECATED.md).
+Don't add new tasks there. The directory is preserved for back-compat with
+consumers still pinning `?ref=v0.10.0–v0.15.x`.
 
-2. **Composition layer (CONSOLIDATION.md).** Top-level verbs that chain
-   primitives via `depends = [...]`. Lives in *each consumer's* mise.toml,
-   not here. See [`mise-tasks/CONSOLIDATION.md`](./mise-tasks/CONSOLIDATION.md)
-   for the plan. Orthogonal to (1) — both can advance.
+A second, orthogonal direction — **composition verbs** in each consumer's
+mise.toml that chain primitives via `depends = [...]`. Lives consumer-side,
+not here. See [`mise-tasks/CONSOLIDATION.md`](./mise-tasks/CONSOLIDATION.md)
+for the (partial) status.
 
-Before adding a new task, ask: should this be a TOML-task with per-task
-tools (almost always yes for new shared tasks), or a file-task (only if
-the body is too large to comfortably inline as a TOML string)?
+## Current state
 
-## Current state (2026-05-07)
-
-- **v0.16.2** — TOML-task pattern shipped + first three namespaces ported.
-  - `tasks/ci.toml` — `ci:parse-check`, `ci:watch`, `ci:clean` (per-task: nu, fnox, gh)
-  - `tasks/cf.toml` — `cf:token-check` (per-task: nu, fnox)
-  - `tasks/secrets.toml` — `secrets:sync-github` (per-task: nu, fnox, gh)
-  - `tasks/mobile.toml` — 8 mobile:* tasks (per-task: nu + java/ruby/cocoapods/cargo:tauri-cli)
-- **Legacy v0.10.0 file-tasks** in `mise-tasks/` still ship and work. Removal
-  blocked on full consumer migration to TOML-task includes.
-- **gsv** is on v0.16.0 and was the migration test bed. CI green on 3 OS
-  including Windows (after fixing a separate 1-deps glob bug + skipping
-  test-gateway on Windows due to upstream Cloudflare workerd instability).
-- **Other 7 consumer repos** still pin `?ref=v0.10.0` — pending mechanical
-  migration to v0.16.x TOML-task includes.
-- **Two CI canaries** on every push:
-  - `tasks-toml-proof.yml` — TOML-task mechanism + each shipped `tasks/*.toml`,
-    on linux+macos+windows (~25s)
-  - `mise-tasks-lint.yml` — parse-check + fnox keychain + negative-path
-    execution for legacy file-tasks, same 3 OS (~30s)
-- **`monorepo-root-proof.yml`** — kept as documentation of an alternative
-  we evaluated and rejected; lets us re-examine if mise drops the
-  experimental flag from `experimental_monorepo_root`.
+- **Latest tag: v0.19.1.** Every active joeblew999 consumer is on it (10 repos:
+  gsv, agentic-inbox, auth-service, d1-manager, kv-manager, nodewarden,
+  saasmail, ifc-lite, mon-house, utm-dev-cli).
+- **Every namespace has a TOML-task counterpart** in `tasks/<ns>.toml`:
+  bw, cf, ci, env, fnox, mise, mobile, prove, rust, secrets, wrangler.
+  Each namespace shares a hidden `<ns>:_base` that pins common tools (nu,
+  often fnox); children `extends = "<ns>:_base"` and only declare deltas.
+- **Self-hosting**: this repo's own `mise.toml` includes every `tasks/*.toml`,
+  so `ci:check-toml-tasks` and `ci:check-workflow-nu` lint the lib against
+  itself. Catches drift before consumers see it.
+- **Drift detection**: `ci:audit-lib-refs` (v0.19.1+) walks every
+  `mise config ls --tracked-configs` on the host and warns if any pinned
+  `?ref=` is stale. Fills the gap that `mise outdated` doesn't see git URLs.
+- **CI canaries** on every push:
+  - `tasks-toml-proof.yml` — discovery + per-task tool install + scoping
+    + real-file validation per shipped `tasks/*.toml`. 3 OS.
+  - `mise-tasks-lint.yml` — structural lint + fnox keychain round-trip
+    + parse-check for the legacy `mise-tasks/` tree. 3 OS. Slimmed in
+    v0.19.1 (negative-path execution moved to tasks-toml-proof).
+- **`monorepo-root-proof.yml`** — preserved as documentation of an
+  experimental alternative (`experimental_monorepo_root`) we evaluated and
+  rejected. Re-examine only if mise drops the experimental flag.
 - **Rust port** (`joeblew999/secrets-manager`) is the long-term destination
   but not started; nu is the bridge.
 
@@ -51,13 +49,13 @@ the body is too large to comfortably inline as a TOML string)?
 
 | Path | Purpose |
 |---|---|
-| `tasks/<ns>.toml` | **New (v0.16+)** — TOML-task definitions with per-task `tools = { ... }`. Consumed remotely via `task_config.includes = ["git::....toml?ref=v0.16.x"]`. **Preferred for new tasks.** |
-| `mise-tasks/<ns>/<name>` | Legacy nu file-tasks (~33 of them). Consumed via `task_config.includes` pointed at the directory. Still work; will be retired as namespaces are ported to `tasks/*.toml`. |
-| [`mise-tasks/CONSOLIDATION.md`](./mise-tasks/CONSOLIDATION.md) | Plan for the *composition layer* (consumer-side, orthogonal to TOML-task work) |
-| `mise-tasks/_proof/nu-cross-platform.nu` | Cross-platform nu syntax smoke test |
-| `mise-tasks/README.md` | Per-namespace task reference |
+| `tasks/<ns>.toml` | **TOML-task definitions (v0.16+)** with per-task `tools = { ... }`. Consumed remotely via `task_config.includes = ["git::....toml?ref=vX.Y.Z"]`. Default for new tasks. |
+| `mise-tasks/<ns>/<name>` | [Deprecated](./mise-tasks/DEPRECATED.md) legacy nu file-tasks. Preserved for consumers pinned at `?ref=v0.10.0–v0.15.x`. No new tasks. |
+| [`mise-tasks/DEPRECATED.md`](./mise-tasks/DEPRECATED.md) | Migration table mapping each legacy file-task path → its `tasks/*.toml` counterpart. |
+| [`mise-tasks/CONSOLIDATION.md`](./mise-tasks/CONSOLIDATION.md) | (Partial) plan for consumer-side composition verbs. |
+| `mise-tasks/_proof/nu-cross-platform.nu` | Cross-platform nu syntax smoke test (kept; exercised by `mise-tasks-lint.yml`). |
 | `.github/workflows/tasks-toml-proof.yml` | **CI canary for TOML-tasks** — discovery + per-task tool install + scoping + real-file validation per shipped `tasks/*.toml`. 3 OS. |
-| `.github/workflows/mise-tasks-lint.yml` | CI lint matrix for legacy file-tasks. 3 OS. |
+| `.github/workflows/mise-tasks-lint.yml` | CI lint for the legacy `mise-tasks/` tree (structure + parse-check + fnox keychain). 3 OS. |
 | `.github/workflows/monorepo-root-proof.yml` | Reference: the experimental alternative we evaluated & rejected. Kept as documentation. |
 | `.github/workflows/reusable-mise-ci.yml` / `reusable-mise-upgrade.yml` | Reusable workflows consumers `uses:` |
 | `profile/` | GitHub org profile page (github.com/joeblew999) |
@@ -169,14 +167,15 @@ This repo is the org's shared system. Every new task MUST be:
 
 This repo is the SSOT for every joeblew999 project's tooling. Drift here breaks every consumer.
 
-- **Every task file has shebang + `#MISE description=`.** Verified by `mise-tasks-lint.yml` on every push.
-- **Every task is parse-clean on linux/macos/windows.** `mise run ci:parse-check` (locally) + the workflow assertion.
-- **Every task that fails on missing prereqs has a negative-path test entry.** Catches runtime nu bugs that parse-check misses.
-- **README.md lists every namespace.** When you add a new namespace (rare), add a section. When you add a task to an existing namespace, add a row.
-- **Reusable workflows** (`reusable-mise-ci.yml`, `reusable-mise-upgrade.yml`) ride the same tag stream as the task library — every release tag (currently `v0.19.1`) ships the workflow files alongside `tasks/` and `mise-tasks/`. Consumers reference by tag (`@vX.Y.Z`). Don't break the input contract without a major bump; safe to bump the `@vX.Y.Z` pin in lockstep with the `[task_config].includes` `?ref=`.
-- **`?ref=` example version in README.md** stays current with the latest tag.
-- **The local `mise tasks ls` count** matches expectations (currently ~50). A surprise drop = mise auto-discovery missed something (probably a missing `chmod +x`).
-- **No `${#array[@]}` in bash files** (Tera template engine eats `{#…#}` blocks). Flagged by the lint workflow; nu files are immune.
+- **Every legacy task file has shebang + `#MISE description=`.** Verified by `mise-tasks-lint.yml` on every push. (TOML-tasks declare `description =` directly.)
+- **Every task — TOML or legacy — is parse-clean on linux/macos/windows.**
+  - TOML-task `run = '''…'''` bodies: `mise run ci:check-toml-tasks` (locally) + the `tasks-toml-proof.yml` self-host step.
+  - Legacy file-tasks: `mise run ci:parse-check` + the `mise-tasks-lint.yml` parse step.
+  - Embedded nu in `.github/workflows/*.yml`: `mise run ci:check-workflow-nu`.
+- **Every TOML task that fails on missing prereqs has a negative-path test entry** in `tasks-toml-proof.yml`. Catches runtime nu bugs that parse-check misses.
+- **Reusable workflows** (`reusable-mise-ci.yml`, `reusable-mise-upgrade.yml`) ride the same tag stream as the task library — every release tag ships the workflow files alongside `tasks/` and `mise-tasks/`. Consumers reference by tag (`@vX.Y.Z`); bump in lockstep with `[task_config].includes` `?ref=`.
+- **`?ref=` example version in README.md + AGENTS.md examples** stays current with the latest tag.
+- **`mise tasks ls` count is sane.** Drop = auto-discovery missed something (legacy file-task missing `chmod +x`, or a TOML-task with malformed header).
 
 ## Reusable workflows (added v0.15.0)
 
