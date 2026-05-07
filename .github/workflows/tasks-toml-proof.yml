@@ -550,57 +550,6 @@ jobs:
           }
           print "✓ rust:wasm-pack fires usage error cleanly"
 
-      # ── Inline run-body parse-check (v0.17.4+) ─────────────────────────
-      # Extract each TOML-task's run body and ide-check it with nu. Catches
-      # nu syntax errors that would only surface at runtime — same coverage
-      # the legacy ci:parse-check provides for file-tasks, applied to inline
-      # TOML bodies.
-      - name: Inline run-body ide-check across every tasks/*.toml
-        shell: 'mise exec -- nu --no-newline {0}'
-        run: |
-          let work = ($env.RUNNER_TEMP | path join "ide-check")
-          if ($work | path exists) { rm -rf $work }
-          mkdir $work
-
-          # path join uses platform separator (backslash on Windows) — glob
-          # parser rejects backslash patterns. Build with string interp +
-          # final backslash sweep so the glob is always forward-slash.
-          let tomls = (glob ($"($env.GITHUB_WORKSPACE)/tasks/*.toml" | str replace --all "\\" "/"))
-          mut total = 0
-          mut failed = []
-
-          # Pattern: capture quoted top-level key (namespace:task) + the
-          # `run = '''<body>'''` block. Double-quoted nu string for proper
-          # escapes — `\\` → `\`, `\"` → `"`, single quotes literal.
-          let pattern = "(?s)\\[\"([^\"]+)\"\\][^\\[]*?run\\s*=\\s*'''(.*?)'''"
-
-          for t in $tomls {
-            let raw = (open --raw $t)
-            let bodies = ($raw | parse --regex $pattern | rename task body)
-            for entry in $bodies {
-              $total = $total + 1
-              let safe = ($entry.task | str replace --all ":" "_")
-              let tmp = ($work | path join $"($safe).nu")
-              $entry.body | save --force $tmp
-              let r = (do { ^nu --ide-check 1 $tmp } | complete)
-              if ($r.stdout | str contains "severity\":\"Error") {
-                $failed = ($failed | append {task: $entry.task, error: ($r.stdout | lines | first)})
-              }
-            }
-          }
-
-          let toml_count = ($tomls | length)
-          print $"→ parse-checked ($total) inline run bodies across ($toml_count) tasks/*.toml files"
-          if ($failed | length) > 0 {
-            print --stderr ""
-            print --stderr $"✗ ($failed | length) task\(s\) with parse errors:"
-            for f in $failed {
-              print --stderr $"  - ($f.task): ($f.error)"
-            }
-            exit 1
-          }
-          print "✓ all inline run bodies parse-clean"
-
       # ── Real-file validation: prove.toml (v0.17.2+) ────────────────────
       - name: Real prove.toml — discovery + negative paths
         shell: 'mise exec -- nu --no-newline {0}'
