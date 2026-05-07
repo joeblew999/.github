@@ -81,8 +81,16 @@ def main [] {
     print $"✓ NDK installed: ($env.ANDROID_NDK_HOME)"
   }
 
-  print "→ adding Rust Android targets..."
-  ^rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+  if (which rustup | is-empty) {
+    print "⤬ rustup not on PATH — skipping Rust Android target install."
+    print "  To add targets, ensure `rust` is pinned in your repo's mise.toml,"
+    print "  then re-run this task or call:"
+    print "    rustup target add aarch64-linux-android armv7-linux-androideabi \\"
+    print "                       i686-linux-android x86_64-linux-android"
+  } else {
+    print "→ adding Rust Android targets..."
+    ^rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+  }
 
   print ""
   print "✓ Android toolchain ready."
@@ -129,8 +137,15 @@ def main [] {
   let pod_ver = (^pod --version | str trim)
   print $"✓ CocoaPods ($pod_ver)"
 
-  print "→ adding Rust iOS targets..."
-  ^rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+  if (which rustup | is-empty) {
+    print "⤬ rustup not on PATH — skipping Rust iOS target install."
+    print "  To add targets, ensure `rust` is pinned in your repo's mise.toml,"
+    print "  then re-run this task or call:"
+    print "    rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios"
+  } else {
+    print "→ adding Rust iOS targets..."
+    ^rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+  }
 
   print ""
   print "✓ iOS toolchain ready."
