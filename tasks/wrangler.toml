@@ -1,0 +1,131 @@
+# tasks/wrangler.toml — TOML-task definitions for the wrangler:* namespace.
+#
+# Thin wrappers around the wrangler CLI plus wrangler:gen, the
+# template-substitution config generator that's how joeblew999 consumers
+# parameterise their wrangler.{toml,jsonc} from config/<env>.env files.
+#
+# Consumer wiring:
+#   [task_config]
+#   includes = [
+#     "git::https://github.com/joeblew999/.github.git//tasks/wrangler.toml?ref=v0.17.1",
+#   ]
+#
+# All wrangler:* tasks pin npm:wrangler per-task; consumers don't have to
+# pin wrangler globally just because a deploy/dev/tail task uses it.
+
+# ── wrangler:deploy ──────────────────────────────────────────────────────────
+# Pass-through to `wrangler deploy`. Forwards all args verbatim.
+["wrangler:deploy"]
+description = "deploy to Cloudflare Workers"
+tools = { "github:nushell/nushell" = "0.112", "npm:wrangler" = "4" }
+run = '''
+#!/usr/bin/env nu
+
+def main [...args] {
+  ^wrangler deploy ...$args
+}
+'''
+
+# ── wrangler:dev ─────────────────────────────────────────────────────────────
+# Pass-through to `wrangler dev` for local multi-worker development.
+["wrangler:dev"]
+description = "wrangler local dev (multi-worker)"
+tools = { "github:nushell/nushell" = "0.112", "npm:wrangler" = "4" }
+run = '''
+#!/usr/bin/env nu
+
+def main [...args] {
+  ^wrangler dev ...$args
+}
+'''
+
+# ── wrangler:gen ─────────────────────────────────────────────────────────────
+# Generate wrangler.{toml,jsonc} from wrangler.{toml,jsonc}.template +
+# config/<env>.env. Auto-detects which template format the fork uses.
+# Per-fork values are interpolated; the result is gitignored.
+#
+# Note: this task does NOT call wrangler — it's pure nu template
+# substitution. So no npm:wrangler in tools.
+["wrangler:gen"]
+description = "Generate wrangler.{toml,jsonc} from wrangler.{toml,jsonc}.template + config/<env>.env via bash native substitution. Auto-detects which template format the fork uses. Per-fork values are interpolated; the result is gitignored."
+tools = { "github:nushell/nushell" = "0.112" }
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let env_file = $"config/($env_name).env"
+  if not ($env_file | path exists) {
+    print --stderr $"ERROR: ($env_file) not found."
+    exit 1
+  }
+
+  let pair = if ("wrangler.toml.template" | path exists) {
+    {src: "wrangler.toml.template", dst: "wrangler.toml"}
+  } else if ("wrangler.jsonc.template" | path exists) {
+    {src: "wrangler.jsonc.template", dst: "wrangler.jsonc"}
+  } else {
+    print --stderr $"ERROR: no wrangler.{toml,jsonc}.template found in \(pwd\)"
+    exit 1
+  }
+
+  # Substitute ${KEY} and $KEY for every defined KEY=VAL in env_file.
+  let env_pairs = (
+    open --raw $env_file
+    | lines
+    | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+    | each {|line|
+        let parts = ($line | split row -n 2 "=")
+        let key = ($parts | get 0)
+        let val = (($parts | get 1) | str trim --char '"')
+        {key: $key, val: $val}
+      }
+  )
+
+  let template = (open --raw $pair.src)
+  let output = ($env_pairs | reduce -f $template {|p, acc|
+    $acc
+    | str replace --all $"${($p.key)}" $p.val
+    | str replace --all $"$($p.key)" $p.val
+  })
+
+  $output | save -f $pair.dst
+  print $"wrote ($pair.dst) from ($pair.src) \(env: ($env_file)\)"
+}
+'''
+
+# ── wrangler:secret-list ─────────────────────────────────────────────────────
+# List secrets set on a deployed Worker (values hidden).
+["wrangler:secret-list"]
+description = "list secrets set on a deployed Worker (values hidden)"
+tools = { "github:nushell/nushell" = "0.112", "npm:wrangler" = "4" }
+usage = '''
+flag "--env <env>" help="Cloudflare environment" default="production"
+'''
+run = '''
+#!/usr/bin/env nu
+
+def main [...args] {
+  # mise's `usage` flag --env populates $env.usage_env; fall back to ENV var, then 'production'
+  let cf_env = ($env.usage_env? | default ($env.ENV? | default "production"))
+  ^wrangler secret list --env $cf_env ...$args
+}
+'''
+
+# ── wrangler:tail ────────────────────────────────────────────────────────────
+# Tail live logs from a deployed Worker. Defaults to production env;
+# pass --env <env> for staging/preview.
+["wrangler:tail"]
+description = "tail live logs from a deployed Worker"
+tools = { "github:nushell/nushell" = "0.112", "npm:wrangler" = "4" }
+usage = '''
+flag "--env <env>" help="Cloudflare environment to tail" default="production"
+'''
+run = '''
+#!/usr/bin/env nu
+
+def main [...args] {
+  let cf_env = ($env.usage_env? | default ($env.ENV? | default "production"))
+  ^wrangler tail --env $cf_env ...$args
+}
+'''
