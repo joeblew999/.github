@@ -1,0 +1,80 @@
+# tasks/fnox.toml — TOML-task definitions for the fnox:* namespace.
+#
+# Currently a single-task namespace: fnox:init bootstraps a fresh fnox
+# config with keychain provider only (no age, no plaintext blobs).
+#
+# Consumer wiring:
+#   [task_config]
+#   includes = [
+#     "git::https://github.com/joeblew999/.github.git//tasks/fnox.toml?ref=v0.17.3",
+#   ]
+
+# ── fnox:init ────────────────────────────────────────────────────────────────
+# Bootstrap fnox for a fresh dev machine. Writes a minimal global config
+# at the platform's standard fnox location with the keychain provider
+# pre-registered. Idempotent — adds the keychain provider to an existing
+# config if missing; no-op if already present.
+["fnox:init"]
+description = "bootstrap fnox for a fresh dev — sets up the keychain provider in the global config (no age key, no plain-file secrets)"
+tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24" }
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let config_path = (
+    try {
+      ^fnox config-files
+      | lines
+      | where { |l| ($l | str trim) ends-with ".toml" }
+      | first
+      | str trim
+    } catch {
+      let host = (sys host | get name)
+      if $host == "Windows" {
+        $"($env.LOCALAPPDATA? | default $env.APPDATA)/fnox/config.toml"
+      } else {
+        $"($env.HOME)/.config/fnox/config.toml"
+      }
+    }
+  )
+
+  let config_dir = ($config_path | path dirname)
+  mkdir $config_dir
+
+  if not ($config_path | path exists) {
+    print $"→ writing fresh fnox config at ($config_path)"
+    let template = "# fnox global config — keychain-only.
+# All secrets are stored directly in the OS keychain (macOS Keychain,
+# Windows Credential Manager, or Linux secret-service). No age key, no
+# plaintext blobs in this file. Only the secret *names* live here.
+
+[providers.keychain]
+type = \"keychain\"
+service = \"fnox\"
+
+[secrets]
+# Add secrets via:
+#   fnox set --global -p keychain SECRET_NAME
+# Then read them via:
+#   fnox get SECRET_NAME
+"
+    $template | save -f $config_path
+    print $"✓ wrote ($config_path)"
+  } else {
+    let existing = (open --raw $config_path)
+    if ($existing | str contains "[providers.keychain]") or ($existing =~ '^keychain\s*=') {
+      print $"✓ ($config_path) already has keychain provider — nothing to do"
+    } else {
+      print $"→ adding keychain provider to existing ($config_path)"
+      ^fnox provider add --global keychain keychain
+      print "✓ keychain provider added"
+    }
+  }
+
+  print ""
+  print "Next:"
+  print "  fnox set --global -p keychain MY_SECRET   # add a secret (reads stdin or prompts)"
+  print "  fnox list                                 # verify"
+  print "  mise run secrets:status                   # check fnox + GitHub state"
+}
+'''
