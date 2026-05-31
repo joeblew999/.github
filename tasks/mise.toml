@@ -1,8 +1,11 @@
 # tasks/mise.toml — TOML-task definitions for the mise:* namespace.
 #
-# Currently a single task: mise:upgrade — a thin wrapper around
-# `mise upgrade --bump --local` that's safer than the bare command
-# (won't accidentally bump the user's global config).
+# Tasks:
+#   mise:upgrade — thin wrapper around `mise upgrade --bump --local` that's
+#                  safer than the bare command (won't bump the global config).
+#   mise:sweep   — reclaim dead mise state (dead config links + unused tool
+#                  versions) across every repo under --root. Safe: re-tracks
+#                  all live configs first so prune can't over-delete.
 #
 # Consumer wiring:
 #   [task_config]
@@ -45,5 +48,54 @@ def main [
   print ""
   print "✓ mise.toml bumped:"
   ^git --no-pager diff -- mise.toml
+}
+'''
+
+# ── mise:sweep ───────────────────────────────────────────────────────────────
+# Reclaim dead mise state across every repo under --root (default: $PWD):
+#   1. Re-track every live mise config so `prune --tools` can't over-delete a
+#      version a live-but-unvisited repo still pins.
+#   2. `mise prune --configs` (dead repo links) + `mise prune --tools -y`.
+# Removed tool versions auto-reinstall on demand for most backends.
+# Use --dry-run to preview without deleting.
+["mise:sweep"]
+description = "Reclaim dead mise state (dead config links + unused tool versions) across all repos under --root. Re-tracks live configs first so prune stays safe. Idempotent."
+tools = { "github:nushell/nushell" = "0.112" }
+run = '''
+#!/usr/bin/env nu
+
+def main [
+  --root: string = ""   # workspace root to scan; defaults to $env.PWD
+  --dry-run             # show what would be removed without deleting anything
+] {
+  let root = (if ($root | is-empty) { $env.PWD } else { $root })
+  print $"→ scanning ($root) for mise configs"
+
+  let cfgs = (
+    glob $"($root)/**/{mise,.mise}.toml"
+    | where {|p| (not ($p | str contains "/target/")) and (not ($p | str contains "/.git/")) }
+  )
+  print $"  found ($cfgs | length) live configs — re-tracking so prune stays safe"
+
+  for c in $cfgs {
+    do { ^mise trust $c } | complete | ignore
+    do { cd ($c | path dirname); ^mise ls --current } | complete | ignore
+  }
+  cd $root
+
+  if $dry_run {
+    print "→ mise prune --configs --dry-run"
+    ^mise prune --configs --dry-run
+    print "→ mise prune --tools --dry-run"
+    ^mise prune --tools --dry-run
+    print "(dry run — nothing deleted)"
+    return
+  }
+
+  print "→ mise prune --configs"
+  ^mise prune --configs
+  print "→ mise prune --tools -y"
+  ^mise prune --tools -y
+  print "✓ sweep complete"
 }
 '''
