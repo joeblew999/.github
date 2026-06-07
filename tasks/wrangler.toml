@@ -17,7 +17,6 @@
 # Pass-through to `wrangler deploy`. Forwards all args verbatim.
 ["wrangler:deploy"]
 description = "deploy to Cloudflare Workers"
-tools = { wrangler = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -30,7 +29,6 @@ def main [...args] {
 # Pass-through to `wrangler dev` for local multi-worker development.
 ["wrangler:dev"]
 description = "wrangler local dev (multi-worker)"
-tools = { wrangler = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -98,7 +96,6 @@ def main [] {
 # List secrets set on a deployed Worker (values hidden).
 ["wrangler:secret-list"]
 description = "list secrets set on a deployed Worker (values hidden)"
-tools = { wrangler = "latest" }
 usage = '''
 flag "--env <env>" help="Cloudflare environment" default="production"
 '''
@@ -117,7 +114,6 @@ def main [...args] {
 # pass --env <env> for staging/preview.
 ["wrangler:tail"]
 description = "tail live logs from a deployed Worker"
-tools = { wrangler = "latest" }
 usage = '''
 flag "--env <env>" help="Cloudflare environment to tail" default="production"
 '''

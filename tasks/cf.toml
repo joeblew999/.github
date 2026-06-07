@@ -1,7 +1,7 @@
 # tasks/cf.toml — TOML-task definitions for the cf:* (Cloudflare) namespace.
 #
 # Tasks ported from the legacy mise-tasks/cf/* file-tasks. Each declares
-# its own per-task tools = { ... }; consumers don't pin gh/jq/wrangler
+# Tools (nu/fnox/gh/wrangler) come from the global mise config; nothing pinned here.
 # unless their own local tasks need them.
 #
 # Consumer wiring:
@@ -60,7 +60,6 @@ def main [] {
 # Apply D1 migrations via wrangler. Pass-through wrapper.
 ["cf:d1-migrate"]
 description = "run D1 migrations"
-tools = { wrangler = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -75,7 +74,6 @@ def main [...args] {
 # that already exist. No-op when QUEUE_NAMES is empty/unset.
 ["cf:provision-queues"]
 description = "Provision Cloudflare Queues for the active env. Reads QUEUE_NAMES (comma-separated) from config/<env>.env. Idempotent. No-op if QUEUE_NAMES is empty or unset."
-tools = { wrangler = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -134,7 +132,6 @@ def main [] {
 # from config/<env>.env (e.g. D1_MANAGER_POLICY_AUD).
 ["cf:secrets-put-mapped"]
 description = "Push 4 CF Access + auth secrets from fnox to the deployed Worker, mapping canonical fnox names -> Worker env names. Reads APP_POLICY_AUD_FNOX_KEY from config/<env>.env (e.g. D1_MANAGER_POLICY_AUD). Depends on wrangler.toml existing — run wrangler:gen first if needed."
-tools = { wrangler = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -193,7 +190,6 @@ def main [] {
 # the named resource already exists.
 ["cf:provision-d1-r2"]
 description = "Provision Cloudflare D1 + R2 for the active env. Reads METADATA_DB_NAME, BACKUP_BUCKET_NAME from config/<env>.env. Either may be empty (skipped). Writes new METADATA_DB_ID back. Idempotent. Skips create when name already present."
-tools = { wrangler = "latest" }
 run = '''
 #!/usr/bin/env nu
 

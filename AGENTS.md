@@ -8,10 +8,17 @@ config. Consumers pull task namespaces by tag via `[task_config].includes`.
 - **Tasks are TOML** under `tasks/<ns>.toml`, one file per namespace. Each task's
   `run = '''#!/usr/bin/env nu …'''` body is nushell. (The old file-task tree under
   `mise-tasks/` was removed in v0.25.0 — everything is TOML now.)
-- **One source of truth for tool versions = the GLOBAL mise config**
-  (`~/.config/mise/config.toml`). Ubiquitous tools (nushell, fnox, gh, jq, usage,
-  git-cliff) live there; **repos' `[tools]` declare only repo-specific tools**;
-  **shared tasks pin NO tool versions** — they inherit. This kills version drift.
+- **The GLOBAL mise config (`~/.config/mise/config.toml`) is the source of truth
+  for the common toolset** — lightweight CLIs every task fronts: nushell, fnox,
+  gh, jq, usage, git-cliff, wrangler, `@bitwarden/cli`. Repos' `[tools]` declare
+  only repo-specific tools; tasks pin NOTHING for these. This kills drift.
+- **Exception — heavy/niche toolchains stay per-task** in the namespace that
+  fronts them: `mobile:*` (java/ruby/cocoapods/tauri-cli) and `rust:*`
+  (wasm-pack). They install only when those tasks run — NOT in the universal
+  global set (e.g. cocoapods is a fragile gem that must not break every task).
+- **CI parity:** the `reusable-mise-ci.yml` workflow seeds the runner's global
+  config the same way (`mise:global-sync --write` from `.github` at `lib-ref`),
+  so consumer CI inherits the common tools exactly like a local machine.
 - **Common tools float to `latest`** (v0.24.0). The lib carries no version strings
   except two deliberate toolchain pins: `java` (temurin-17, Android NDK) and
   `ruby` (3.3, CocoaPods). NEVER per-task-pin a ubiquitous tool — it installs
@@ -91,8 +98,8 @@ Reusable CI (one-line consumer CI):
 ```yaml
 jobs:
   ci:
-    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@v0.25.0
-    with: { task: check }
+    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@v0.26.0
+    with: { task: check, lib-ref: v0.26.0 }   # lib-ref seeds the global toolset on the runner
 ```
 
 ## Secrets model

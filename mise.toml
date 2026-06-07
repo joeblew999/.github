@@ -31,3 +31,7 @@ gh                       = "latest"
 jq                       = "latest"
 usage                    = "latest"
 git-cliff                = "latest"  # cliff:* changelog/release-intel tasks
+# lightweight CLIs fronted by their namespace — pulled from global, never pinned per-task.
+# (Heavy/niche toolchains — java/ruby/cocoapods/tauri-cli/wasm-pack — stay per-task in mobile:*/rust:*.)
+wrangler                 = "latest"
+"npm:@bitwarden/cli"     = "latest"

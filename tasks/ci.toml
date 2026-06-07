@@ -1,6 +1,6 @@
 # tasks/ci.toml — TOML-task definitions for the ci:* namespace.
 #
-# Each task declares its own `tools = { ... }` — those tools auto-install
+# Tools come from the global mise config (no per-task pins) — see AGENTS.md.
 # when the task runs and don't leak into the consumer's root context.
 #
 # Consumer wiring:
@@ -127,7 +127,6 @@ def main [
 # Tools: gh (GitHub API for tags). nu comes from global config.
 ["ci:audit-lib-refs"]
 description = "Audit ?ref= drift across every tracked mise.toml that includes joeblew999/.github"
-tools = { gh = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -341,7 +340,6 @@ def main [
 # Token from GH_TOKEN/GITHUB_TOKEN env or `fnox get GITHUB_TOKEN`.
 ["ci:watch"]
 description = "Watch the latest CI run on this branch — streams per-job + per-step transitions, dumps failed-step logs via gh api"
-tools = { gh = "latest" }   # gh provided; fnox from global
 run = '''
 #!/usr/bin/env nu
 
@@ -545,7 +543,6 @@ def main [
 # --dry-run to preview). REPO from origin remote; token from env/fnox.
 ["ci:clean"]
 description = "Delete CI runs (default: failed/cancelled only; --all to nuke every run; --dry-run to preview)"
-tools = { gh = "latest" }   # gh provided; fnox from global
 run = '''
 #!/usr/bin/env nu
 

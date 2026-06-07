@@ -3,6 +3,29 @@
 All notable changes to the shared mise task library. Bump consumer repos'
 `[task_config].includes` pin when adopting a new release.
 
+## v0.26.0 — 2026-06-07
+
+**Namespaces front the tools.** Shared tasks now declare almost no per-task
+tools — the common toolset lives in the global config and tasks just front it.
+Plus CI parity: consumer CI seeds the global config like a local machine.
+
+### Changed
+
+- **Lightweight CLIs → global**: added `wrangler` + `@bitwarden/cli` to the
+  canonical `[tools]` (joining nushell/fnox/gh/jq/usage/git-cliff). Removed their
+  per-task pins (cf/bw/wrangler/ci/secrets tasks are now pure — zero `tools`).
+- **Heavy/niche toolchains stay per-task** (the deliberate exception): `mobile:*`
+  (java/ruby/cocoapods/tauri-cli) + `rust:*` (wasm-pack). Globalising these broke
+  every task — `cocoapods` (a native-dep gem) fails to install and would gate all
+  task runs. They install only when their namespace's tasks run.
+
+### Added
+
+- **`reusable-mise-ci.yml`: a `lib-ref` input + a "seed canonical global config"
+  step** — clones `.github` at `lib-ref` and runs `mise:global-sync --write`, so
+  CI runners get the common tools exactly like local (tasks inherit them). Pass
+  `lib-ref: vX.Y.Z` matching your task `?ref=`.
+
 ## v0.25.0 — 2026-06-07
 
 **Retired the legacy `mise-tasks/` file-task tree.** Everything's been TOML for
