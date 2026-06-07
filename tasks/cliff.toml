@@ -28,7 +28,10 @@ run = '''
 def main [tag?: string, ...assets: string] {
   let t = ($tag | default "")
   if not ($t =~ '^v[0-9]+\.[0-9]+\.[0-9]+$') { print -e "✗ usage: mise run cliff:release -- vX.Y.Z [assets...]"; exit 1 }
-  if ((^git rev-parse --abbrev-ref HEAD | str trim) != "main") { print -e "✗ not on main"; exit 1 }
+  # Release from whatever branch is checked out (main for our own repos, the
+  # overlay branch e.g. joeblew999 for forks) — just not a detached HEAD.
+  let branch = (^git rev-parse --abbrev-ref HEAD | str trim)
+  if ($branch == "HEAD") { print -e "✗ detached HEAD — checkout a branch first"; exit 1 }
   if (^git status --porcelain | str trim | is-not-empty) { print -e "✗ working tree dirty — commit your work first (build artifacts must be gitignored)"; exit 1 }
   if (^git tag -l $t | str trim | is-not-empty) { print -e $"✗ tag ($t) already exists"; exit 1 }
 
