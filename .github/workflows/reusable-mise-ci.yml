@@ -23,10 +23,6 @@ on:
         description: 'Name of the mise task to run'
         type: string
         default: 'ci'
-      lib-ref:
-        description: 'joeblew999/.github ref to source the canonical GLOBAL tools from (match your task includes ?ref=).'
-        type: string
-        default: 'main'
       os-matrix:
         description: 'JSON array of GH runners (default linux/macos/windows)'
         type: string
@@ -72,16 +68,8 @@ jobs:
           key: sccache-${{ matrix.os }}-${{ hashFiles(inputs.cargo-lock-path) }}
           restore-keys: sccache-${{ matrix.os }}-
 
-      # Seed the runner's GLOBAL mise config with the canonical tools — same as
-      # `mise run mise:global-sync --write` locally — so shared tasks inherit
-      # nushell/fnox/gh/etc. (the lib pins them globally, not per-task).
-      - name: Seed canonical global mise config
-        shell: bash
-        run: |
-          git clone --depth 1 --branch "${{ inputs.lib-ref }}" https://github.com/joeblew999/.github "$RUNNER_TEMP/dotgithub"
-          cd "$RUNNER_TEMP/dotgithub"
-          mise trust
-          mise install
-          mise run mise:global-sync --write
+      # Seed the runner's global toolset — the SAME mise task you run locally.
+      # (Consumer must include tasks/mise.toml for mise:global.)
+      - run: mise run mise:global
 
       - run: mise run ${{ inputs.task }}

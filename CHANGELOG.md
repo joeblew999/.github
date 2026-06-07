@@ -3,6 +3,20 @@
 All notable changes to the shared mise task library. Bump consumer repos'
 `[task_config].includes` pin when adopting a new release.
 
+## v0.28.0 — 2026-06-07
+
+- **`mise:global`** (replaces `mise:global-sync`) — a plain `mise use -g` task
+  that installs the common toolset. No nushell needed, so it runs on a bare
+  runner; **runs locally and in CI identically.**
+- **Global = runtime-free binaries only** (nushell, fnox, gh, jq, usage,
+  git-cliff). Tools needing a runtime stay per-task in their namespace: wrangler
+  + `@bitwarden/cli` (node), mobile toolchain, wasm-pack. (Putting npm/gem tools
+  in the universal set broke `mise install` on a bare machine.)
+- **CI is all mise tasks** — `reusable-mise-ci.yml` now just runs
+  `mise run mise:global` + `mise run <task>` (dropped the inline bash + lib-ref).
+- **Docs slimmed + version-free** — AGENTS.md/README describe the model, not a
+  version (those live in CHANGELOG + each consumer's `?ref=` pin).
+
 ## v0.27.0 — 2026-06-07
 
 Cleanup the cleaner model made possible.

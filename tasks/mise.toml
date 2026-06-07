@@ -98,50 +98,19 @@ def main [
 }
 '''
 
-# ── mise:global-sync ─────────────────────────────────────────────────────────
-# Align the GLOBAL mise config (~/.config/mise/config.toml — the standard path
-# VSCode + mise read) to THIS repo's [tools]. Report-only by default; --write
-# applies via mise's own `mise use -g`. Normalises tool short-names so
-# `github:jdx/fnox` vs `fnox` isn't mistaken for two tools. Never repoints path.
-["mise:global-sync"]
-description = "Align global ~/.config/mise/config.toml to this repo's [tools]. Report-only; --write applies via `mise use -g`. Run from .github to set the canonical global set."
-run = '''
-#!/usr/bin/env nu
-
-def short [spec: string] { $spec | split row "/" | last | split row "[" | first }
-
-def main [--write] {
-  let local = (open mise.toml | get tools? | default {})
-  let gpath = ($nu.home-dir | path join ".config" "mise" "config.toml")
-  let global = (if ($gpath | path exists) { (open $gpath | get tools? | default {}) } else { {} })
-  let gshort = ($global | columns | each {|k| {name: (short $k), ver: ($global | get $k | to text)} })
-
-  mut rows = []
-  for k in ($local | columns) {
-    let n = (short $k)
-    let want = ($local | get $k | to text)
-    let g = ($gshort | where name == $n | get ver? | default [] | first | default "—")
-    if $g != $want { $rows = ($rows | append { tool: $n, spec: $k, want: $want }) }
-  }
-  if ($rows | is-empty) { print "✓ global already aligned to [tools]"; return }
-
-  if not $write {
-    print "Drift — run with --write to apply:"
-    for r in $rows { print $"  mise use -g ($r.spec)@($r.want)" }
-    return
-  }
-  for r in $rows {
-    print $"→ mise use -g ($r.spec)@($r.want)"
-    ^mise use -g $"($r.spec)@($r.want)"
-  }
-  print "✓ global config synced to canonical [tools]"
-}
-'''
+# ── mise:global ──────────────────────────────────────────────────────────────
+# Install the canonical COMMON toolset into the GLOBAL mise config — the single
+# source of truth that every shared task inherits (nushell, fnox, gh, …). Plain
+# `mise use -g` (no nushell needed, so it works on a bare runner), idempotent.
+# Run it once locally; CI runs the SAME task. Keep this list in sync with the
+# lib's own [tools] (ci:check-global guards it).
+["mise:global"]
+description = "Install the canonical common toolset into the global mise config (mise use -g). Run locally; CI runs it too. Idempotent."
+run = "mise use -g github:nushell/nushell@latest fnox@latest gh@latest jq@latest usage@latest git-cliff@latest"
 
 # ── mise:release ─────────────────────────────────────────────────────────────
-# Tag and push a new semver release of THIS lib (local-only; no goreleaser/CI).
-#   mise run mise:release -- v0.25.0
-# Guards: on main, clean tree, valid vX.Y.Z, tag not already present.
+# Tag + push a new semver release of THIS lib (local-only; no CI/goreleaser).
+#   mise run mise:release -- v0.28.0
 ["mise:release"]
 description = "Tag + push a new semver release (vX.Y.Z). On main, clean tree only. Local; no CI."
 run = '''

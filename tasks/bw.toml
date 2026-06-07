@@ -23,6 +23,7 @@
 # Reads BW_SESSION from fnox keychain. Fails-fast if bw is missing or
 # BW_SESSION is unset.
 ["bw:status"]
+tools = { "npm:@bitwarden/cli" = "latest" }
 description = "Show bw login status against NodeWarden (server URL, lock state, email). Reads BW_SESSION from fnox keychain."
 
 run = '''
@@ -50,6 +51,7 @@ print $"  userEmail: ($s.userEmail? | default '?')"
 # Refresh BW_SESSION (vault auto-locks after inactivity). Hidden prompt
 # for master password, stores new session in fnox keychain.
 ["bw:unlock"]
+tools = { "npm:@bitwarden/cli" = "latest" }
 description = "Refresh BW_SESSION (vault auto-locks after inactivity). Hidden prompt for master password, stores new session in fnox keychain."
 
 run = '''
@@ -84,6 +86,7 @@ print "✓ BW_SESSION refreshed in fnox keychain"
 # ── bw:list ──────────────────────────────────────────────────────────────────
 # List item names + sizes in your NodeWarden vault. Values are NOT shown.
 ["bw:list"]
+tools = { "npm:@bitwarden/cli" = "latest" }
 description = "List item names + sizes in your NodeWarden vault. Values are NOT shown."
 
 run = '''
@@ -117,6 +120,7 @@ if ($status.status? != "unlocked") {
 # Show drift between keychain and NodeWarden — which keys are in each,
 # which match. Values are NOT revealed (only sha256 prefix comparison).
 ["bw:diff"]
+tools = { "npm:@bitwarden/cli" = "latest" }
 description = "Show drift between keychain and NodeWarden — which keys are in each, which match. Values are NOT revealed (only sha256 prefix comparison)."
 
 run = '''
@@ -189,6 +193,7 @@ for k in $all_keys {
 # keychain. Use to rotate a secret on Mac (kept consistent in both
 # stores in one shot).
 ["bw:set"]
+tools = { "npm:@bitwarden/cli" = "latest" }
 description = "Write-through: hidden-input prompt → set NodeWarden item + mirror to keychain. Use to rotate a secret on Mac (kept consistent in both stores in one shot)."
 
 run = '''
@@ -259,6 +264,7 @@ def main [name?: string] {
 # Pull all NodeWarden items → update keychain (idempotent). Run after
 # rotating a secret on iPhone or web vault.
 ["bw:sync"]
+tools = { "npm:@bitwarden/cli" = "latest" }
 description = "Pull all NodeWarden items → update keychain (idempotent). Run after rotating a secret on iPhone or web vault. Skip list: BW_CLIENTID/BW_CLIENTSECRET/BW_SESSION (override via BW_SYNC_SKIP)."
 
 run = '''
@@ -338,6 +344,7 @@ def main [--dry-run] {
 # ── bw:sync-dry ──────────────────────────────────────────────────────────────
 # Dry-run wrapper for bw:sync.
 ["bw:sync-dry"]
+tools = { "npm:@bitwarden/cli" = "latest" }
 description = "DRY RUN of bw:sync (preview, no changes)."
 
 run = '''
@@ -352,6 +359,7 @@ def main [] {
 # Push every keychain-backed fnox secret → matching NodeWarden item.
 # Idempotent. Skips BW_* (chicken/egg).
 ["bw:migrate-from-keychain"]
+tools = { "npm:@bitwarden/cli" = "latest" }
 description = "Push every keychain-backed fnox secret → matching NodeWarden item. Idempotent. Skips BW_* (chicken/egg). Override skip list via BW_MIGRATE_SKIP env var (comma-separated)."
 
 run = '''
@@ -494,6 +502,7 @@ def main [--dry-run] {
 # ── bw:migrate-from-keychain-dry ────────────────────────────────────────────
 # Dry-run wrapper for bw:migrate-from-keychain.
 ["bw:migrate-from-keychain-dry"]
+tools = { "npm:@bitwarden/cli" = "latest" }
 description = "DRY RUN of bw:migrate-from-keychain (preview, no changes)."
 
 run = '''
@@ -511,6 +520,7 @@ def main [] {
 # creds in OS keychain via fnox, registers bitwarden provider in fnox
 # global config. Idempotent — re-run to refresh BW_SESSION.
 ["bw:bootstrap"]
+tools = { "npm:@bitwarden/cli" = "latest" }
 description = "One-shot Bitwarden CLI ↔ fnox bootstrap. Three hidden prompts (client_id, client_secret, master password). Configures bw against NODEWARDEN_URL, logs in via API key, unlocks vault, stores all three creds in OS keychain via fnox, registers bitwarden provider in fnox global config. Idempotent — re-run to refresh BW_SESSION."
 
 run = '''
