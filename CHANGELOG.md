@@ -3,6 +3,32 @@
 All notable changes to the shared mise task library. Bump consumer repos'
 `[task_config].includes` pin when adopting a new release.
 
+## v0.23.0 — 2026-06-07
+
+**Canonical tool specs + global config as the single source of truth.** Resolves
+the v0.22.0 "still open" item.
+
+### Changed
+
+- **Standardised every tool spec to its registry short-name**: `github:jdx/fnox`
+  → `fnox`, `aqua:cli/cli` → `gh`, `aqua:jqlang/jq` → `jq`, `cargo:usage-cli` →
+  `usage`, `aqua:orhun/git-cliff` → `git-cliff`, `npm:wrangler` → `wrangler`.
+  (nushell has no registry short-name, so `github:nushell/nushell` stays as the
+  canonical backend.) mise no longer sees the same tool under multiple backends.
+- **Bumped the canonical versions** to current: `fnox 1.25.1`, `nushell 0.113.1`.
+
+### Added
+
+- **`mise:global-sync --write`** now safe (specs are canonical, so `mise use -g`
+  aligns instead of duplicating). Run from `.github` to make the lib's `[tools]`
+  the canonical **global** set; every repo then inherits and nothing drifts.
+
+### Migration
+
+Consumers: drop the ubiquitous tools (nushell, fnox, gh, git-cliff…) from your
+repo `[tools]` and rely on global; run `mise run mise:global-sync --write` once
+from `.github`, then `mise run mise:sweep` to prune the now-orphaned installs.
+
 ## v0.22.0 — 2026-06-07
 
 **Stop pinning ubiquitous tool versions per-task.** Every `*:_base` (and a few

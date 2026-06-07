@@ -12,7 +12,7 @@
 #
 # Tool-pin policy:
 #   - cf:_base provides nu + fnox to every cf:* task (`extends` merges tools)
-#   - Tasks calling ^wrangler add "npm:wrangler" = "4" on top via their own tools
+#   - Tasks calling ^wrangler add wrangler = "4" on top via their own tools
 #   - Tasks calling ^curl rely on system curl (present on all 3 OS GHA runners)
 #
 # Consumer requirement: `[settings].experimental = true` in mise.toml — `extends`
@@ -72,7 +72,7 @@ def main [] {
 ["cf:d1-migrate"]
 extends = "cf:_base"
 description = "run D1 migrations"
-tools = { "npm:wrangler" = "4" }
+tools = { wrangler = "4" }
 run = '''
 #!/usr/bin/env nu
 
@@ -88,7 +88,7 @@ def main [...args] {
 ["cf:provision-queues"]
 extends = "cf:_base"
 description = "Provision Cloudflare Queues for the active env. Reads QUEUE_NAMES (comma-separated) from config/<env>.env. Idempotent. No-op if QUEUE_NAMES is empty or unset."
-tools = { "npm:wrangler" = "4" }
+tools = { wrangler = "4" }
 run = '''
 #!/usr/bin/env nu
 
@@ -148,7 +148,7 @@ def main [] {
 ["cf:secrets-put-mapped"]
 extends = "cf:_base"
 description = "Push 4 CF Access + auth secrets from fnox to the deployed Worker, mapping canonical fnox names -> Worker env names. Reads APP_POLICY_AUD_FNOX_KEY from config/<env>.env (e.g. D1_MANAGER_POLICY_AUD). Depends on wrangler.toml existing — run wrangler:gen first if needed."
-tools = { "npm:wrangler" = "4" }
+tools = { wrangler = "4" }
 run = '''
 #!/usr/bin/env nu
 
@@ -208,7 +208,7 @@ def main [] {
 ["cf:provision-d1-r2"]
 extends = "cf:_base"
 description = "Provision Cloudflare D1 + R2 for the active env. Reads METADATA_DB_NAME, BACKUP_BUCKET_NAME from config/<env>.env. Either may be empty (skipped). Writes new METADATA_DB_ID back. Idempotent. Skips create when name already present."
-tools = { "npm:wrangler" = "4" }
+tools = { wrangler = "4" }
 run = '''
 #!/usr/bin/env nu
 

@@ -134,7 +134,7 @@ def main [
 ["ci:audit-lib-refs"]
 extends = "ci:_base"
 description = "Audit ?ref= drift across every tracked mise.toml that includes joeblew999/.github"
-tools = { "aqua:cli/cli" = "2" }
+tools = { gh = "2" }
 run = '''
 #!/usr/bin/env nu
 
@@ -351,7 +351,7 @@ def main [
 ["ci:watch"]
 extends = "ci:_base"
 description = "Watch the latest CI run on this branch — streams per-job + per-step transitions, dumps failed-step logs via gh api"
-tools = { "aqua:cli/cli" = "2" }   # gh provided; fnox from global
+tools = { gh = "2" }   # gh provided; fnox from global
 run = '''
 #!/usr/bin/env nu
 
@@ -556,7 +556,7 @@ def main [
 ["ci:clean"]
 extends = "ci:_base"
 description = "Delete CI runs (default: failed/cancelled only; --all to nuke every run; --dry-run to preview)"
-tools = { "aqua:cli/cli" = "2" }   # gh provided; fnox from global
+tools = { gh = "2" }   # gh provided; fnox from global
 run = '''
 #!/usr/bin/env nu
 

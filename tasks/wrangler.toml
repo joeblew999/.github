@@ -23,7 +23,7 @@ hide = true
 ["wrangler:deploy"]
 extends = "wrangler:_base"
 description = "deploy to Cloudflare Workers"
-tools = { "npm:wrangler" = "4" }
+tools = { wrangler = "4" }
 run = '''
 #!/usr/bin/env nu
 
@@ -37,7 +37,7 @@ def main [...args] {
 ["wrangler:dev"]
 extends = "wrangler:_base"
 description = "wrangler local dev (multi-worker)"
-tools = { "npm:wrangler" = "4" }
+tools = { wrangler = "4" }
 run = '''
 #!/usr/bin/env nu
 
@@ -107,7 +107,7 @@ def main [] {
 ["wrangler:secret-list"]
 extends = "wrangler:_base"
 description = "list secrets set on a deployed Worker (values hidden)"
-tools = { "npm:wrangler" = "4" }
+tools = { wrangler = "4" }
 usage = '''
 flag "--env <env>" help="Cloudflare environment" default="production"
 '''
@@ -127,7 +127,7 @@ def main [...args] {
 ["wrangler:tail"]
 extends = "wrangler:_base"
 description = "tail live logs from a deployed Worker"
-tools = { "npm:wrangler" = "4" }
+tools = { wrangler = "4" }
 usage = '''
 flag "--env <env>" help="Cloudflare environment to tail" default="production"
 '''

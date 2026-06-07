@@ -99,20 +99,18 @@ def main [
 '''
 
 # ── mise:global-sync ─────────────────────────────────────────────────────────
-# Compare this repo's [tools] to the GLOBAL config (~/.config/mise/config.toml)
-# and report drift, normalising tool short-names (so `github:jdx/fnox` vs `fnox`
-# is recognised as the same tool, not a duplicate). Prints the exact
-# `mise use -g` commands to align — it does NOT write (a naive write could add a
-# second backend for the same tool). Standard config path only; VSCode-safe.
+# Align the GLOBAL mise config (~/.config/mise/config.toml — the standard path
+# VSCode + mise read) to THIS repo's [tools]. Report-only by default; --write
+# applies via mise's own `mise use -g`. Normalises tool short-names so
+# `github:jdx/fnox` vs `fnox` isn't mistaken for two tools. Never repoints path.
 ["mise:global-sync"]
-description = "Report drift between this repo's [tools] and the global mise config, and print the `mise use -g` commands to align. Read-only."
+description = "Align global ~/.config/mise/config.toml to this repo's [tools]. Report-only; --write applies via `mise use -g`. Run from .github to set the canonical global set."
 run = '''
 #!/usr/bin/env nu
 
-# tool short-name = last path segment, minus any backend prefix / [options].
 def short [spec: string] { $spec | split row "/" | last | split row "[" | first }
 
-def main [] {
+def main [--write] {
   let local = (open mise.toml | get tools? | default {})
   let gpath = ($nu.home-dir | path join ".config" "mise" "config.toml")
   let global = (if ($gpath | path exists) { (open $gpath | get tools? | default {}) } else { {} })
@@ -123,12 +121,19 @@ def main [] {
     let n = (short $k)
     let want = ($local | get $k | to text)
     let g = ($gshort | where name == $n | get ver? | default [] | first | default "—")
-    if $g != $want { $rows = ($rows | append { tool: $n, spec: $k, global: $g, canonical: $want }) }
+    if $g != $want { $rows = ($rows | append { tool: $n, spec: $k, want: $want }) }
   }
   if ($rows | is-empty) { print "✓ global already aligned to [tools]"; return }
-  print "Drift — global vs this repo's [tools] (canonical):"
-  $rows | select tool global canonical | table
-  print "\nTo align global (review first — pick the canonical backend per tool):"
-  for r in $rows { print $"  mise use -g ($r.spec)@($r.canonical)" }
+
+  if not $write {
+    print "Drift — run with --write to apply:"
+    for r in $rows { print $"  mise use -g ($r.spec)@($r.want)" }
+    return
+  }
+  for r in $rows {
+    print $"→ mise use -g ($r.spec)@($r.want)"
+    ^mise use -g $"($r.spec)@($r.want)"
+  }
+  print "✓ global config synced to canonical [tools]"
 }
 '''

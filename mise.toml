@@ -28,9 +28,9 @@ includes = [
 ]
 
 [tools]
-"github:jdx/fnox"        = "1.24"
-"github:nushell/nushell" = "0.112"   # pinned — bw:* shared tasks are nu (cross-platform; bash unavailable on Windows)
-"aqua:cli/cli"           = "2"
-"aqua:jqlang/jq"         = "1"
-"cargo:usage-cli"        = "3"
-"aqua:orhun/git-cliff"   = "2.13"  # cliff:* changelog/release-intel tasks
+fnox                     = "1.25.1"
+"github:nushell/nushell" = "0.113.1"   # pinned — bw:* shared tasks are nu (cross-platform; bash unavailable on Windows)
+gh                       = "2"
+jq                       = "1"
+usage                    = "3"
+git-cliff                = "2.13"  # cliff:* changelog/release-intel tasks

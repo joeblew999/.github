@@ -23,7 +23,7 @@ hide = true
 ["prove:bindings"]
 extends = "prove:_base"
 description = "Confirm the deployed Worker's bindings via wrangler --dry-run (no upload). Catches drift between wrangler.toml.template and the resources actually created."
-tools = { "npm:wrangler" = "4" }
+tools = { wrangler = "4" }
 run = '''
 #!/usr/bin/env nu
 
@@ -45,7 +45,7 @@ def main [] {
 ["prove:secrets"]
 extends = "prove:_base"
 description = "List secrets on the deployed Worker, assert all 4 expected names present (ACCOUNT_ID, API_KEY, TEAM_DOMAIN, POLICY_AUD)."
-tools = { "npm:wrangler" = "4" }
+tools = { wrangler = "4" }
 run = '''
 #!/usr/bin/env nu
 
