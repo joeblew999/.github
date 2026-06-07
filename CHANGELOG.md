@@ -1,593 +1,408 @@
-# Changelog
+## [0.29.0] - 2026-06-07
 
-All notable changes to the shared mise task library. Bump consumer repos'
-`[task_config].includes` pin when adopting a new release.
+### 🚀 Features
 
-## v0.28.0 — 2026-06-07
+- *(cliff)* Add cliff:release git-cliff release driver; rewrite AGENTS.md
+## [0.28.0] - 2026-06-07
 
-- **`mise:global`** (replaces `mise:global-sync`) — a plain `mise use -g` task
-  that installs the common toolset. No nushell needed, so it runs on a bare
-  runner; **runs locally and in CI identically.**
-- **Global = runtime-free binaries only** (nushell, fnox, gh, jq, usage,
-  git-cliff). Tools needing a runtime stay per-task in their namespace: wrangler
-  + `@bitwarden/cli` (node), mobile toolchain, wasm-pack. (Putting npm/gem tools
-  in the universal set broke `mise install` on a bare machine.)
-- **CI is all mise tasks** — `reusable-mise-ci.yml` now just runs
-  `mise run mise:global` + `mise run <task>` (dropped the inline bash + lib-ref).
-- **Docs slimmed + version-free** — AGENTS.md/README describe the model, not a
-  version (those live in CHANGELOG + each consumer's `?ref=` pin).
+### 🚀 Features
 
-## v0.27.0 — 2026-06-07
+- *(mise)* Mise:global task (local=CI); global = runtime-free binaries (v0.28.0)
+## [0.27.0] - 2026-06-07
 
-Cleanup the cleaner model made possible.
+### ⚙️ Miscellaneous Tasks
 
-### Removed
+- *(mise)* Retire dead experimental flag + rejected-approach workflow (v0.27.0)
+## [0.26.0] - 2026-06-07
 
-- **`[settings].experimental`** from the lib — `extends` is gone (no `_base`
-  tasks left), so the experimental flag was dead. **Consumers can drop
-  `experimental = true` too** unless they use it for their own reasons.
-- **`monorepo-root-proof.yml`** — proved a mise feature (`experimental_monorepo_root`)
-  we evaluated and rejected; reference-only, now removed.
+### 🚀 Features
 
-### Fixed
+- *(mise)* Namespaces front the tools — global toolset, CI parity (v0.26.0)
+## [0.25.0] - 2026-06-07
 
-- Stale header comments in `cf.toml` (mangled `extends`/tool-pin prose from the
-  sweeps) + the deleted-workflow row in AGENTS.md.
+### 🚜 Refactor
 
-## v0.26.0 — 2026-06-07
+- *(mise)* Retire legacy mise-tasks/ tree; port release→mise:release (v0.25.0)
+## [0.24.0] - 2026-06-07
 
-**Namespaces front the tools.** Shared tasks now declare almost no per-task
-tools — the common toolset lives in the global config and tasks just front it.
-Plus CI parity: consumer CI seeds the global config like a local machine.
+### 🚀 Features
 
-### Changed
+- *(mise)* No version pinning — common tools float to latest (v0.24.0)
+## [0.23.0] - 2026-06-07
 
-- **Lightweight CLIs → global**: added `wrangler` + `@bitwarden/cli` to the
-  canonical `[tools]` (joining nushell/fnox/gh/jq/usage/git-cliff). Removed their
-  per-task pins (cf/bw/wrangler/ci/secrets tasks are now pure — zero `tools`).
-- **Heavy/niche toolchains stay per-task** (the deliberate exception): `mobile:*`
-  (java/ruby/cocoapods/tauri-cli) + `rust:*` (wasm-pack). Globalising these broke
-  every task — `cocoapods` (a native-dep gem) fails to install and would gate all
-  task runs. They install only when their namespace's tasks run.
+### 🚀 Features
 
-### Added
+- *(mise)* Canonical tool short-names + global as SSOT (v0.23.0)
+## [0.22.0] - 2026-06-07
 
-- **`reusable-mise-ci.yml`: a `lib-ref` input + a "seed canonical global config"
-  step** — clones `.github` at `lib-ref` and runs `mise:global-sync --write`, so
-  CI runners get the common tools exactly like local (tasks inherit them). Pass
-  `lib-ref: vX.Y.Z` matching your task `?ref=`.
+### 🚀 Features
 
-## v0.25.0 — 2026-06-07
+- *(mise)* Drop per-task ubiquitous tool pins; add mise:global-sync (v0.22.0)
+## [0.21.0] - 2026-06-07
 
-**Retired the legacy `mise-tasks/` file-task tree.** Everything's been TOML for
-many releases; the old tree was dead weight.
+### 🚀 Features
 
-### Removed
+- *(cliff)* Add cliff:* namespace — git-cliff changelog/release intel (v0.21.0)
+## [0.20.0] - 2026-05-31
 
-- **The entire `mise-tasks/` directory** — every namespace had a `tasks/*.toml`
-  counterpart already. Dropped its self-include, the `mise-tasks/**` workflow
-  path triggers, the CODEOWNERS entry, and the `mise-tasks-lint.yml` workflow
-  (its cross-platform nu proof is already covered by `tasks-toml-proof.yml` on
-  windows-latest).
+### 🚀 Features
 
-### Added
+- *(mise)* Add mise:sweep task to reclaim dead mise state
+## [0.19.2] - 2026-05-07
 
-- **`mise:release`** (in `tasks/mise.toml`) — ported from the old
-  `mise-tasks/release` file-task. `mise run mise:release -- vX.Y.Z`.
+### 📚 Documentation
 
-### Changed
+- Mark legacy mise-tasks/ as deprecated
+- Refresh README/CONTRIBUTING/CHANGELOG; slim legacy lint workflow
+- *(agents)* Clarify reusable workflow versioning aligns with task lib tag
+- Refresh AGENTS.md status block; drop stale .claude agent file
+- *(changelog)* V0.19.2 entry
+## [0.19.1] - 2026-05-07
 
-- **Rewrote `AGENTS.md`** to the current model (TOML-only, global-config SSOT,
-  no version pinning, the real task list) — it still described the deleted
-  file-task flow + old per-task pinning. README + CONTRIBUTING updated to match.
+### 🚀 Features
 
-## v0.24.0 — 2026-06-07
+- *(ci)* Ci:audit-lib-refs — drift detection for ?ref= URLs (v0.19.1)
+## [0.19.0] - 2026-05-07
 
-**No more version pinning.** Common tools float to `latest`; the lib carries no
-versions except two deliberate toolchain pins.
+### 🐛 Bug Fixes
 
-### Changed
+- *(v0.19)* Gemini Code Assist feedback bundle (#47)
+## [0.18.0] - 2026-05-07
 
-- **All common tools → `latest`**: fnox, nushell, gh, jq, usage, git-cliff
-  (lib `[tools]`), plus wrangler, wasm-pack, tauri-cli (per-task). git is
-  versioned by you globally; mise floats the rest. **Deliberate exceptions:**
-  `java` (`temurin-17` — Android NDK/Gradle need a specific JDK) and `ruby`
-  (`3.3` — CocoaPods toolchain) stay pinned.
-- **Dropped 7 now-empty `_base` tasks** (cf/ci/mobile/prove/rust/secrets/wrangler)
-  + their `extends` + orphaned comments — after the v0.22/v0.23 sweeps they held
-  nothing. `bw:_base` stays (carries `@bitwarden/cli`). So `extends` (and the
-  `[settings].experimental` it needs) is now only relevant to `bw:*` consumers.
+### 🚜 Refactor
 
-### Still open (next refactor)
+- *(tasks)* Extends-based tools dedup across all namespaces (v0.18) (#46)
+## [0.17.5] - 2026-05-07
 
-- Retire the deprecated `mise-tasks/` dir: port `release` → a `mise:release`
-  TOML task and update the 5 workflows that still reference `mise-tasks/`. Left
-  for a deliberate, workflow-aware pass.
+### 🚀 Features
 
-## v0.23.0 — 2026-06-07
+- *(ci)* Ci:check-toml-tasks + ci:check-workflow-nu shared tasks (v0.17.5) (#45)
+## [0.17.4] - 2026-05-07
 
-**Canonical tool specs + global config as the single source of truth.** Resolves
-the v0.22.0 "still open" item.
+### 🚀 Features
 
-### Changed
+- *(tasks)* Port rust:* + mise:upgrade + inline ide-check (v0.17.4) (#44)
 
-- **Standardised every tool spec to its registry short-name**: `github:jdx/fnox`
-  → `fnox`, `aqua:cli/cli` → `gh`, `aqua:jqlang/jq` → `jq`, `cargo:usage-cli` →
-  `usage`, `aqua:orhun/git-cliff` → `git-cliff`, `npm:wrangler` → `wrangler`.
-  (nushell has no registry short-name, so `github:nushell/nushell` stays as the
-  canonical backend.) mise no longer sees the same tool under multiple backends.
-- **Bumped the canonical versions** to current: `fnox 1.25.1`, `nushell 0.113.1`.
+### 🐛 Bug Fixes
 
-### Added
+- *(lint)* Skip 3 Windows-broken legacy *-dry cases (covered by TOML proof)
 
-- **`mise:global-sync --write`** now safe (specs are canonical, so `mise use -g`
-  aligns instead of duplicating). Run from `.github` to make the lib's `[tools]`
-  the canonical **global** set; every repo then inherits and nothing drifts.
-
-### Migration
+### 📚 Documentation
 
-Consumers: drop the ubiquitous tools (nushell, fnox, gh, git-cliff…) from your
-repo `[tools]` and rely on global; run `mise run mise:global-sync --write` once
-from `.github`, then `mise run mise:sweep` to prune the now-orphaned installs.
+- *(agents)* Refresh for v0.16.x TOML-task reality + bump fnox 1.23→1.24 (#39)
+## [0.17.3] - 2026-05-07
 
-## v0.22.0 — 2026-06-07
+### 🚀 Features
 
-**Stop pinning ubiquitous tool versions per-task.** Every `*:_base` (and a few
-tasks) pinned `nushell 0.112` / `fnox 1.24`, while consumer repos pin their own
-(e.g. nushell `0.113.1`, fnox `1.25.1`) and the global config a third (fnox
-`1.19.0`). That three-way skew installed duplicate versions and confused the
-mise GUI / `[tools]` view. Tasks now declare **no version pins** for ubiquitous
-tools — they inherit from the consumer's global config / `[tools]`, so there's
-one version and no drift.
-
-### Changed
-
-- **Swept every `*:_base`**: removed `nushell` + `fnox` version pins across all
-  namespaces. Genuinely task-specific tools stay per-task (`wrangler`, `java`,
-  `@bitwarden/cli`, `gh`). `cliff:*` dropped its `_base` entirely — `git-cliff`
-  now comes from your global config (`mise use -g aqua:orhun/git-cliff`).
-- **Requirement:** consumers must have the ubiquitous tools (nushell, fnox, gh,
-  git-cliff) available via their **global** `~/.config/mise/config.toml` or repo
-  `[tools]`. The lib still pins them in its own `[tools]` for self-runs.
-
-### Added
-
-- **`mise:global-sync`** — reports drift between a repo's `[tools]` and the
-  global config and prints the `mise use -g` commands to align (read-only;
-  normalises tool short-names so `github:jdx/fnox` vs `fnox` isn't mistaken for
-  two tools). Run it from `.github` to make the lib's `[tools]` the canonical
-  global set. Never repoints the config path (VSCode-safe).
-
-### Still open
-
-- **Backend canonicalisation** — the lib uses `github:jdx/fnox` / `github:nushell/nushell`
-  while global/repos use `fnox` / `nushell`. mise treats those as different
-  tools, so making global authoritative (a `--write`) needs one canonical
-  backend per tool chosen first. Tracked for a follow-up.
-
-## v0.21.0 — 2026-06-07
-
-Adds the `cliff:*` namespace — changelog / release intelligence via git-cliff.
-Additive; opt-in per consumer (add the include). No change to existing tasks.
+- *(tasks)* Port secrets/fnox/bw — final namespace batch (v0.17.3) (#43)
+## [0.17.2] - 2026-05-07
 
-### Added
-
-- **`tasks/cliff.toml`** (`cliff:*`) — map commits to release tags with
-  [git-cliff](https://github.com/orhun/git-cliff), for this repo and any
-  third-party repo you track (no cooperation needed from the other repo):
-  - `cliff:unreleased` — this repo's changes since the last tag.
-  - `cliff:show` — this repo's full changelog.
-  - `cliff:repo <owner/repo> [fromTag]` — clone any external repo and show its
-    unreleased delta. Defaults to the latest **semver** tag, so rolling tags
-    (e.g. `nightly`) don't hide the delta.
-  - mise-native: `aqua:orhun/git-cliff` pinned in `tools`; the nu bodies only
-    call the binary. The inverse lookup ("which release shipped commit X?")
-    stays a `git tag --contains <sha>` one-liner, not a task.
+### 🚀 Features
 
-## v0.20.0 — 2026-06-04
+- *(tasks)* Port prove:* to TOML + fix wrangler:gen description (v0.17.2) (#42)
+## [0.17.1] - 2026-05-07
 
-### Added
-
-- **`mise:sweep`** — reclaim dead mise state (dead config links + unused tool
-  versions) across all repos under `--root`. Re-tracks live configs first.
+### 🚀 Features
 
-## v0.19.2 — 2026-05-07
+- *(tasks)* Port env:resolve + wrangler:* to TOML (v0.17.1) (#41)
+## [0.17.0] - 2026-05-07
 
-Docs + cleanup. No behaviour change for consumers — `?ref=` bump is
-optional, but recommended so `ci:audit-lib-refs` stops flagging.
+### 🚀 Features
 
-### Changed
+- *(tasks)* Port full cf:* namespace to TOML (v0.17.0) (#40)
+## [0.16.2] - 2026-05-07
 
-- **README + CONTRIBUTING + AGENTS.md** refreshed for v0.19.x reality.
-  README's `?ref=` example was on v0.3.0; CONTRIBUTING described the
-  legacy file-task authoring flow only; AGENTS.md status block was a
-  v0.16.x snapshot.
-- **`mise-tasks-lint.yml`** slimmed 238 → 124 lines. Negative-path
-  execution is fully covered by `tasks-toml-proof.yml`; the dead Tera
-  bash check (no bash files left after v0.10.0) is gone. Workflow is
-  now legacy-only as titled.
-- **`mise-tasks/README.md`** + **`mise-tasks/CONSOLIDATION.md`** got
-  deprecation/status banners pointing at `tasks/`.
-- **`.claude/agents/github-meta-repo-expert.md`** deleted — claimed
-  "Current release: v0.4.0", duplicated AGENTS.md content. `.claude/README.md`
-  now points at AGENTS.md as SSOT.
-- **Reusable workflows** clarified to ride the same tag stream as the
-  task library (`@vX.Y.Z` in lockstep with `?ref=`).
+### 🐛 Bug Fixes
 
-## v0.19.1 — 2026-05-07
+- *(mobile)* Guard rustup-target-add when rustup not on PATH (#38)
+## [0.16.1] - 2026-05-07
 
-### Added
+### 🚀 Features
 
-- **`ci:audit-lib-refs`** — scans every `mise config ls --tracked-configs`
-  for `?ref=v…` URLs pointing at the lib and warns if any are not on the
-  latest tag. Closes the gap that `mise outdated` doesn't see git URLs in
-  `[task_config].includes`. Run from anywhere on the machine — it walks
-  *all* tracked mise configs, not just the current repo.
+- *(tasks)* Port mobile:* namespace to TOML with per-task tools (#37)
+## [0.16.0] - 2026-05-07
 
-## v0.19.0 — 2026-05-07
+### 🚀 Features
 
-### Fixed (Gemini Code Assist feedback bundle)
+- TOML-tasks with per-task tools (v0.16.0) (#36)
+## [0.15.3] - 2026-05-07
 
-- **`tasks/secrets.toml`** — `secrets:_base` block was nested inside
-  `secrets:sync-github`'s comment header at the top of the file. mise
-  parsed it correctly (the `["secrets:_base"]` table header restarted
-  the section), but it read as a maintenance hazard. Moved to the top
-  of the file with its own `── secrets:_base ──` banner.
-- **`ci:check-toml-tasks`** — regex now handles BOTH `'''…'''` and
-  `"""…"""` body forms. Previous version silently skipped any task body
-  authored with triple-double-quotes.
-- **`ci:check-toml-tasks`** — diagnostic filter now requires both
-  `"type":"diagnostic"` AND `"severity":"Error"`. Was matching warnings
-  and treating them as failures.
-- **`ci:audit-lib-refs --dir`** (preview) — handles absolute paths
-  correctly (was producing `/abs//rel/…` when an absolute path was
-  passed).
+### 🐛 Bug Fixes
 
-### Changed
+- *(bw, secrets)* Const here = (path self ...) — was let, broken at runtime
 
-- **`.github` self-hosts** — root `mise.toml` now explicitly includes
-  every `tasks/*.toml`, so the library runs its own `ci:check-toml-tasks`
-  and `ci:check-workflow-nu` against itself. Catches drift inside the lib
-  before consumers see it.
+### 💼 Other
 
-## v0.18.0 — 2026-05-07
+- Pointer to AGENTS.md only (don't duplicate content)
+## [0.15.2] - 2026-05-07
 
-### Changed
+### ⚙️ Miscellaneous Tasks
 
-- **Extends-based per-task tools dedup** — every namespace now has a
-  hidden `<ns>:_base` task that pins shared tools (always nu, sometimes
-  fnox/gh/etc.). Each child task `extends = "<ns>:_base"` and only declares
-  its delta. mise MERGES tools from base + child, so `nu` and other
-  shared pins live in one place per namespace instead of being repeated
-  across every task. ~80% reduction in `tools = { … }` block duplication
-  across `tasks/`.
+- README + AGENTS + CLAUDE drift cleanup; lint covers ci:* tasks
+## [0.15.1] - 2026-05-07
 
-  Requires `[settings].experimental = true` in consumer mise.toml (the
-  `extends` key is still flagged experimental; behaviour is stable).
+### 🐛 Bug Fixes
 
-## v0.17.5 — 2026-05-07
+- *(ci:parse-check)* Filter to files with nu shebang (skip .md, etc.)
+## [0.15.0] - 2026-05-07
 
-### Added
+### 🚀 Features
 
-- **`ci:check-toml-tasks`** — lints every `run = '''…'''` body in
-  `tasks/*.toml` by extracting it to a temp file and running
-  `nu --ide-check 1`. Sub-second feedback locally vs. waiting on Actions.
-- **`ci:check-workflow-nu`** — same idea for nu blocks embedded in
-  `.github/workflows/*.yml`.
+- *(workflows)* Reusable Mise CI + Mise upgrade workflows (v0.15.0)
+## [0.14.1] - 2026-05-07
 
-Both shared so consumers can wire them into a local `[tasks.check]`
-aggregator. The lib runs them on itself in CI.
+### 🚀 Features
 
-## v0.17.4 — 2026-05-07
+- *(ci)* Ci:parse-check task — generic nu file parse-checker (v0.14.1)
+## [0.14.0] - 2026-05-07
 
-### Added
+### 🚀 Features
 
-- **`rust:build`**, **`rust:test`**, **`rust:wasm-pack`** — full `rust:*`
-  namespace ported to TOML-tasks. `rust:wasm-pack` pins
-  `cargo:wasm-pack = "0.13"` per-task (consumers don't pre-install).
-- **`mise:upgrade`** — TOML port; bumps the lib include `?ref=` pin in
-  the calling repo's mise.toml.
+- *(ci, mise)* Add ci:watch, ci:clean, mise:upgrade tasks (v0.14.0)
+## [0.13.1] - 2026-05-05
 
-## v0.17.3 — 2026-05-07
+### 🐛 Bug Fixes
 
-### Added
+- *(cf)* Service tokens need decision: non_identity policy (v0.13.1)
+## [0.13.0] - 2026-05-05
 
-- Final namespace ports to TOML: **`secrets:*`**, **`fnox:*`**, **`bw:*`**.
-  Tools (fnox, bw, gh) propagate per-task — consumers no longer pin them
-  globally.
+### 🚀 Features
 
-## v0.17.2 — 2026-05-07
+- *(cf)* Cf:service-token-setup + cf:service-token-revoke (v0.13.0)
+## [0.12.1] - 2026-05-05
 
-### Added
+### 🐛 Bug Fixes
 
-- **`prove:*`** namespace ported to TOML.
+- *(cf)* Use app-level revoke_tokens (works with existing token scope)
+## [0.12.0] - 2026-05-05
 
-### Fixed
+### 🚀 Features
 
-- **`wrangler:gen`** description corrected.
+- *(cf)* Auto-revoke removed users + new cf:access-revoke task (v0.12.0)
+## [0.11.0] - 2026-05-05
 
-## v0.17.1 — 2026-05-07
+### 🚀 Features
 
-### Added
+- *(lint)* Real-execution negative-path tests for every task
+- *(lint)* Migrate 3 more workflow steps from bash to nu (full SSOT in CI)
 
-- **`env:resolve`** ported to TOML.
-- **`wrangler:*`** namespace ported to TOML with per-task `wrangler` pin.
+### 🐛 Bug Fixes
 
-## v0.17.0 — 2026-05-07
+- *(test)* Real bug + test-expectation fixes after first run
+- *(test)* Use 'shell: nu' for negative-path test — dogfood SSOT in CI
+- *(lint)* Factor Tera-check shebang lookup into a nu def
+- *(lint)* Revert Tera-syntax check to bash — pragmatic, not every step migrates cleanly
+- *(lint)* Nu shell — drop redundant mise wrapper, use glob, handle Windows
+- *(lint)* Use 'path type' to filter dirs out of glob
+- *(lint)* Revert verify-scripts + parse-check to bash
+- *(cf:access-setup)* Set-based allow-policy ensure (v0.11.0)
 
-### Added
+### 📚 Documentation
 
-- Full **`cf:*`** namespace ported to TOML-tasks. Per-task tool pins
-  (gh, jq, fnox, etc.) propagate via `git::` includes — consumers no
-  longer need a global `[tools]` block.
+- Consolidation plan — stop adding primitives, plan composition layer
+- *(AGENTS.md)* Refresh for v0.10.0 + link consolidation plan
+- *(consolidation)* Note utm-dev-cli generalization beyond Tauri
+## [0.10.0] - 2026-05-02
 
-## v0.16.2 — 2026-05-07
+### 🚀 Features
 
-### Fixed
+- *(lint)* Nu cross-platform proof step + accept nu shebangs
+- *(lint)* Add fnox keychain round-trip proof on Windows + macOS
+- *(bw)* Port bw:list to nushell — first real shared task on nu
+- *(bw)* Port ALL bw:* tasks to nushell — full SSOT migration
+- Port ALL remaining mise-tasks bash → nushell — full SSOT
 
-- **`mobile:rustup-target-add`** — defensive guard when `rustup` is not
-  on PATH. Skips with a friendly message rather than blowing up with a
-  command-not-found error.
+### 🐛 Bug Fixes
 
-## v0.16.1 — 2026-05-07
+- *(lint)* Comment in bw/bootstrap was self-flagging Tera-syntax check
 
-### Added
+### ⚙️ Miscellaneous Tasks
 
-- **`mobile:*`** namespace ported to TOML-tasks (first non-cf port after
-  v0.16.0).
+- Pin nushell to 0.112 in .github mise.toml
+## [0.9.0] - 2026-05-02
 
-## v0.16.0 — 2026-05-07
+### 🚀 Features
 
-### Added
+- *(bw)* Keychain ↔ NodeWarden hybrid sync tasks
+## [0.8.3] - 2026-05-01
 
-- **TOML-tasks with per-task tools** — new `tasks/*.toml` library
-  alongside the legacy `mise-tasks/` file-tasks. Per-task `tools = { … }`
-  blocks let each task pin its own dependencies (nu, gh, fnox, jq, …),
-  so consumers no longer need a one-size-fits-all `[tools]` block in
-  every mise.toml. Tools come along for the ride through the `git::`
-  include URL.
+### 🐛 Bug Fixes
 
-  See [`mise-tasks/DEPRECATED.md`](mise-tasks/DEPRECATED.md) for the
-  migration table and consumer wiring guide.
+- *(wrangler:gen)* Use bash native substitution (works with all envsubsts) (#35)
+## [0.8.2] - 2026-05-01
 
-## v0.15.3 — 2026-05-07
+### 🐛 Bug Fixes
 
-### Fixed
+- *(wrangler:gen)* Only substitute vars defined in env file (#34)
+## [0.8.1] - 2026-05-01
 
-- **`bw:*`**, **`secrets:*`** — `const here = (path self …)` was
-  declared as `let` in earlier shipped tasks, which broke at runtime
-  in nu (path self resolves at parse time, but `let` requires runtime
-  context). Switched to `const`.
+### 🚀 Features
 
-## v0.15.2 — 2026-05-07
+- *(wrangler:gen)* Auto-detect .toml.template vs .jsonc.template (#33)
+## [0.8.0] - 2026-05-01
 
-### Changed
+### 🚀 Features
 
-- README + AGENTS + CLAUDE drift cleanup. `mise-tasks-lint.yml` now
-  covers `ci:*` tasks too.
+- *(cf)* Provision-queues + soften provision-d1-r2 (#32)
+## [0.7.0] - 2026-04-30
 
-## v0.15.1 — 2026-05-07
+### 🚀 Features
 
-### Fixed
+- *(mise-tasks)* Wrangler:gen + prove:{deployed,access-policy,bindings,secrets}
+## [0.6.0] - 2026-04-30
 
-- **`ci:parse-check`** — only inspects files with a `#!/usr/bin/env nu`
-  shebang. Previous version tripped on README.md and other plain text.
+### 🚀 Features
 
-## v0.15.0 — 2026-05-07
+- *(mise-tasks)* Cf:access-setup, cf:provision-d1-r2, cf:secrets-put-mapped, env:resolve
+## [0.5.0] - 2026-04-28
 
-### Added
+### 🚀 Features
 
-- **Reusable workflows** at `.github/workflows/`:
-  - `reusable-mise-ci.yml` — drop-in CI workflow callable via
-    `uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@vX.Y.Z`.
-  - `reusable-mise-upgrade.yml` — automated weekly bump of the lib
-    `?ref=` pin via `mise:upgrade`.
+- *(mobile)* Add Tauri mobile mise-tasks for Android + iOS
 
-## v0.14.1 — 2026-05-07
+### ⚙️ Miscellaneous Tasks
 
-### Added
+- Clean up .github repo — pin tools, remove stale content, plan vm: namespace
+## [0.4.0] - 2026-04-28
 
-- **`ci:parse-check`** — generic nu file parse-checker. Walks a path,
-  runs `nu --ide-check 1` against every nu source file, exits non-zero
-  on any parse error. Used by every consumer's local `check` task.
+### 🚀 Features
 
-## v0.14.0 — 2026-05-07
+- *(mise-tasks)* Add #USAGE annotations for tab completion via jdx/usage
 
-### Added
+### 📚 Documentation
 
-- **`ci:watch`**, **`ci:clean`**, **`mise:upgrade`** — convenience
-  tasks. `ci:watch` polls `gh run list` until the latest run on the
-  current branch finishes; `ci:clean` cancels in-flight runs;
-  `mise:upgrade` bumps the lib pin to the latest tag.
+- Add utm-dev cross-platform wiring + fix stale v0.2.0 refs
+## [0.3.0] - 2026-04-28
 
-## v0.13.1 — 2026-05-05
+### 🚀 Features
 
-### Fixed
+- *(mise-tasks)* Wrangler:tail, wrangler:secret-list, cf:token-check
 
-- **`cf:service-token-setup`** — service tokens now correctly bypass the
-  OAuth flow. v0.13.0 added the service-token "Include" rule to the existing
-  `operator-only` policy whose `decision` is `allow` — but `allow` requires
-  identity verification, so service-token-headed requests still got
-  redirected through CF Access OAuth (`auth_status: NONE` → 302 to login,
-  causing redirect loops in `wrangler dev` with `remote=true` AI bindings).
+### 🐛 Bug Fixes
 
-  v0.13.1 creates a **separate `service-token-only` policy** with
-  `decision: "non_identity"`, which is the CF Access primitive that bypasses
-  OAuth when valid service-token headers are present. The two policies coexist
-  on the same Access App:
+- Close all audit gaps in mise-tasks + CI lint
+- *(mise-tasks)* Three quality fixes from audit
 
-  ```
-  operator-only        decision=allow         include=[email1, email2, ...]
-  service-token-only   decision=non_identity  include=[service_token: <uuid>]
-  ```
+### 📚 Documentation
 
-  The setup task also auto-scrubs any stale v0.13.0 includes left over in
-  the operator-only policy. Re-run `cf:service-token-setup` after upgrading
-  to migrate cleanly.
+- *(agents)* CLAUDE.md + AGENTS.md + release task + README authoring guide
 
-- **`cf:service-token-revoke`** — now deletes the `service-token-only` policy
-  entirely instead of trying to scrub it from `operator-only`. Falls back to
-  cleaning any stale allow-policy includes for full backward compatibility
-  with v0.13.0 deployments.
+### ⚙️ Miscellaneous Tasks
 
-## v0.13.0 — 2026-05-05
+- Delete NATS / Taskfile / age era — keep mise-tasks + org config
+- Repo hygiene + mise-tasks dev experience
+- Test on ubuntu + macos + windows, shell: bash for SSOT
+- Trigger lint on workflow file changes + add workflow_dispatch
+- Use actions/checkout@v5 (consistent with all other repos)
+- Bump jdx/mise-action v2 → v4 (Node 24)
+- Bump actions/checkout v5 → v6 (latest)
+## [0.2.0] - 2026-04-27
 
-### Added
+### 🚀 Features
 
-- **`cf:service-token-setup`** — new task. Provisions a CF Access service
-  token so wrangler dev (with `remote = true` bindings), Playwright
-  automation, CI, and any other non-interactive client can authenticate
-  past the Access wall. Without one, `mise run dev` errors with:
+- Refactor to template-based approach with Go processor
+- Complete template-based GitHub organization setup
+- Add GitHub CLI validation and verification
+- Add comprehensive enhancements and finalization
+- Add workflow monitoring and template test marker
+- Add NATS-powered snake prevention with Synadia Cloud integration
+- Add comprehensive cross-platform compatibility
+- Integrate bee for next-generation event-driven GitHub workflows
+- Multi-repo infrastructure platform with comprehensive secret management
+- Add comprehensive logging system with Playwright guidance for Synadia NATS
+- Add complete NATS-Playwright integration
+- Add Claude agent configuration for meta-repo expertise
+- Add email contact as SVG image in repository
+- Add security credentials and compliance benefits
+- Enhance profile with notable clients, team leadership, and education
+- Make product development focus front and center
+- Add investor outreach to partnership opportunities
+- Add European Climate Foundation to Notable Clients with role detail
+- Add Ubuntu Software logo to profile
+- Add email signature SVG
+- Add rust-wasm Claude Code skill
+- Add cf-workers Claude Code skill
+- Add truck-kernel Claude Code skill
+- Add mise rust:build task
+- Add mise rust:test task
+- Add mise rust:wasm-pack task
+- Add mise wrangler:dev task
+- Add mise wrangler:deploy task
+- Add mise cf:d1-migrate task
+- *(mise-tasks)* Shared secrets + fnox tasks (keychain workflow)
 
-  > The domain "X.workers.dev" is behind Cloudflare Access, but no Access
-  > Service Token credentials were found and the current environment is
-  > non-interactive…
+### 🐛 Bug Fixes
 
-  Usage (one-time per repo):
+- Resolve idempotent race condition
+- Regenerate GitHub Actions from templates
+- Properly quote GITHUB_OUTPUT in workflow template [skip-regen]
+- Add write permissions to GitHub Actions workflow [skip-regen]
+- Use absolute GitHub URL for email SVG image
+- Change email SVG text to white to match profile style
+- Use full URL text for blog link
+- Adjust email SVG vertical alignment
+- Further adjust email SVG vertical alignment
+- Fine-tune email SVG vertical alignment
+- *(mise-tasks)* Chmod +x existing tasks
+- *(mise-tasks)* Detect repo via git remote, not gh repo view
 
-  ```bash
-  mise run cf:service-token-setup
-  ```
+### 💼 Other
 
-  Steps it performs:
+- *(deps)* Bump github.com/nats-io/nats.go from 1.43.0 to 1.47.0 (#15)
+- Bump github.com/nats-io/nats-server/v2 from 2.11.6 to 2.12.2
+- *(deps)* Bump github.com/nats-io/nats-server/v2 from 2.12.2 to 2.12.3 (#18)
 
-  1. POSTs `/accounts/{id}/access/service_tokens` to create
-     `<WORKER_NAME>-automation` (skipped if fnox already has the creds).
-  2. Stores `client_id` + `client_secret` in fnox keychain under canonical
-     names `CLOUDFLARE_ACCESS_CLIENT_ID` and `CLOUDFLARE_ACCESS_CLIENT_SECRET`
-     — matches the env vars wrangler/vite-plugin look up automatically.
-  3. PUTs the operator-only policy with a new `service_token` include rule
-     so requests carrying these headers are allowed alongside the existing
-     email allowlist.
+### 🚜 Refactor
 
-  Idempotent. fnox is the source of truth: re-runs are no-ops once the
-  creds are stored. If the CF-side token is deleted but fnox still has
-  values, the task aborts with guidance (rotate or recreate).
+- Simplify Playwright architecture and clean up JS files
+- Move internal docs to .docs/ directory
+- Move Blog & Updates to About Me section
+- Move Current Focus to About Me section
+- Polish profile content and organization
+- Reorganize profile with About Me at top and update CAD kernel deployment info
+- Update focus to product development with consulting availability
+- Remove redundant Current Focus section from About Me
+- Reframe Archethought Inc. as collaboration partnership
 
-- **`cf:service-token-revoke`** — companion task. Deletes the token at CF,
-  scrubs its include rule from the operator-only policy, and clears the
-  fnox keychain entries. Use to rotate (revoke + setup again), kill a
-  leaked secret, or decommission. Idempotent — safe when nothing exists.
+### 📚 Documentation
 
-  ```bash
-  mise run cf:service-token-revoke
-  ```
+- Add snake chasing its tail architecture explanation
+- Add well-known endpoints guide and demo env
+- Add introductory context to README explaining repository purpose
+- Add credit to charmbracelet for pioneering .github pattern
+- Add CGO build support and GUI app capabilities to README
+- Explain special .github repository files near top of README
+- Add Ubuntu Software company link to organization profile
+- Clarify Ubuntu Software builds systems and products for orgs
+- Add call-to-action for product info, tools, and blog
+- Add Global Collaboration Network section
+- Add Current Focus section on Offline AI & Vision Systems
+- Add Blog & Updates section with RSS feed
+- Add Notable Open Source Projects section to profile
+- Add 3D Solids CAD Kernel and Digital Twin capabilities
+- Add Partnership Opportunities section to profile
+- Add email contact as image to reduce spam
+- Add international background and company location
+- Clarify contact method usage
+- Clarify email is displayed as text to prevent spam
+- Usage guide for mise-tasks
+- Usage guide for Claude Code skills
 
-  Order of operations: policy include → token delete → fnox clear. An
-  in-flight request might still complete during teardown but will fail at
-  the policy-check step on its next call, which is the correct failure
-  mode for "revoked".
+### 🎨 Styling
 
-### Why this complements v0.12.0
+- Improve profile layout with better spacing and organization
+- Declutter Blog & Updates section
 
-`cf:access-setup` + `cf:access-revoke` cover the **human OAuth path**
-(GitHub IdP, email allowlist, browser cookies). The two new tasks cover
-the **machine-to-machine path** (service token via Client ID + Secret
-headers). Same Access App, same operator-only policy — both auth modes
-coexist as separate "Include" rules. Pick whichever your client supports.
+### 🧪 Testing
 
-## v0.12.0 — 2026-05-05
+- Trigger workflow to verify CI fix
+- Verify fixed GitHub Actions workflow
 
-### Added
+### ⚙️ Miscellaneous Tasks
 
-- **`cf:access-revoke`** — new task. Revokes ALL active Cloudflare Access
-  sessions for the Worker (kicks everyone out — they re-login if still
-  allowlisted). Useful when you want to evict someone *right now* rather
-  than wait for their session cookie (24h default) to expire. Usage:
-
-  ```bash
-  mise run cf:access-revoke
-  ```
-
-  Calls `POST /accounts/{id}/access/apps/{app_id}/revoke_tokens`. Reads
-  `WORKER_NAME` + `CF_SUBDOMAIN` from `config/<env>.env` to find the
-  Access App. Does NOT touch the allow policy — pair with `cf:access-setup`
-  (after editing `OPERATOR_EMAIL`) for permanent removal.
-
-  Why app-wide and not per-user? The per-email endpoint
-  (`organizations/revoke_user`) requires the broader scope "Access:
-  Organizations, Identity Providers, and Groups: Edit" which the
-  standard `cf:access-setup` token shape doesn't carry. The app-level
-  endpoint works with the same `Access: Apps and Policies: Edit` scope
-  that policy management already needs. Trade-off: any other
-  allowlisted user is also evicted and must re-login (5s OAuth flow).
-
-### Changed
-
-- **`cf:access-setup`** — auto-revokes active sessions when the allow
-  set shrinks. When a re-run drops one or more emails from the existing
-  policy, the script now POSTs `apps/{id}/revoke_tokens` after the
-  policy PUT succeeds. Closes the window where a removed user kept
-  their existing session cookie until it timed out. No-op on adds or
-  no-changes.
-
-### Migration notes
-
-Pure additive — bump the include pin, no caller-side changes:
-
-```diff
-- includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.11.0"]
-+ includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.12.0"]
-```
-
-If someone you removed via `cf:access-setup` on v0.11.0 still has an
-active session, run `mise run cf:access-revoke` once on v0.12.0 to
-evict them (and re-login yourself).
-
-## v0.11.0 — 2026-05-05
-
-### Fixed
-
-- **`cf:access-setup`** — allow-policy idempotency. Previous versions
-  created a NEW policy on every re-run because the dedupe check compared
-  the literal `OPERATOR_EMAIL` string (e.g. `"a@x.com,b@y.com"`) against
-  a flat list of individual emails — never matched, so it always took
-  the create path. Result: appending an email to `OPERATOR_EMAIL` and
-  re-running piled on duplicate `operator-only` policies.
-
-  v0.11.0 switches to a set-based ensure: split `OPERATOR_EMAIL` into a
-  sorted set, find the existing `operator-only` allow policy, PUT-update
-  its include list if the set differs, only POST a new policy when none
-  exists. No caller-side changes — same `config/<env>.env` shape.
-
-### Migration notes for consumers (mon-house, kv-manager, d1-manager, etc.)
-
-1. Bump the include pin in your `mise.toml`:
-
-   ```diff
-   - includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.10.0"]
-   + includes = ["git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.11.0"]
-   ```
-
-2. **If you already have duplicate `operator-only` policies** from
-   running v0.10.0 multiple times: the new task warns and uses the
-   first one. Clean up the duplicates either via the CF dashboard
-   (Access → Apps → your app → Policies) or via the API:
-
-   ```bash
-   # List policies
-   TOKEN=$(fnox get CLOUDFLARE_API_TOKEN)
-   ACCT=$(fnox get CLOUDFLARE_ACCOUNT_ID)
-   curl -sS -H "Authorization: Bearer $TOKEN" \
-     "https://api.cloudflare.com/client/v4/accounts/$ACCT/access/apps/<APP_ID>/policies" | jq
-
-   # Delete the orphan(s) — keep the most comprehensive one
-   curl -sS -X DELETE -H "Authorization: Bearer $TOKEN" \
-     "https://api.cloudflare.com/client/v4/accounts/$ACCT/access/apps/<APP_ID>/policies/<POLICY_ID>"
-   ```
-
-3. Re-run `mise run cf:access-setup`. The output should now include
-   one of: `✓ policy already matches`, `→ updating policy ... → ...`,
-   or `→ no existing policy, creating`.
-
-If you only ever ran v0.10.0 once with a single email, no cleanup is
-needed — upgrade silently.
-
-## v0.10.0 — 2026-05-02
-
-Full nushell migration. All 33 mise-tasks ported from bash to nushell
-for Windows compatibility. CI proof on every push (parse-check on macOS
-+ Linux + Windows, fnox-keychain round-trip, 12-task real-execution
-test). 9 consumer repos rolled out in lockstep.
-
-See [`AGENTS.md`](./AGENTS.md) for the full v0.10.0 status snapshot.
+- Regenerate .github files from templates [skip-regen]
+- *(deps)* Bump actions/checkout from 4 to 5
+- *(deps)* Bump actions/first-interaction from 1 to 3 (#5)
+- *(deps)* Bump actions/setup-go from 4 to 6 (#9)
+- Add working files and tooling configurations
+- *(deps)* Bump actions/checkout from 5 to 6 (#17)
