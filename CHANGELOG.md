@@ -1,8 +1,17 @@
+## [0.32.0] - 2026-06-07
+
+### 🐛 Bug Fixes
+
+- *(cliff)* Allow fork-distinct semver suffix + verify uploaded assets
 ## [0.31.0] - 2026-06-07
 
 ### 🐛 Bug Fixes
 
 - *(cliff)* Cliff:release works on any branch, not just main
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.31.0
 ## [0.30.0] - 2026-06-07
 
 ### 🚀 Features
