@@ -1,8 +1,17 @@
+## [0.33.0] - 2026-06-07
+
+### 🐛 Bug Fixes
+
+- *(cliff)* Target fork's own repo (--repo) + push only the release tag
 ## [0.32.0] - 2026-06-07
 
 ### 🐛 Bug Fixes
 
 - *(cliff)* Allow fork-distinct semver suffix + verify uploaded assets
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.32.0
 ## [0.31.0] - 2026-06-07
 
 ### 🐛 Bug Fixes
