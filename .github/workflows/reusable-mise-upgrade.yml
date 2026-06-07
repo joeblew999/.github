@@ -45,7 +45,7 @@ jobs:
         run: mise run mise:upgrade
 
       - name: Open PR if mise.toml changed
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           commit-message: "chore(mise): bump pinned tool versions"
           branch: ${{ inputs.pr-branch }}
