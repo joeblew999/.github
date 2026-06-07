@@ -17,16 +17,19 @@
 # ── cliff:release ────────────────────────────────────────────────────────────
 # The release driver: regenerate CHANGELOG.md from conventional commits, commit
 # it, tag, push branch + tag, and cut the GitHub release with the same notes.
-# Local-only (no CI/goreleaser). Usage: mise run cliff:release -- vX.Y.Z
+# Optionally uploads binary assets (build them into a gitignored dir first).
+# Local-only (no CI/goreleaser).
+#   mise run cliff:release -- vX.Y.Z                    # changelog + tag + release
+#   mise run cliff:release -- vX.Y.Z dist/app-*         # ...and upload binaries
 ["cliff:release"]
-description = "git-cliff release: regenerate CHANGELOG.md, commit, tag, push, and create the GitHub release. Usage: mise run cliff:release -- vX.Y.Z"
+description = "git-cliff release: regenerate CHANGELOG.md, commit, tag, push, create the GitHub release, and optionally upload binary assets. Usage: mise run cliff:release -- vX.Y.Z [assets...]"
 run = '''
 #!/usr/bin/env nu
-def main [tag?: string] {
+def main [tag?: string, ...assets: string] {
   let t = ($tag | default "")
-  if not ($t =~ '^v[0-9]+\.[0-9]+\.[0-9]+$') { print -e "✗ usage: mise run cliff:release -- vX.Y.Z"; exit 1 }
+  if not ($t =~ '^v[0-9]+\.[0-9]+\.[0-9]+$') { print -e "✗ usage: mise run cliff:release -- vX.Y.Z [assets...]"; exit 1 }
   if ((^git rev-parse --abbrev-ref HEAD | str trim) != "main") { print -e "✗ not on main"; exit 1 }
-  if (^git status --porcelain | str trim | is-not-empty) { print -e "✗ working tree dirty — commit your work first"; exit 1 }
+  if (^git status --porcelain | str trim | is-not-empty) { print -e "✗ working tree dirty — commit your work first (build artifacts must be gitignored)"; exit 1 }
   if (^git tag -l $t | str trim | is-not-empty) { print -e $"✗ tag ($t) already exists"; exit 1 }
 
   # 1. regenerate the changelog with the new tag (unreleased commits become $t)
@@ -41,6 +44,12 @@ def main [tag?: string] {
   # 3. GitHub release with this tag's notes
   let notes = (^git-cliff --tag $t --latest --strip all)
   $notes | ^gh release create $t --title $t --notes-file -
+
+  # 4. optionally upload binary assets
+  if ($assets | is-not-empty) {
+    ^gh release upload $t ...$assets --clobber
+    print $"✓ uploaded ($assets | length) asset\(s\)"
+  }
   print $"✓ released ($t): changelog + tag + GitHub release"
 }
 '''
