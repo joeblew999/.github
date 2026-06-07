@@ -1,8 +1,3 @@
-[settings]
-# extends task-inheritance is mise experimental — joeblew999/.github
-# v0.18+ uses it for per-namespace tools dedup (cf:_base, bw:_base, etc).
-experimental = true
-
 [task_config]
 # Self-hosting: include every tasks/*.toml file so the lib can run its
 # own ci:check-toml-tasks etc. against itself. mise doesn't auto-discover

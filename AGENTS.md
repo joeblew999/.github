@@ -34,7 +34,6 @@ config. Consumers pull task namespaces by tag via `[task_config].includes`.
 | `tasks/<ns>.toml` | TOML-task definitions. Namespaces: `bw cf ci cliff env fnox mise mobile prove rust secrets wrangler`. Consumed via `git::….toml?ref=vX.Y.Z`. |
 | `mise.toml` | Self-includes every `tasks/*.toml` (so CI lints the lib against itself) + the canonical `[tools]`. |
 | `.github/workflows/tasks-toml-proof.yml` | CI canary — discovery + scoping + real-file validation per `tasks/*.toml`. 3 OS (ubuntu/macos/windows). |
-| `.github/workflows/monorepo-root-proof.yml` | Reference for an experimental layout we evaluated & rejected. |
 | `.github/workflows/reusable-mise-ci.yml` / `reusable-mise-upgrade.yml` | Reusable workflows consumers `uses:`. |
 | `profile/`, `.claude/` | Org profile page; Claude Code skills/agents. |
 
@@ -83,8 +82,8 @@ config. Consumers pull task namespaces by tag via `[task_config].includes`.
 ```toml
 [task_config]
 includes = [
-  "git::https://github.com/joeblew999/.github.git//tasks/cliff.toml?ref=v0.25.0",
-  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.25.0",
+  "git::https://github.com/joeblew999/.github.git//tasks/cliff.toml?ref=v0.27.0",
+  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.27.0",
   # one URL per namespace file — mise does NOT chain git:: includes.
 ]
 
@@ -98,8 +97,8 @@ Reusable CI (one-line consumer CI):
 ```yaml
 jobs:
   ci:
-    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@v0.26.0
-    with: { task: check, lib-ref: v0.26.0 }   # lib-ref seeds the global toolset on the runner
+    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@v0.27.0
+    with: { task: check, lib-ref: v0.27.0 }   # lib-ref seeds the global toolset on the runner
 ```
 
 ## Secrets model

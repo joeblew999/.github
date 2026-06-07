@@ -3,6 +3,23 @@
 All notable changes to the shared mise task library. Bump consumer repos'
 `[task_config].includes` pin when adopting a new release.
 
+## v0.27.0 — 2026-06-07
+
+Cleanup the cleaner model made possible.
+
+### Removed
+
+- **`[settings].experimental`** from the lib — `extends` is gone (no `_base`
+  tasks left), so the experimental flag was dead. **Consumers can drop
+  `experimental = true` too** unless they use it for their own reasons.
+- **`monorepo-root-proof.yml`** — proved a mise feature (`experimental_monorepo_root`)
+  we evaluated and rejected; reference-only, now removed.
+
+### Fixed
+
+- Stale header comments in `cf.toml` (mangled `extends`/tool-pin prose from the
+  sweeps) + the deleted-workflow row in AGENTS.md.
+
 ## v0.26.0 — 2026-06-07
 
 **Namespaces front the tools.** Shared tasks now declare almost no per-task

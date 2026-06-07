@@ -1,20 +1,14 @@
 # tasks/cf.toml — TOML-task definitions for the cf:* (Cloudflare) namespace.
 #
-# Tasks ported from the legacy mise-tasks/cf/* file-tasks. Each declares
-# Tools (nu/fnox/gh/wrangler) come from the global mise config; nothing pinned here.
-# unless their own local tasks need them.
+# Tools (nu / fnox / gh / wrangler) come from the global mise config — nothing
+# pinned here. See AGENTS.md for the global-config model.
 #
 # Consumer wiring:
 #   [task_config]
 #   includes = [
-#     "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.17.0",
+#     "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.27.0",
 #   ]
-#
-# Tool-pin policy:
-#
-# is mise's experimental task-inheritance feature. See discussion #9637.
 
-# which mise MERGES with the base's tools at runtime.
 # ── cf:token-check ───────────────────────────────────────────────────────────
 # Verify CLOUDFLARE_API_TOKEN is valid via /user/tokens/verify. Used as a
 # precondition gate by deploy/prove tasks.
