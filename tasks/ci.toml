@@ -15,11 +15,6 @@
 # Tool pin policy: track the same versions as joeblew999/.github's own
 # mise.toml [tools] block. Bump them together when the lib version is bumped.
 
-# ── ci:_base ──
-# Hidden base task — every ci:* extends this for shared nu pin.
-["ci:_base"]
-hide = true
-
 # ── ci:check-toml-tasks ──────────────────────────────────────────────────────
 # Parse-check every inline `run = '''...'''` body in tasks/*.toml of the
 # current repo. Spawns `nu --ide-check 1` on each extracted body — same
@@ -32,7 +27,6 @@ hide = true
 # Use as a local pre-push lint AND in CI. Self-hosted: this very task
 # parse-checks itself when run against joeblew999/.github's own tasks/.
 ["ci:check-toml-tasks"]
-extends = "ci:_base"
 description = "Parse-check every inline `run = '''...'''` body in tasks/*.toml via `nu --ide-check`"
 
 run = '''
@@ -130,11 +124,10 @@ def main [
 # `mise outdated` only sees pinned TOOLS, not git URLs, so this fills
 # the gap. Run before bumping or as a periodic sanity check.
 #
-# Tools: gh (GitHub API for tags). Inherits nu from ci:_base.
+# Tools: gh (GitHub API for tags). nu comes from global config.
 ["ci:audit-lib-refs"]
-extends = "ci:_base"
 description = "Audit ?ref= drift across every tracked mise.toml that includes joeblew999/.github"
-tools = { gh = "2" }
+tools = { gh = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -199,7 +192,6 @@ def main [
 # block and ships it without ever running nu against it locally — leading
 # to a CI failure that takes 60-90s per iteration to feedback.
 ["ci:check-workflow-nu"]
-extends = "ci:_base"
 description = "Parse-check every embedded nu block in .github/workflows/*.yml via `nu --ide-check`"
 
 run = '''
@@ -295,7 +287,6 @@ def main [
 # `nu --ide-check 1` on each. Used by every consumer's local `check` bundle
 # as the cheap first-line-of-defense lint.
 ["ci:parse-check"]
-extends = "ci:_base"
 description = "Parse-check every nu task file in mise-tasks/ (fails if any has a syntax error)"
 
 run = '''
@@ -349,9 +340,8 @@ def main [
 # REPO is auto-derived from `git remote get-url origin`; works in any repo.
 # Token from GH_TOKEN/GITHUB_TOKEN env or `fnox get GITHUB_TOKEN`.
 ["ci:watch"]
-extends = "ci:_base"
 description = "Watch the latest CI run on this branch — streams per-job + per-step transitions, dumps failed-step logs via gh api"
-tools = { gh = "2" }   # gh provided; fnox from global
+tools = { gh = "latest" }   # gh provided; fnox from global
 run = '''
 #!/usr/bin/env nu
 
@@ -554,9 +544,8 @@ def main [
 # Delete CI runs (default: failed/cancelled only; --all to nuke every run;
 # --dry-run to preview). REPO from origin remote; token from env/fnox.
 ["ci:clean"]
-extends = "ci:_base"
 description = "Delete CI runs (default: failed/cancelled only; --all to nuke every run; --dry-run to preview)"
-tools = { gh = "2" }   # gh provided; fnox from global
+tools = { gh = "latest" }   # gh provided; fnox from global
 run = '''
 #!/usr/bin/env nu
 

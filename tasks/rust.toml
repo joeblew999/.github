@@ -10,15 +10,9 @@
 #     "git::https://github.com/joeblew999/.github.git//tasks/rust.toml?ref=v0.17.4",
 #   ]
 
-# ── rust:_base ──
-# Hidden base task — every rust:* extends this for shared nu pin.
-["rust:_base"]
-hide = true
-
 # ── rust:build ───────────────────────────────────────────────────────────────
 # cargo build --all-targets, with RUST_BACKTRACE=1 for better diagnostics.
 ["rust:build"]
-extends = "rust:_base"
 description = "cargo build (all targets)"
 
 env = { RUST_BACKTRACE = "1" }
@@ -33,7 +27,6 @@ def main [...args] {
 # ── rust:test ────────────────────────────────────────────────────────────────
 # cargo test --all-targets.
 ["rust:test"]
-extends = "rust:_base"
 description = "cargo test (all targets)"
 
 env = { RUST_BACKTRACE = "1" }
@@ -49,9 +42,8 @@ def main [...args] {
 # Compile a Rust crate to WASM via wasm-pack. Pins wasm-pack per-task
 # (consumers don't have to install it globally).
 ["rust:wasm-pack"]
-extends = "rust:_base"
 description = "compile a Rust crate to WASM via wasm-pack"
-tools = { "cargo:wasm-pack" = "0.13" }
+tools = { "cargo:wasm-pack" = "latest" }
 usage = '''
 arg "<crate-dir>" help="path to the crate directory to compile"
 '''

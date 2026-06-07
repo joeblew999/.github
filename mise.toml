@@ -28,9 +28,9 @@ includes = [
 ]
 
 [tools]
-fnox                     = "1.25.1"
-"github:nushell/nushell" = "0.113.1"   # pinned — bw:* shared tasks are nu (cross-platform; bash unavailable on Windows)
-gh                       = "2"
-jq                       = "1"
-usage                    = "3"
-git-cliff                = "2.13"  # cliff:* changelog/release-intel tasks
+fnox                     = "latest"
+"github:nushell/nushell" = "latest"   # pinned — bw:* shared tasks are nu (cross-platform; bash unavailable on Windows)
+gh                       = "latest"
+jq                       = "latest"
+usage                    = "latest"
+git-cliff                = "latest"  # cliff:* changelog/release-intel tasks

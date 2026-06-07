@@ -11,25 +11,14 @@
 #   ]
 #
 # Tool-pin policy:
-#   - cf:_base provides nu + fnox to every cf:* task (`extends` merges tools)
-#   - Tasks calling ^wrangler add wrangler = "4" on top via their own tools
-#   - Tasks calling ^curl rely on system curl (present on all 3 OS GHA runners)
 #
-# Consumer requirement: `[settings].experimental = true` in mise.toml — `extends`
 # is mise's experimental task-inheritance feature. See discussion #9637.
 
-# ── cf:_base ─────────────────────────────────────────────────────────────────
-# Hidden base task — every cf:* task extends this for the common nu + fnox
-# pin. Tasks calling ^wrangler add it via their own `tools = { ... }` block,
 # which mise MERGES with the base's tools at runtime.
-["cf:_base"]
-hide = true
-
 # ── cf:token-check ───────────────────────────────────────────────────────────
 # Verify CLOUDFLARE_API_TOKEN is valid via /user/tokens/verify. Used as a
 # precondition gate by deploy/prove tasks.
 ["cf:token-check"]
-extends = "cf:_base"
 description = "verify CLOUDFLARE_API_TOKEN is valid — reads from env or fnox"
 run = '''
 #!/usr/bin/env nu
@@ -70,9 +59,8 @@ def main [] {
 # ── cf:d1-migrate ────────────────────────────────────────────────────────────
 # Apply D1 migrations via wrangler. Pass-through wrapper.
 ["cf:d1-migrate"]
-extends = "cf:_base"
 description = "run D1 migrations"
-tools = { wrangler = "4" }
+tools = { wrangler = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -86,9 +74,8 @@ def main [...args] {
 # (comma-separated) from config/<env>.env. Idempotent — skips queues
 # that already exist. No-op when QUEUE_NAMES is empty/unset.
 ["cf:provision-queues"]
-extends = "cf:_base"
 description = "Provision Cloudflare Queues for the active env. Reads QUEUE_NAMES (comma-separated) from config/<env>.env. Idempotent. No-op if QUEUE_NAMES is empty or unset."
-tools = { wrangler = "4" }
+tools = { wrangler = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -146,9 +133,8 @@ def main [] {
 # canonical fnox names → Worker env var names. Reads APP_POLICY_AUD_FNOX_KEY
 # from config/<env>.env (e.g. D1_MANAGER_POLICY_AUD).
 ["cf:secrets-put-mapped"]
-extends = "cf:_base"
 description = "Push 4 CF Access + auth secrets from fnox to the deployed Worker, mapping canonical fnox names -> Worker env names. Reads APP_POLICY_AUD_FNOX_KEY from config/<env>.env (e.g. D1_MANAGER_POLICY_AUD). Depends on wrangler.toml existing — run wrangler:gen first if needed."
-tools = { wrangler = "4" }
+tools = { wrangler = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -206,9 +192,8 @@ def main [] {
 # Writes the new D1 id back to the env file. Idempotent — skips create when
 # the named resource already exists.
 ["cf:provision-d1-r2"]
-extends = "cf:_base"
 description = "Provision Cloudflare D1 + R2 for the active env. Reads METADATA_DB_NAME, BACKUP_BUCKET_NAME from config/<env>.env. Either may be empty (skipped). Writes new METADATA_DB_ID back. Idempotent. Skips create when name already present."
-tools = { wrangler = "4" }
+tools = { wrangler = "latest" }
 run = '''
 #!/usr/bin/env nu
 
@@ -297,7 +282,6 @@ def main [] {
 # from config/<env>.env. Uses the app-level revoke_tokens endpoint (works
 # with the same scope cf:access-setup needs).
 ["cf:access-revoke"]
-extends = "cf:_base"
 description = "Revoke ALL active CF Access sessions for the Worker (kicks everyone out — they can re-login if still on the allowlist). Reads WORKER_NAME + CF_SUBDOMAIN from config/<env>.env. Requires CLOUDFLARE_API_TOKEN with Access: Apps and Policies: Edit (same scope as cf:access-setup)."
 run = '''
 #!/usr/bin/env nu
@@ -363,7 +347,6 @@ def main [] {
 # (immediately invalidates all uses), removes the policy include, and
 # clears CLOUDFLARE_ACCESS_CLIENT_ID/SECRET from fnox. Idempotent.
 ["cf:service-token-revoke"]
-extends = "cf:_base"
 description = "Revoke this Worker's CF Access service token: deletes the token at CF (immediately invalidates all uses), removes its 'Include' rule from the operator-only policy, and clears CLOUDFLARE_ACCESS_CLIENT_ID/SECRET from fnox. Idempotent — safe to run when nothing exists. Reads WORKER_NAME from config/<env>.env."
 run = '''
 #!/usr/bin/env nu
@@ -489,7 +472,6 @@ def main [] {
 # Stores CLOUDFLARE_ACCESS_CLIENT_ID/SECRET in fnox so wrangler dev with
 # remote bindings, Playwright, etc. authenticate non-interactively.
 ["cf:service-token-setup"]
-extends = "cf:_base"
 description = "One-shot CF Access service token setup: ensure a per-Worker service token exists and is allowed by the app's operator-only policy. Stores CLOUDFLARE_ACCESS_CLIENT_ID + _SECRET in fnox so wrangler/vite-plugin/Playwright can authenticate non-interactively. Idempotent. Requires CLOUDFLARE_API_TOKEN with Access:Edit. Run cf:access-setup first."
 run = '''
 #!/usr/bin/env nu
@@ -670,7 +652,6 @@ def main [] {
 # exist; write TEAM_DOMAIN + the per-app POLICY_AUD to fnox. Auto-revokes
 # sessions for emails dropped from OPERATOR_EMAIL. Idempotent.
 ["cf:access-setup"]
-extends = "cf:_base"
 description = "One-shot CF Access setup: ensure GitHub IdP + Access App for this Worker exist; write TEAM_DOMAIN + the per-app POLICY_AUD to fnox. Auto-revokes sessions for emails dropped from OPERATOR_EMAIL. Idempotent. Requires CLOUDFLARE_API_TOKEN with Access:Edit + Access:Organizations:Read + Account.Settings:Read."
 run = '''
 #!/usr/bin/env nu

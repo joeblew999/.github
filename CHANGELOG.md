@@ -3,6 +3,29 @@
 All notable changes to the shared mise task library. Bump consumer repos'
 `[task_config].includes` pin when adopting a new release.
 
+## v0.24.0 — 2026-06-07
+
+**No more version pinning.** Common tools float to `latest`; the lib carries no
+versions except two deliberate toolchain pins.
+
+### Changed
+
+- **All common tools → `latest`**: fnox, nushell, gh, jq, usage, git-cliff
+  (lib `[tools]`), plus wrangler, wasm-pack, tauri-cli (per-task). git is
+  versioned by you globally; mise floats the rest. **Deliberate exceptions:**
+  `java` (`temurin-17` — Android NDK/Gradle need a specific JDK) and `ruby`
+  (`3.3` — CocoaPods toolchain) stay pinned.
+- **Dropped 7 now-empty `_base` tasks** (cf/ci/mobile/prove/rust/secrets/wrangler)
+  + their `extends` + orphaned comments — after the v0.22/v0.23 sweeps they held
+  nothing. `bw:_base` stays (carries `@bitwarden/cli`). So `extends` (and the
+  `[settings].experimental` it needs) is now only relevant to `bw:*` consumers.
+
+### Still open (next refactor)
+
+- Retire the deprecated `mise-tasks/` dir: port `release` → a `mise:release`
+  TOML task and update the 5 workflows that still reference `mise-tasks/`. Left
+  for a deliberate, workflow-aware pass.
+
 ## v0.23.0 — 2026-06-07
 
 **Canonical tool specs + global config as the single source of truth.** Resolves
