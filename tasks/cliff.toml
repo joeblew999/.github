@@ -1,0 +1,68 @@
+# tasks/cliff.toml — TOML-task definitions for the cliff:* namespace.
+#
+# Changelog / release intelligence via git-cliff (orhun/git-cliff). Maps commits
+# to release tags — for THIS repo and for any THIRD-PARTY repo you track
+# (uncloud, dockur, …). Conventional-commit aware; needs nothing in the other
+# repo (it reads a clone).
+#
+# Tool versions are mise-native: declared in `tools = {}` so mise installs/pins
+# git-cliff — the nu bodies just CALL it, no version strings or install logic.
+#
+# Consumer wiring:
+#   [task_config]
+#   includes = [
+#     "git::https://github.com/joeblew999/.github.git//tasks/cliff.toml?ref=v0.21.0",
+#   ]
+#
+# Inverse lookup ("which release shipped commit/PR X?") is plain git, not
+# git-cliff, so it's NOT a task here — it's a one-liner:
+#   git tag --contains <merge-sha>      # empty output = still unreleased
+
+# ── cliff:_base ──
+# Hidden base — every cliff:* extends this for the shared tool pins.
+["cliff:_base"]
+hide = true
+tools = { "github:nushell/nushell" = "0.112", "aqua:orhun/git-cliff" = "2.13" }
+
+# ── cliff:unreleased ─────────────────────────────────────────────────────────
+["cliff:unreleased"]
+extends = "cliff:_base"
+description = "This repo: changelog for commits since the last tag (what the next release would contain)."
+run = '''
+#!/usr/bin/env nu
+def main [] { ^git-cliff --unreleased --strip all }
+'''
+
+# ── cliff:show ───────────────────────────────────────────────────────────────
+["cliff:show"]
+extends = "cliff:_base"
+description = "This repo: the full changelog across all tags (stdout)."
+run = '''
+#!/usr/bin/env nu
+def main [] { ^git-cliff --strip all }
+'''
+
+# ── cliff:repo ───────────────────────────────────────────────────────────────
+["cliff:repo"]
+extends = "cliff:_base"
+description = "Any repo: clone owner/repo and show its UNreleased delta (or a TAG..HEAD range). Usage: mise run cliff:repo -- psviderski/uncloud [v0.19.0]"
+run = '''
+#!/usr/bin/env nu
+def main [repo: string, from?: string] {
+  let dir = (^mktemp -d | str trim)
+  ^git clone --quiet $"https://github.com/($repo).git" $dir
+  # Default base = latest SEMVER tag (ignores rolling tags like `nightly`, which
+  # otherwise sit at HEAD and make --unreleased empty). Empty = no tags → full.
+  let base = (if ($from | default "" | is-empty) {
+    (^git -C $dir tag --list "v*.*.*" --sort=-version:refname | lines
+      | where ($it | str trim | is-not-empty) | get 0? | default "")
+  } else { $from })
+  let out = (if ($base | is-empty) {
+    ^git-cliff --repository $dir --strip all | complete
+  } else {
+    ^git-cliff --repository $dir --strip all $"($base)..HEAD" | complete
+  })
+  ^rm -rf $dir
+  print ($out.stdout | str trim)
+}
+'''

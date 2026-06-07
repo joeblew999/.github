@@ -3,6 +3,32 @@
 All notable changes to the shared mise task library. Bump consumer repos'
 `[task_config].includes` pin when adopting a new release.
 
+## v0.21.0 — 2026-06-07
+
+Adds the `cliff:*` namespace — changelog / release intelligence via git-cliff.
+Additive; opt-in per consumer (add the include). No change to existing tasks.
+
+### Added
+
+- **`tasks/cliff.toml`** (`cliff:*`) — map commits to release tags with
+  [git-cliff](https://github.com/orhun/git-cliff), for this repo and any
+  third-party repo you track (no cooperation needed from the other repo):
+  - `cliff:unreleased` — this repo's changes since the last tag.
+  - `cliff:show` — this repo's full changelog.
+  - `cliff:repo <owner/repo> [fromTag]` — clone any external repo and show its
+    unreleased delta. Defaults to the latest **semver** tag, so rolling tags
+    (e.g. `nightly`) don't hide the delta.
+  - mise-native: `aqua:orhun/git-cliff` pinned in `tools`; the nu bodies only
+    call the binary. The inverse lookup ("which release shipped commit X?")
+    stays a `git tag --contains <sha>` one-liner, not a task.
+
+## v0.20.0 — 2026-06-04
+
+### Added
+
+- **`mise:sweep`** — reclaim dead mise state (dead config links + unused tool
+  versions) across all repos under `--root`. Re-tracks live configs first.
+
 ## v0.19.2 — 2026-05-07
 
 Docs + cleanup. No behaviour change for consumers — `?ref=` bump is

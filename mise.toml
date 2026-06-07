@@ -16,6 +16,7 @@ includes = [
   "tasks/bw.toml",
   "tasks/cf.toml",
   "tasks/ci.toml",
+  "tasks/cliff.toml",
   "tasks/env.toml",
   "tasks/fnox.toml",
   "tasks/mise.toml",
@@ -32,3 +33,4 @@ includes = [
 "aqua:cli/cli"           = "2"
 "aqua:jqlang/jq"         = "1"
 "cargo:usage-cli"        = "3"
+"aqua:orhun/git-cliff"   = "2.13"  # cliff:* changelog/release-intel tasks
