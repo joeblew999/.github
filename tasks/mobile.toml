@@ -8,7 +8,7 @@
 # Consumer wiring:
 #   [task_config]
 #   includes = [
-#     "git::https://github.com/joeblew999/.github.git//tasks/mobile.toml?ref=v0.16.1",
+#     "git::https://github.com/joeblew999/.github.git//tasks/mobile.toml?ref=<tag>",
 #   ]
 #
 # See tasks/ci.toml header for the broader context + cross-OS canary.

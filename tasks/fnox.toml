@@ -6,7 +6,7 @@
 # Consumer wiring:
 #   [task_config]
 #   includes = [
-#     "git::https://github.com/joeblew999/.github.git//tasks/fnox.toml?ref=v0.17.3",
+#     "git::https://github.com/joeblew999/.github.git//tasks/fnox.toml?ref=<tag>",
 #   ]
 
 # ── fnox:init ────────────────────────────────────────────────────────────────

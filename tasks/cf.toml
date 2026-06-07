@@ -6,7 +6,7 @@
 # Consumer wiring:
 #   [task_config]
 #   includes = [
-#     "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.27.0",
+#     "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=<tag>",
 #   ]
 
 # ── cf:token-check ───────────────────────────────────────────────────────────

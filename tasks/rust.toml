@@ -7,7 +7,7 @@
 # Consumer wiring:
 #   [task_config]
 #   includes = [
-#     "git::https://github.com/joeblew999/.github.git//tasks/rust.toml?ref=v0.17.4",
+#     "git::https://github.com/joeblew999/.github.git//tasks/rust.toml?ref=<tag>",
 #   ]
 
 # ── rust:build ───────────────────────────────────────────────────────────────

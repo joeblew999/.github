@@ -7,7 +7,7 @@
 # Consumer wiring:
 #   [task_config]
 #   includes = [
-#     "git::https://github.com/joeblew999/.github.git//tasks/wrangler.toml?ref=v0.17.1",
+#     "git::https://github.com/joeblew999/.github.git//tasks/wrangler.toml?ref=<tag>",
 #   ]
 #
 # All wrangler:* tasks pin npm:wrangler per-task; consumers don't have to

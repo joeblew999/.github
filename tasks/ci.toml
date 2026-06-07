@@ -6,7 +6,7 @@
 # Consumer wiring:
 #   [task_config]
 #   includes = [
-#     "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.16.0",
+#     "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=<tag>",
 #   ]
 #
 # No experimental flag, no vendoring, no env-var setup needed. Validated by

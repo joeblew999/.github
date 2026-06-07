@@ -8,7 +8,7 @@
 # Consumer wiring:
 #   [task_config]
 #   includes = [
-#     "git::https://github.com/joeblew999/.github.git//tasks/prove.toml?ref=v0.17.2",
+#     "git::https://github.com/joeblew999/.github.git//tasks/prove.toml?ref=<tag>",
 #   ]
 
 # ── prove:bindings ───────────────────────────────────────────────────────────
