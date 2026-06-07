@@ -1,8 +1,17 @@
+## [0.30.0] - 2026-06-07
+
+### 🚀 Features
+
+- *(cliff)* Cliff:release uploads binary assets (optional trailing args)
 ## [0.29.0] - 2026-06-07
 
 ### 🚀 Features
 
 - *(cliff)* Add cliff:release git-cliff release driver; rewrite AGENTS.md
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.29.0
 ## [0.28.0] - 2026-06-07
 
 ### 🚀 Features
