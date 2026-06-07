@@ -1,8 +1,17 @@
+## [0.31.0] - 2026-06-07
+
+### 🐛 Bug Fixes
+
+- *(cliff)* Cliff:release works on any branch, not just main
 ## [0.30.0] - 2026-06-07
 
 ### 🚀 Features
 
 - *(cliff)* Cliff:release uploads binary assets (optional trailing args)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.30.0
 ## [0.29.0] - 2026-06-07
 
 ### 🚀 Features
