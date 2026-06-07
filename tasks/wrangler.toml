@@ -17,7 +17,6 @@
 # Hidden base task — every wrangler:* extends this for shared nu pin.
 ["wrangler:_base"]
 hide = true
-tools = { "github:nushell/nushell" = "0.112" }
 
 # ── wrangler:deploy ──────────────────────────────────────────────────────────
 # Pass-through to `wrangler deploy`. Forwards all args verbatim.

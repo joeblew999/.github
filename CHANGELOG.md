@@ -3,6 +3,41 @@
 All notable changes to the shared mise task library. Bump consumer repos'
 `[task_config].includes` pin when adopting a new release.
 
+## v0.22.0 — 2026-06-07
+
+**Stop pinning ubiquitous tool versions per-task.** Every `*:_base` (and a few
+tasks) pinned `nushell 0.112` / `fnox 1.24`, while consumer repos pin their own
+(e.g. nushell `0.113.1`, fnox `1.25.1`) and the global config a third (fnox
+`1.19.0`). That three-way skew installed duplicate versions and confused the
+mise GUI / `[tools]` view. Tasks now declare **no version pins** for ubiquitous
+tools — they inherit from the consumer's global config / `[tools]`, so there's
+one version and no drift.
+
+### Changed
+
+- **Swept every `*:_base`**: removed `nushell` + `fnox` version pins across all
+  namespaces. Genuinely task-specific tools stay per-task (`wrangler`, `java`,
+  `@bitwarden/cli`, `gh`). `cliff:*` dropped its `_base` entirely — `git-cliff`
+  now comes from your global config (`mise use -g aqua:orhun/git-cliff`).
+- **Requirement:** consumers must have the ubiquitous tools (nushell, fnox, gh,
+  git-cliff) available via their **global** `~/.config/mise/config.toml` or repo
+  `[tools]`. The lib still pins them in its own `[tools]` for self-runs.
+
+### Added
+
+- **`mise:global-sync`** — reports drift between a repo's `[tools]` and the
+  global config and prints the `mise use -g` commands to align (read-only;
+  normalises tool short-names so `github:jdx/fnox` vs `fnox` isn't mistaken for
+  two tools). Run it from `.github` to make the lib's `[tools]` the canonical
+  global set. Never repoints the config path (VSCode-safe).
+
+### Still open
+
+- **Backend canonicalisation** — the lib uses `github:jdx/fnox` / `github:nushell/nushell`
+  while global/repos use `fnox` / `nushell`. mise treats those as different
+  tools, so making global authoritative (a `--write`) needs one canonical
+  backend per tool chosen first. Tracked for a follow-up.
+
 ## v0.21.0 — 2026-06-07
 
 Adds the `cliff:*` namespace — changelog / release intelligence via git-cliff.

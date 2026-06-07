@@ -15,7 +15,6 @@
 # Hidden base task — every prove:* extends this for shared nu pin.
 ["prove:_base"]
 hide = true
-tools = { "github:nushell/nushell" = "0.112" }
 
 # ── prove:bindings ───────────────────────────────────────────────────────────
 # Confirm the deployed Worker's bindings via wrangler --dry-run (no upload).
@@ -72,7 +71,6 @@ def main [] {
 ["prove:deployed"]
 extends = "prove:_base"
 description = "Smoke-test the deployed Worker — expect 302 to CF Access challenge with the AUD stored in fnox under APP_POLICY_AUD_FNOX_KEY."
-tools = { "github:jdx/fnox" = "1.24" }
 run = '''
 #!/usr/bin/env nu
 
@@ -142,7 +140,6 @@ def main [] {
 ["prove:access-policy"]
 extends = "prove:_base"
 description = "Verify the CF Access App for this Worker has at least one allow policy. Without one, login 403s after OAuth."
-tools = { "github:jdx/fnox" = "1.24" }
 run = '''
 #!/usr/bin/env nu
 

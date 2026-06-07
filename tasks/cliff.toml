@@ -5,28 +5,23 @@
 # (uncloud, dockur, …). Conventional-commit aware; needs nothing in the other
 # repo (it reads a clone).
 #
-# Tool versions are mise-native: declared in `tools = {}` so mise installs/pins
-# git-cliff — the nu bodies just CALL it, no version strings or install logic.
+# No per-task tool pins (v0.22.0): the tasks just CALL git-cliff, which comes
+# from your config — put it in the GLOBAL mise config once so every repo shares
+# one version and nothing drifts:
+#     mise use -g aqua:orhun/git-cliff
 #
 # Consumer wiring:
 #   [task_config]
 #   includes = [
-#     "git::https://github.com/joeblew999/.github.git//tasks/cliff.toml?ref=v0.21.0",
+#     "git::https://github.com/joeblew999/.github.git//tasks/cliff.toml?ref=v0.22.0",
 #   ]
 #
 # Inverse lookup ("which release shipped commit/PR X?") is plain git, not
 # git-cliff, so it's NOT a task here — it's a one-liner:
 #   git tag --contains <merge-sha>      # empty output = still unreleased
 
-# ── cliff:_base ──
-# Hidden base — every cliff:* extends this for the shared tool pins.
-["cliff:_base"]
-hide = true
-tools = { "github:nushell/nushell" = "0.112", "aqua:orhun/git-cliff" = "2.13" }
-
 # ── cliff:unreleased ─────────────────────────────────────────────────────────
 ["cliff:unreleased"]
-extends = "cliff:_base"
 description = "This repo: changelog for commits since the last tag (what the next release would contain)."
 run = '''
 #!/usr/bin/env nu
@@ -35,7 +30,6 @@ def main [] { ^git-cliff --unreleased --strip all }
 
 # ── cliff:show ───────────────────────────────────────────────────────────────
 ["cliff:show"]
-extends = "cliff:_base"
 description = "This repo: the full changelog across all tags (stdout)."
 run = '''
 #!/usr/bin/env nu
@@ -44,7 +38,6 @@ def main [] { ^git-cliff --strip all }
 
 # ── cliff:repo ───────────────────────────────────────────────────────────────
 ["cliff:repo"]
-extends = "cliff:_base"
 description = "Any repo: clone owner/repo and show its UNreleased delta (or a TAG..HEAD range). Usage: mise run cliff:repo -- psviderski/uncloud [v0.19.0]"
 run = '''
 #!/usr/bin/env nu

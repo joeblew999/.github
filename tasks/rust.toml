@@ -14,7 +14,6 @@
 # Hidden base task — every rust:* extends this for shared nu pin.
 ["rust:_base"]
 hide = true
-tools = { "github:nushell/nushell" = "0.112" }
 
 # ── rust:build ───────────────────────────────────────────────────────────────
 # cargo build --all-targets, with RUST_BACKTRACE=1 for better diagnostics.

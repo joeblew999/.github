@@ -16,7 +16,6 @@
 # config if missing; no-op if already present.
 ["fnox:init"]
 description = "bootstrap fnox for a fresh dev — sets up the keychain provider in the global config (no age key, no plain-file secrets)"
-tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24" }
 run = '''
 #!/usr/bin/env nu
 

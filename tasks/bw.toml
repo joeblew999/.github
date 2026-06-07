@@ -21,7 +21,7 @@
 # even though they only call ^mise; tiny over-install, acceptable.
 ["bw:_base"]
 hide = true
-tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24", "npm:@bitwarden/cli" = "latest" }
+tools = { "npm:@bitwarden/cli" = "latest" }   # bitwarden is bw-specific; nu+fnox come from global
 
 # ── bw:status ────────────────────────────────────────────────────────────────
 # Show bw login status against NodeWarden (server URL, lock state, email).

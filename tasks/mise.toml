@@ -19,7 +19,6 @@
 # global ~/.config/mise/config.toml.
 ["mise:upgrade"]
 description = "Bump pinned tool versions in this repo's mise.toml via `mise upgrade --bump --local`. Idempotent."
-tools = { "github:nushell/nushell" = "0.112" }
 run = '''
 #!/usr/bin/env nu
 
@@ -60,7 +59,6 @@ def main [
 # Use --dry-run to preview without deleting.
 ["mise:sweep"]
 description = "Reclaim dead mise state (dead config links + unused tool versions) across all repos under --root. Re-tracks live configs first so prune stays safe. Idempotent."
-tools = { "github:nushell/nushell" = "0.112" }
 run = '''
 #!/usr/bin/env nu
 
@@ -97,5 +95,40 @@ def main [
   print "→ mise prune --tools -y"
   ^mise prune --tools -y
   print "✓ sweep complete"
+}
+'''
+
+# ── mise:global-sync ─────────────────────────────────────────────────────────
+# Compare this repo's [tools] to the GLOBAL config (~/.config/mise/config.toml)
+# and report drift, normalising tool short-names (so `github:jdx/fnox` vs `fnox`
+# is recognised as the same tool, not a duplicate). Prints the exact
+# `mise use -g` commands to align — it does NOT write (a naive write could add a
+# second backend for the same tool). Standard config path only; VSCode-safe.
+["mise:global-sync"]
+description = "Report drift between this repo's [tools] and the global mise config, and print the `mise use -g` commands to align. Read-only."
+run = '''
+#!/usr/bin/env nu
+
+# tool short-name = last path segment, minus any backend prefix / [options].
+def short [spec: string] { $spec | split row "/" | last | split row "[" | first }
+
+def main [] {
+  let local = (open mise.toml | get tools? | default {})
+  let gpath = ($nu.home-dir | path join ".config" "mise" "config.toml")
+  let global = (if ($gpath | path exists) { (open $gpath | get tools? | default {}) } else { {} })
+  let gshort = ($global | columns | each {|k| {name: (short $k), ver: ($global | get $k | to text)} })
+
+  mut rows = []
+  for k in ($local | columns) {
+    let n = (short $k)
+    let want = ($local | get $k | to text)
+    let g = ($gshort | where name == $n | get ver? | default [] | first | default "—")
+    if $g != $want { $rows = ($rows | append { tool: $n, spec: $k, global: $g, canonical: $want }) }
+  }
+  if ($rows | is-empty) { print "✓ global already aligned to [tools]"; return }
+  print "Drift — global vs this repo's [tools] (canonical):"
+  $rows | select tool global canonical | table
+  print "\nTo align global (review first — pick the canonical backend per tool):"
+  for r in $rows { print $"  mise use -g ($r.spec)@($r.canonical)" }
 }
 '''

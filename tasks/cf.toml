@@ -24,7 +24,6 @@
 # which mise MERGES with the base's tools at runtime.
 ["cf:_base"]
 hide = true
-tools = { "github:nushell/nushell" = "0.112", "github:jdx/fnox" = "1.24" }
 
 # ── cf:token-check ───────────────────────────────────────────────────────────
 # Verify CLOUDFLARE_API_TOKEN is valid via /user/tokens/verify. Used as a
