@@ -37,27 +37,33 @@ def main [tag?: string, ...assets: string] {
   if (^git status --porcelain | str trim | is-not-empty) { print -e "✗ working tree dirty — commit your work first (build artifacts must be gitignored)"; exit 1 }
   if (^git tag -l $t | str trim | is-not-empty) { print -e $"✗ tag ($t) already exists"; exit 1 }
 
+  # Target OUR repo explicitly. gh defaults a fork's release/PR ops to the parent
+  # (upstream) repo — pass --repo everywhere so a fork releases to itself.
+  let repo = (^git remote get-url origin | str trim | str replace -r '.*github\.com[:/]' '' | str replace -r '\.git$' '')
+
   # 1. regenerate the changelog with the new tag (unreleased commits become $t)
   ^git-cliff --tag $t -o CHANGELOG.md
   ^git add CHANGELOG.md
   ^git commit -m $"chore\(release\): ($t)"
 
-  # 2. tag + push branch and tag together
+  # 2. tag + push the branch and THIS tag only (never --tags — that mirrors every
+  #    inherited upstream tag into the fork).
   ^git tag $t
-  ^git push origin HEAD --tags
+  ^git push origin HEAD
+  ^git push origin $t
 
-  # 3. GitHub release with this tag's notes
+  # 3. GitHub release on OUR repo, with this tag's notes
   let notes = (^git-cliff --tag $t --latest --strip all)
-  $notes | ^gh release create $t --title $t --notes-file -
+  $notes | ^gh release create $t --repo $repo --title $t --notes-file -
 
   # 4. optionally upload binary assets — and VERIFY they actually landed, so a
   #    release can never report success with no binaries attached.
   if ($assets | is-not-empty) {
-    ^gh release upload $t ...$assets --clobber
+    ^gh release upload $t ...$assets --repo $repo --clobber
     let want = ($assets | length)
-    let got = (^gh release view $t --json assets | from json | get assets | length)
+    let got = (^gh release view $t --repo $repo --json assets | from json | get assets | length)
     if ($got < $want) { print -e $"✗ asset upload incomplete: ($got)/($want) attached to ($t)"; exit 1 }
-    print $"✓ uploaded + verified ($got) asset\(s\)"
+    print $"✓ uploaded + verified ($got) asset\(s\) to ($repo)"
   }
   print $"✓ released ($t): changelog + tag + GitHub release"
 }
