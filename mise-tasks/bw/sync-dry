@@ -1,7 +1,0 @@
-#!/usr/bin/env nu
-#MISE description="DRY RUN of bw:sync (preview, no changes)."
-
-# Delegate to ./sync --dry-run. path self gives the directory of this script
-# so we don't depend on $PWD.
-const here = (path self | path dirname)
-^$"($here)/sync" --dry-run

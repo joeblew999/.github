@@ -1,5 +1,0 @@
-#!/usr/bin/env nu
-#MISE description="deploy to Cloudflare Workers"
-def main [...args] {
-  ^wrangler deploy ...$args
-}

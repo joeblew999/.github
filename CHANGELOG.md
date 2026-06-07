@@ -3,6 +3,30 @@
 All notable changes to the shared mise task library. Bump consumer repos'
 `[task_config].includes` pin when adopting a new release.
 
+## v0.25.0 — 2026-06-07
+
+**Retired the legacy `mise-tasks/` file-task tree.** Everything's been TOML for
+many releases; the old tree was dead weight.
+
+### Removed
+
+- **The entire `mise-tasks/` directory** — every namespace had a `tasks/*.toml`
+  counterpart already. Dropped its self-include, the `mise-tasks/**` workflow
+  path triggers, the CODEOWNERS entry, and the `mise-tasks-lint.yml` workflow
+  (its cross-platform nu proof is already covered by `tasks-toml-proof.yml` on
+  windows-latest).
+
+### Added
+
+- **`mise:release`** (in `tasks/mise.toml`) — ported from the old
+  `mise-tasks/release` file-task. `mise run mise:release -- vX.Y.Z`.
+
+### Changed
+
+- **Rewrote `AGENTS.md`** to the current model (TOML-only, global-config SSOT,
+  no version pinning, the real task list) — it still described the deleted
+  file-task flow + old per-task pinning. README + CONTRIBUTING updated to match.
+
 ## v0.24.0 — 2026-06-07
 
 **No more version pinning.** Common tools float to `latest`; the lib carries no

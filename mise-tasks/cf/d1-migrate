@@ -1,5 +1,0 @@
-#!/usr/bin/env nu
-#MISE description="run D1 migrations"
-def main [...args] {
-  ^wrangler d1 migrations apply ...$args
-}

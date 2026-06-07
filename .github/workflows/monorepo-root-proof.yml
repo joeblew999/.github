@@ -22,12 +22,10 @@ on:
     branches: [main, "feat/**"]
     paths:
       - "mise.toml"
-      - "mise-tasks/**"
       - ".github/workflows/monorepo-root-proof.yml"
   pull_request:
     paths:
       - "mise.toml"
-      - "mise-tasks/**"
       - ".github/workflows/monorepo-root-proof.yml"
   workflow_dispatch:
 

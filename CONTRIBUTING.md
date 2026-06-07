@@ -5,7 +5,7 @@ See [AGENTS.md](./AGENTS.md) for the full authoring guide — task structure, ru
 The short version (TOML-tasks, the v0.16+ pattern):
 
 ```bash
-# 1. add the task to tasks/<namespace>.toml — extend the namespace's _base
+# 1. add the task to tasks/<namespace>.toml (run body is nushell)
 vim tasks/<namespace>.toml
 
 # 2. lint the embedded nu code locally (sub-second)
@@ -16,7 +16,6 @@ mise tasks info <namespace>:<task-name>
 mise run <namespace>:<task-name>
 
 # 4. release
-mise run release -- vX.Y.Z
+mise run mise:release -- vX.Y.Z
 ```
 
-Don't add new tasks under `mise-tasks/` — that tree is [deprecated](mise-tasks/DEPRECATED.md).

@@ -137,3 +137,26 @@ def main [--write] {
   print "✓ global config synced to canonical [tools]"
 }
 '''
+
+# ── mise:release ─────────────────────────────────────────────────────────────
+# Tag and push a new semver release of THIS lib (local-only; no goreleaser/CI).
+#   mise run mise:release -- v0.25.0
+# Guards: on main, clean tree, valid vX.Y.Z, tag not already present.
+["mise:release"]
+description = "Tag + push a new semver release (vX.Y.Z). On main, clean tree only. Local; no CI."
+run = '''
+#!/usr/bin/env nu
+def main [tag?: string] {
+  let t = ($tag | default "")
+  if ($t | is-empty) { print -e "✗ usage: mise run mise:release -- vX.Y.Z"; exit 1 }
+  if not ($t =~ '^v[0-9]+\.[0-9]+\.[0-9]+$') { print -e "✗ tag must be vX.Y.Z"; exit 1 }
+  if ((^git rev-parse --abbrev-ref HEAD | str trim) != "main") { print -e "✗ not on main"; exit 1 }
+  if ((^git diff --quiet | complete | get exit_code) != 0) or ((^git diff --cached --quiet | complete | get exit_code) != 0) {
+    print -e "✗ working tree dirty — commit first"; exit 1
+  }
+  if (^git tag -l $t | str trim | is-not-empty) { print -e $"✗ tag ($t) already exists"; exit 1 }
+  ^git tag $t
+  ^git push origin $t
+  print $"✓ tagged ($t) and pushed — consumers: bump ?ref=($t)"
+}
+'''

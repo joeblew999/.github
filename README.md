@@ -6,8 +6,7 @@ Meta-repository for the `joeblew999` GitHub organisation.
 
 | Path | Purpose |
 |---|---|
-| `tasks/` | **Shared TOML-task library (v0.16+)** — consumed via `[task_config].includes` of individual files. Per-task tool pins propagate. |
-| `mise-tasks/` | Legacy file-task library (v0.10–v0.15.x consumers). [Deprecated](mise-tasks/DEPRECATED.md) — preserved for back-compat, no new tasks. |
+| `tasks/` | **Shared TOML-task library** — consumed via `[task_config].includes` of individual files. Tasks pin no tool versions; ubiquitous tools come from your global mise config. |
 | `.github/workflows/` | Reusable workflows: `reusable-mise-ci.yml`, `reusable-mise-upgrade.yml`. Plus self-proof CI (`tasks-toml-proof.yml`). |
 | `CHANGELOG.md` | Per-release notes — read before bumping a consumer's `?ref=` pin. |
 | `AGENTS.md` | Authoring + release guide. SSOT for Claude/Cursor/Copilot in this repo and the canonical pointer target for branch-local `AGENTS.md` files in consumers. |
@@ -21,16 +20,16 @@ In any consumer repo's `mise.toml` — include the specific TOML files you want,
 ```toml
 [task_config]
 includes = [
-  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.19.1",
-  "git::https://github.com/joeblew999/.github.git//tasks/secrets.toml?ref=v0.19.1",
-  "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.19.1",
+  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.25.0",
+  "git::https://github.com/joeblew999/.github.git//tasks/secrets.toml?ref=v0.25.0",
+  "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.25.0",
   # ...whichever namespaces you need
 ]
 ```
 
-Per-task tool pins (gh, jq, wrangler, fnox, nu, …) come along for the ride — consumers don't pin them globally.
+Tasks pin no tool versions. Ubiquitous tools (nushell, fnox, gh, jq, git-cliff, …) live in your **global** mise config — run `mise run mise:global-sync --write` from `.github` to set the canonical set; your repo `[tools]` declares only repo-specific tools.
 
-Available namespaces: `bw`, `cf`, `ci`, `env`, `fnox`, `mise`, `mobile`, `prove`, `rust`, `secrets`, `wrangler`. See [tasks/](tasks/) for the source.
+Available namespaces: `bw`, `cf`, `ci`, `cliff`, `env`, `fnox`, `mise`, `mobile`, `prove`, `rust`, `secrets`, `wrangler`. See [tasks/](tasks/) for the source.
 
 ### Lint your own tasks locally
 
@@ -58,7 +57,7 @@ mise does not chain `git::` includes, so list both explicitly:
 ```toml
 [task_config]
 includes = [
-  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.19.1",
+  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.25.0",
   "git::https://github.com/joeblew999/utm-dev.git//.mise/tasks?ref=v2.1.0",
 ]
 ```

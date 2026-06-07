@@ -1,6 +1,0 @@
-#!/usr/bin/env nu
-#MISE description="cargo build (all targets)"
-#MISE env = {RUST_BACKTRACE = "1"}
-def main [...args] {
-  ^cargo build --all-targets ...$args
-}

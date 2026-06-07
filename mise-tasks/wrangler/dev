@@ -1,5 +1,0 @@
-#!/usr/bin/env nu
-#MISE description="wrangler local dev (multi-worker)"
-def main [...args] {
-  ^wrangler dev ...$args
-}

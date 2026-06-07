@@ -1,7 +1,0 @@
-#!/usr/bin/env nu
-#MISE description="tail live logs from a deployed Worker"
-#USAGE flag "--env <env>" help="Cloudflare environment to tail" env="ENV" default="production"
-def main [...args] {
-  let cf_env = ($env.usage_env? | default ($env.ENV? | default "production"))
-  ^wrangler tail --env $cf_env ...$args
-}
