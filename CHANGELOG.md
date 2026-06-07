@@ -1,8 +1,17 @@
+## [0.34.0] - 2026-06-07
+
+### 📚 Documentation
+
+- Version-free <tag> in all task-header example refs (no more stale ?ref=)
 ## [0.33.0] - 2026-06-07
 
 ### 🐛 Bug Fixes
 
 - *(cliff)* Target fork's own repo (--repo) + push only the release tag
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.33.0
 ## [0.32.0] - 2026-06-07
 
 ### 🐛 Bug Fixes
