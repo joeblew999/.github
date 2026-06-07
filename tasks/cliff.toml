@@ -1,24 +1,49 @@
-# tasks/cliff.toml — TOML-task definitions for the cliff:* namespace.
+# tasks/cliff.toml — the cliff:* namespace: changelog + releases via git-cliff.
 #
-# Changelog / release intelligence via git-cliff (orhun/git-cliff). Maps commits
-# to release tags — for THIS repo and for any THIRD-PARTY repo you track
-# (uncloud, dockur, …). Conventional-commit aware; needs nothing in the other
-# repo (it reads a clone).
+# git-cliff (orhun/git-cliff) maps conventional commits to release tags. It comes
+# from the GLOBAL mise config (`mise run mise:global`) — tasks pin nothing.
 #
-# No per-task tool pins (v0.22.0): the tasks just CALL git-cliff, which comes
-# from your config — put it in the GLOBAL mise config once so every repo shares
-# one version and nothing drifts:
-#     mise use -g aqua:orhun/git-cliff
+# Read tasks work on THIS repo or any THIRD-PARTY repo (it reads a clone).
+# cliff:release is the release driver for any repo that wants an auto-generated
+# changelog — e.g. our uncloud fork.
 #
 # Consumer wiring:
 #   [task_config]
-#   includes = [
-#     "git::https://github.com/joeblew999/.github.git//tasks/cliff.toml?ref=v0.22.0",
-#   ]
+#   includes = ["git::https://github.com/joeblew999/.github.git//tasks/cliff.toml?ref=<tag>"]
 #
-# Inverse lookup ("which release shipped commit/PR X?") is plain git, not
-# git-cliff, so it's NOT a task here — it's a one-liner:
-#   git tag --contains <merge-sha>      # empty output = still unreleased
+# "Which release shipped commit X?" is plain git, not a task:
+#   git tag --contains <merge-sha>      # empty = still unreleased
+
+# ── cliff:release ────────────────────────────────────────────────────────────
+# The release driver: regenerate CHANGELOG.md from conventional commits, commit
+# it, tag, push branch + tag, and cut the GitHub release with the same notes.
+# Local-only (no CI/goreleaser). Usage: mise run cliff:release -- vX.Y.Z
+["cliff:release"]
+description = "git-cliff release: regenerate CHANGELOG.md, commit, tag, push, and create the GitHub release. Usage: mise run cliff:release -- vX.Y.Z"
+run = '''
+#!/usr/bin/env nu
+def main [tag?: string] {
+  let t = ($tag | default "")
+  if not ($t =~ '^v[0-9]+\.[0-9]+\.[0-9]+$') { print -e "✗ usage: mise run cliff:release -- vX.Y.Z"; exit 1 }
+  if ((^git rev-parse --abbrev-ref HEAD | str trim) != "main") { print -e "✗ not on main"; exit 1 }
+  if (^git status --porcelain | str trim | is-not-empty) { print -e "✗ working tree dirty — commit your work first"; exit 1 }
+  if (^git tag -l $t | str trim | is-not-empty) { print -e $"✗ tag ($t) already exists"; exit 1 }
+
+  # 1. regenerate the changelog with the new tag (unreleased commits become $t)
+  ^git-cliff --tag $t -o CHANGELOG.md
+  ^git add CHANGELOG.md
+  ^git commit -m $"chore\(release\): ($t)"
+
+  # 2. tag + push branch and tag together
+  ^git tag $t
+  ^git push origin HEAD --tags
+
+  # 3. GitHub release with this tag's notes
+  let notes = (^git-cliff --tag $t --latest --strip all)
+  $notes | ^gh release create $t --title $t --notes-file -
+  print $"✓ released ($t): changelog + tag + GitHub release"
+}
+'''
 
 # ── cliff:unreleased ─────────────────────────────────────────────────────────
 ["cliff:unreleased"]

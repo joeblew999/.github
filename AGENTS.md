@@ -1,60 +1,58 @@
-# Agent Guidelines: joeblew999/.github
+# joeblew999/.github
 
-Shared mise task library for `joeblew999` repos. Consumers pull namespaces by
-tag via `[task_config].includes`.
+Shared mise task library. Each `tasks/<ns>.toml` is a namespace of nushell
+tasks; a repo includes the ones it wants, pinned by tag.
 
-## Model
+## How tools work
 
-- **Tasks are TOML** in `tasks/<ns>.toml`; bodies are nushell.
-- **The global mise config owns the common toolset** — runtime-free binaries
-  every shared task inherits: nushell, fnox, gh, jq, usage, git-cliff. `mise run
-  mise:global` installs them. Tasks pin none of these.
-- **Tools that need a runtime stay per-task** in their namespace: `cf:*`/
-  `wrangler:*` (wrangler — node), `bw:*` (bitwarden — node), `mobile:*`
-  (java/ruby/cocoapods/tauri-cli), `rust:*` (wasm-pack). They install only when
-  their task runs.
-- **Common tools float to `latest`** (only `java`/`ruby` pinned).
-- **Specs use registry short-names** (`fnox`, `gh`, …); `nushell` →
-  `github:nushell/nushell`; forks keep their backend.
-- **Everything CI does is a mise task** → run it locally, then a real GitHub run
-  only confirms. `reusable-mise-ci.yml` is just `mise run mise:global` +
-  `mise run <task>`.
+One rule: **a repo's `[tools]` lists only what's unique to that repo.** Shared
+tools live in one of two places:
+
+| Tool kind | Lives in | Examples |
+|---|---|---|
+| Runtime-free binary | the **global** config — `mise run mise:global` | nushell, fnox, gh, jq, usage, git-cliff |
+| Needs node/ruby/rust | the **task** that uses it | wrangler (`cf`/`wrangler`), bitwarden (`bw`), java/cocoapods (`mobile`), wasm-pack (`rust`) |
+
+Common tools float to `latest`. Tasks never pin a tool that's in the global set.
 
 ## Tasks
 
-- `mise:global` — install the common toolset into the global config.
-- `mise:sweep` — prune orphaned tool installs.
-- `mise:release -- vX.Y.Z` — tag + push a release (local).
-- `cliff:repo <owner/repo>` — an upstream's unreleased delta (+ `cliff:unreleased`/`cliff:show`).
-- `ci:* cf:* bw:* secrets:* prove:* fnox:* wrangler:* rust:* mobile:*`.
+| Task | Does |
+|---|---|
+| `mise:global` | install the global toolset (run locally; CI runs the same task) |
+| `mise:sweep` | prune orphaned tool installs |
+| `mise:release -- vX.Y.Z` | tag + push (hand-written CHANGELOG) |
+| `cliff:release -- vX.Y.Z` | git-cliff CHANGELOG → commit → tag → GitHub release |
+| `cliff:repo <owner/repo>` | another repo's unreleased delta |
+| `ci:* cf:* bw:* secrets:* prove:* fnox:* wrangler:* rust:* mobile:*` | checks + domain tasks |
 
-## Nushell gotchas
+## Working here
 
-- `$"… ($var) …"` = variable; `$"… \(lit\) …"` = literal parens (don't write `$"x (lit)"`).
-- Lists need commas; `sort` doesn't dedupe (`sort | uniq`); parse-check = `nu --ide-check 1 <f>`.
-- Repo detect: `git remote get-url origin` (not `gh repo view` — follows forks).
-- `unset FNOX_AGE_KEY` in fnox tasks (Claude Code leaks it).
+1. Edit `tasks/<ns>.toml` — nushell body, no pins for global tools.
+2. `mise run ci:check-toml-tasks` (CI runs the same task).
+3. `mise run cliff:release -- vX.Y.Z` (or `mise:release`).
 
-## Add a task
-
-Edit `tasks/<ns>.toml` (no version pins for common tools) → `mise run
-ci:check-toml-tasks` → update `CHANGELOG.md` → `mise run mise:release -- vX.Y.Z`.
-
-## Consume
+## Consuming
 
 ```toml
 [task_config]
 includes = [
-  "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref=<tag>",   # mise:global etc.
-  "git::https://github.com/joeblew999/.github.git//tasks/<ns>.toml?ref=<tag>",   # one per namespace
+  "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref=<tag>",
+  "git::https://github.com/joeblew999/.github.git//tasks/<ns>.toml?ref=<tag>",
 ]
-[tools]
-# repo-specific only — common tools come from the global config (mise run mise:global)
+[tools]    # repo-specific only — globals come from `mise run mise:global`
 ```
 
-CI: `uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@<tag>` with `{ task: check }`.
+CI: `uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@<tag>` with
+`{ task: check }`. Everything CI runs is a mise task, so it runs locally first.
+
+## Nushell
+
+- `$"($var)"` interpolates; `$"\(lit\)"` is literal parens.
+- Lists need commas; `sort | uniq` to dedupe; parse-check is `nu --ide-check 1 <f>`.
+- Detect repo via `git remote get-url origin`; `unset FNOX_AGE_KEY` in fnox tasks.
 
 ## Secrets
 
-`fnox` = local store (keychain; `fnox set` always `-p keychain`). `bw:*` syncs
-keychain ↔ self-hosted NodeWarden. CI reads GH Actions secrets, never runs fnox.
+`fnox` = local keychain store (`fnox set -p keychain`); `bw:*` syncs it to
+self-hosted NodeWarden; CI reads GH Actions secrets, never runs fnox.
