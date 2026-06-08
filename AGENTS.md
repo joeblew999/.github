@@ -1,9 +1,21 @@
 # joeblew999/.github
 
-Shared mise task library + agent conventions for the whole joeblew999 fleet.
-Each `tasks/<ns>.toml` is a namespace of nushell tasks a repo includes, pinned.
+Shared mise task library + Claude plugin marketplace + agent conventions for the
+whole joeblew999 fleet.
 
-## 1. The flows — how this reaches a repo (READ FIRST)
+## Order of operations — ALWAYS this order (READ FIRST)
+
+1. **EDIT** here — a task in `tasks/<ns>.toml`, the `fleet` skill, or a workflow.
+2. **VALIDATE** in the sandbox
+   [`.github-example`](https://github.com/joeblew999/.github-example): it includes
+   this repo by *local, unversioned path*, so `mise run <task>` there tests the
+   edit instantly. Loop 1↔2 — **no release while iterating.**
+3. **RELEASE** only once it works: `mise run release:github -- vX.Y.Z`
+   (changelog → tag → GitHub release).
+4. **CONSUMERS ADOPT** by bumping `?ref=` / `@ref` / plugin version. Old refs are
+   immutable → nothing breaks → which is why you refactor here DEEPLY, never surface-patch.
+
+## The flows — what reaches a repo (by reference + versioned; never copy)
 
 Everything is distributed **BY REFERENCE + versioned. Nothing copies files into
 repos.** If you find yourself writing code to clone/copy/"stamp" .github content
@@ -20,14 +32,14 @@ A repo "upgrades" by bumping `?ref=`/`@ref` or its installed plugin. Old refs ar
 immutable, so nothing breaks. **Before building anything fleet-wide: search the
 fleet for the existing mechanism (grep tasks/, check known_marketplaces.json).**
 
-## 2. Refactor DEEPLY — this repo is version-protected
+## Refactor DEEPLY — this repo is version-protected
 
 You **cannot break a consumer** by changing `main` — they pin tags. So fix cruft
 **now**: rename, merge, delete, move across files, break things. Then
 `mise run release:github -- vX.Y.Z`. Never leave it "for later" or surface-patch.
 Being timid is the bug; the version pin is the safety net.
 
-## 3. NAMESPACE = TOOL
+## NAMESPACE = TOOL
 
 Each namespace = exactly one tool; a task NEVER lives in another tool's namespace.
 Orchestration that composes tools gets its OWN namespace (e.g. `release:`).
@@ -44,7 +56,7 @@ Orchestration that composes tools gets its OWN namespace (e.g. `release:`).
 Name implies one tool but drives others? Mis-named — move it. (`cliff:release`
 was wrong → it's `release:github`.)
 
-## 4. Tools
+## Tools
 
 A repo's `[tools]` lists only what's unique to it. Runtime-free binaries
 (nushell, fnox, gh, jq, usage, git-cliff) live in the **global** config
@@ -52,7 +64,7 @@ A repo's `[tools]` lists only what's unique to it. Runtime-free binaries
 **Rust = rustup + per-repo `rust-toolchain.toml`, NEVER mise** (mise exports
 `RUSTUP_TOOLCHAIN` which overrides the file); `ci:check-global` enforces this.
 
-## 5. Working in THIS repo
+## Working in THIS repo
 
 1. Edit `tasks/<ns>.toml` — nushell, no pins for global tools.
 2. **RUN the task, don't just parse it** — parse-clean ≠ runtime-correct (e.g.
@@ -63,12 +75,12 @@ A repo's `[tools]` lists only what's unique to it. Runtime-free binaries
 Key tasks: `mise:global`, `release:github -- vX.Y.Z [assets]`, `release:pack
 [-- --dir D]`, `docker:image -- vX.Y.Z`, `cliff:unreleased`, `ci:check-global`.
 
-## 6. Nushell
+## Nushell
 
 `$"($var)"` interpolates, `$"\(lit\)"` literal parens; `glob` (not `ls`) expands a
 path pattern; lists need commas; detect repo via `git remote get-url origin`.
 
-## 7. Secrets
+## Secrets
 
 `fnox` = local keychain (`fnox set -p keychain`); `bw:*` syncs to NodeWarden; CI
 reads GH Actions secrets, never runs fnox.
