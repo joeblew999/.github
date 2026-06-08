@@ -3,17 +3,21 @@
 # own ci:check-toml-tasks etc. against itself. mise doesn't auto-discover
 # tasks/ (only mise-tasks/, mise/tasks/, .mise/tasks/), so list explicitly.
 #
-# (release is now mise:release in tasks/mise.toml; legacy mise-tasks/ removed.)
+# Releases use release:github (tasks/release.toml). NAMESPACE = TOOL: cliff:* is
+# git-cliff only; release:* is the release orchestration (cliff+git+gh); ci:* is
+# all CI guards; docker:* is docker. No task lives in another tool's namespace.
 includes = [
   "tasks/bw.toml",
   "tasks/cf.toml",
   "tasks/ci.toml",
   "tasks/cliff.toml",
+  "tasks/docker.toml",
   "tasks/env.toml",
   "tasks/fnox.toml",
   "tasks/mise.toml",
   "tasks/mobile.toml",
   "tasks/prove.toml",
+  "tasks/release.toml",
   "tasks/rust.toml",
   "tasks/secrets.toml",
   "tasks/wrangler.toml",

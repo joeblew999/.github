@@ -1,11 +1,11 @@
-# tasks/cliff.toml — the cliff:* namespace: changelog + releases via git-cliff.
+# tasks/cliff.toml — the cliff:* namespace: changelog QUERIES via git-cliff only.
 #
 # git-cliff (orhun/git-cliff) maps conventional commits to release tags. It comes
 # from the GLOBAL mise config (`mise run mise:global`) — tasks pin nothing.
 #
-# Read tasks work on THIS repo or any THIRD-PARTY repo (it reads a clone).
-# cliff:release is the release driver for any repo that wants an auto-generated
-# changelog — e.g. our uncloud fork.
+# These are READ-ONLY (this repo or any third-party clone). The release DRIVER
+# moved to release:github (tasks/release.toml) — it composes git-cliff + git +
+# gh, so it belongs in the release: namespace, not cliff:.
 #
 # Consumer wiring:
 #   [task_config]
@@ -13,61 +13,6 @@
 #
 # "Which release shipped commit X?" is plain git, not a task:
 #   git tag --contains <merge-sha>      # empty = still unreleased
-
-# ── cliff:release ────────────────────────────────────────────────────────────
-# The release driver: regenerate CHANGELOG.md from conventional commits, commit
-# it, tag, push branch + tag, and cut the GitHub release with the same notes.
-# Optionally uploads binary assets (build them into a gitignored dir first).
-# Local-only (no CI/goreleaser).
-#   mise run cliff:release -- vX.Y.Z                    # changelog + tag + release
-#   mise run cliff:release -- vX.Y.Z dist/app-*         # ...and upload binaries
-["cliff:release"]
-description = "git-cliff release: regenerate CHANGELOG.md, commit, tag, push, create the GitHub release, and optionally upload binary assets. Usage: mise run cliff:release -- vX.Y.Z [assets...]"
-run = '''
-#!/usr/bin/env nu
-def main [tag?: string, ...assets: string] {
-  let t = ($tag | default "")
-  # vX.Y.Z, with an optional fork-distinct suffix (e.g. v1.0.0-jb.1) so forks
-  # don't collide with upstream's own tags.
-  if not ($t =~ '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$') { print -e "✗ usage: mise run cliff:release -- vX.Y.Z[-suffix] [assets...]"; exit 1 }
-  # Release from whatever branch is checked out (main for our own repos, the
-  # overlay branch e.g. joeblew999 for forks) — just not a detached HEAD.
-  let branch = (^git rev-parse --abbrev-ref HEAD | str trim)
-  if ($branch == "HEAD") { print -e "✗ detached HEAD — checkout a branch first"; exit 1 }
-  if (^git status --porcelain | str trim | is-not-empty) { print -e "✗ working tree dirty — commit your work first (build artifacts must be gitignored)"; exit 1 }
-  if (^git tag -l $t | str trim | is-not-empty) { print -e $"✗ tag ($t) already exists"; exit 1 }
-
-  # Target OUR repo explicitly. gh defaults a fork's release/PR ops to the parent
-  # (upstream) repo — pass --repo everywhere so a fork releases to itself.
-  let repo = (^git remote get-url origin | str trim | str replace -r '.*github\.com[:/]' '' | str replace -r '\.git$' '')
-
-  # 1. regenerate the changelog with the new tag (unreleased commits become $t)
-  ^git-cliff --tag $t -o CHANGELOG.md
-  ^git add CHANGELOG.md
-  ^git commit -m $"chore\(release\): ($t)"
-
-  # 2. tag + push the branch and THIS tag only (never --tags — that mirrors every
-  #    inherited upstream tag into the fork).
-  ^git tag $t
-  ^git push origin HEAD
-  ^git push origin $t
-
-  # 3. GitHub release on OUR repo, with this tag's notes
-  let notes = (^git-cliff --tag $t --latest --strip all)
-  $notes | ^gh release create $t --repo $repo --title $t --notes-file -
-
-  # 4. optionally upload binary assets — and VERIFY they actually landed, so a
-  #    release can never report success with no binaries attached.
-  if ($assets | is-not-empty) {
-    ^gh release upload $t ...$assets --repo $repo --clobber
-    let want = ($assets | length)
-    let got = (^gh release view $t --repo $repo --json assets | from json | get assets | length)
-    if ($got < $want) { print -e $"✗ asset upload incomplete: ($got)/($want) attached to ($t)"; exit 1 }
-    print $"✓ uploaded + verified ($got) asset\(s\) to ($repo)"
-  }
-  print $"✓ released ($t): changelog + tag + GitHub release"
-}
-'''
 
 # ── cliff:unreleased ─────────────────────────────────────────────────────────
 ["cliff:unreleased"]

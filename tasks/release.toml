@@ -39,3 +39,49 @@ def main [
   print $"✓ packed ($n) archive\(s\) in ($dir)"
 }
 '''
+
+# ── release:github ───────────────────────────────────────────────────────────
+# Release driver — composes git-cliff + git + gh (this is WHY it lives in
+# release:, not cliff:): regenerate CHANGELOG.md, commit, tag, push branch+tag,
+# cut the GitHub release with the same notes, and optionally upload + verify
+# binary assets (build them into a gitignored dir, then release:pack first).
+# Any branch (main, or a fork's overlay); fork-distinct -suffix ok.
+#   mise run release:github -- vX.Y.Z                 # changelog + tag + release
+#   mise run release:github -- vX.Y.Z dist/*.tar.gz   # ...and upload binaries
+["release:github"]
+description = "Release driver: git-cliff changelog + tag + push + gh release create + verified asset upload. Usage: mise run release:github -- vX.Y.Z [assets...]"
+run = '''
+#!/usr/bin/env nu
+def main [tag?: string, ...assets: string] {
+  let t = ($tag | default "")
+  # vX.Y.Z, with an optional fork-distinct suffix (e.g. v1.0.0-jb.1).
+  if not ($t =~ '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$') { print -e "✗ usage: mise run release:github -- vX.Y.Z[-suffix] [assets...]"; exit 1 }
+  let branch = (^git rev-parse --abbrev-ref HEAD | str trim)
+  if ($branch == "HEAD") { print -e "✗ detached HEAD — checkout a branch first"; exit 1 }
+  if (^git status --porcelain | str trim | is-not-empty) { print -e "✗ working tree dirty — commit your work first (build artifacts must be gitignored)"; exit 1 }
+  if (^git tag -l $t | str trim | is-not-empty) { print -e $"✗ tag ($t) already exists"; exit 1 }
+
+  # Target OUR repo explicitly so a fork releases to itself, not its parent.
+  let repo = (^git remote get-url origin | str trim | str replace -r '.*github\.com[:/]' '' | str replace -r '\.git$' '')
+
+  ^git-cliff --tag $t -o CHANGELOG.md
+  ^git add CHANGELOG.md
+  ^git commit -m $"chore\(release\): ($t)"
+
+  ^git tag $t
+  ^git push origin HEAD
+  ^git push origin $t
+
+  let notes = (^git-cliff --tag $t --latest --strip all)
+  $notes | ^gh release create $t --repo $repo --title $t --notes-file -
+
+  if ($assets | is-not-empty) {
+    ^gh release upload $t ...$assets --repo $repo --clobber
+    let want = ($assets | length)
+    let got = (^gh release view $t --repo $repo --json assets | from json | get assets | length)
+    if ($got < $want) { print -e $"✗ asset upload incomplete: ($got)/($want) attached to ($t)"; exit 1 }
+    print $"✓ uploaded + verified ($got) asset\(s\) to ($repo)"
+  }
+  print $"✓ released ($t): changelog + tag + GitHub release"
+}
+'''
