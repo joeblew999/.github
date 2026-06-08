@@ -1,5 +1,6 @@
 name: Reusable Mise CI
 
+# ▸ See ./README.md for how the system works (bootstrap, matrix, isomorphic local==CI).
 # Reusable workflow — every joeblew999 repo can call this from its own
 # .github/workflows/<name>.yml via:
 #
