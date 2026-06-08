@@ -69,7 +69,7 @@ mise** (mise exports `RUSTUP_TOOLCHAIN`, which overrides the toolchain file).
    just parse it (parse-clean ≠ runtime-correct; e.g. `ls path-with-glob` needs `glob`).
 3. `mise run release:github -- vX.Y.Z`.
 
-## Consuming (.github wiring — normally `stamp:repo` writes this)
+## Consuming (.github wiring — add to the repo's mise.toml)
 
 ```toml
 [task_config]
