@@ -69,7 +69,7 @@ jobs:
           restore-keys: sccache-${{ matrix.os }}-
 
       # Seed the runner's global toolset — the SAME mise task you run locally.
-      # (Consumer must include tasks/mise.toml for mise:global.)
-      - run: mise run mise:global
+      # (Consumer must include tasks/mise.toml for mise:global:bootstrap.)
+      - run: mise run mise:global:bootstrap
 
       - run: mise run ${{ inputs.task }}

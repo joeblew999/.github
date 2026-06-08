@@ -1,7 +1,7 @@
 # tasks/cliff.toml — the cliff:* namespace: changelog QUERIES via git-cliff only.
 #
 # git-cliff (orhun/git-cliff) maps conventional commits to release tags. It comes
-# from the GLOBAL mise config (`mise run mise:global`) — tasks pin nothing.
+# from the GLOBAL mise config (`mise run mise:global:bootstrap`) — tasks pin nothing.
 #
 # These are READ-ONLY (this repo or any third-party clone). The release DRIVER
 # moved to release:github (tasks/release.toml) — it composes git-cliff + git +

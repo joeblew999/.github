@@ -18,33 +18,20 @@ How a change flows — **always in this order**:
 4. **Consumers adopt** by bumping their `?ref=` / `@ref` / plugin version.
    Old refs never break (immutable) — which is why you refactor here *deeply*.
 
-## Use it
+## New repo — what a dev runs
 
-Pin the namespaces you want in a consumer's `mise.toml`:
-
-```toml
-[task_config]
-includes = [
-  "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref=<tag>",   # mise:global, mise:sweep, …
-  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=<tag>",
-  # one URL per namespace — mise does NOT chain git:: includes
-]
-[tools]
-# repo-specific tools only — common ones come from the global config:
-#   mise run mise:global
+```sh
+# 1. add the includes to mise.toml (pin ?ref= to the latest tag):
+#    [task_config]
+#    includes = [
+#      "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref=<tag>",
+#      "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=<tag>",
+#    ]
+mise trust             # load the config + includes
+mise run mise:global:bootstrap   # bootstrap the machine's toolset (nu, gh, …)
+mise run mise:repo:bootstrap     # bootstrap this repo's .github/workflows
+mise run ci            # verify
 ```
 
+Working example: [.github-example](https://github.com/joeblew999/.github-example).
 Namespaces: `bw cf ci cliff env fnox mise mobile prove rust secrets wrangler`.
-
-## Local = CI
-
-Everything CI runs is a mise task, so it runs locally too. One-line CI:
-
-```yaml
-jobs:
-  ci:
-    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@<tag>
-    with: { task: check }
-```
-
-`mise run cliff:repo -- <owner/repo>` shows any upstream's unreleased delta.

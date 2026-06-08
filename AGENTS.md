@@ -3,6 +3,25 @@
 Shared mise task library + Claude plugin marketplace + agent conventions for the
 whole joeblew999 fleet.
 
+## Keep .github-example repo matching 
+
+KEEP README.md Updated with the correct shell commands that .github-example repo must run and keep it idempotent !! 
+
+## Cross-platform or it's broken (READ FIRST)
+
+Every repo here must work on **macOS, Linux AND Windows**. Therefore:
+
+- **All task logic is nushell** (`#!/usr/bin/env nu`) — never bash/sh/PowerShell,
+  never a `.sh` file. No bash-isms, no hardcoded `/Users`, `/home`, `/opt` paths;
+  derive from env + install state.
+- A task that is a **single plain command** mise runs in the default shell (e.g.
+  `mise:global` = `mise use -g …`) is fine — it's not shell-specific.
+- The **bootstrap before nu exists** is bare `mise` commands ONLY. nu is installed
+  by `mise run mise:global`, so the bootstrap can't be written in nu either — mise
+  is the one cross-platform tool guaranteed present. (See README "New repo".)
+
+If you reach for a shell script, you've already broken the rule. Write a nu task.
+
 ## Order of operations — ALWAYS this order (READ FIRST)
 
 1. **EDIT** here — a task in `tasks/<ns>.toml`, the `fleet` skill, or a workflow.

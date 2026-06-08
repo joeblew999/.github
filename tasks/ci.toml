@@ -15,6 +15,15 @@
 # Tool pin policy: track the same versions as joeblew999/.github's own
 # mise.toml [tools] block. Bump them together when the lib version is bumped.
 
+# ── ci ───────────────────────────────────────────────────────────────────────
+# The default CI umbrella. The mise:repo:bootstrap workflow stub runs `mise run ci`, so
+# EVERY repo that includes ci.toml has a working CI with zero repo code: it runs
+# the shared guards. A repo extends it by defining its own `ci` with extra
+# `depends` (build/test) — but this is the floor that always works.
+["ci"]
+description = "Default CI umbrella — runs the shared guards. Repos extend it with their own build/test."
+depends = ["ci:check-global", "ci:check-toml-tasks"]
+
 # ── ci:check-toml-tasks ──────────────────────────────────────────────────────
 # Parse-check every inline `run = '''...'''` body in tasks/*.toml of the
 # current repo. Spawns `nu --ide-check 1` on each extracted body — same
@@ -701,11 +710,11 @@ def main [
     }
     for t in ["fnox" "gh" "jq" "usage" "git-cliff" "nushell"] {
       if not ($txt | str contains $t) {
-        $violations = ($violations | append $"($global): missing canonical tool `($t)` — run `mise run mise:global`")
+        $violations = ($violations | append $"($global): missing canonical tool `($t)` — run `mise run mise:global:bootstrap`")
       }
     }
   } else {
-    $violations = ($violations | append $"($global): not found — run `mise run mise:global`")
+    $violations = ($violations | append $"($global): not found — run `mise run mise:global:bootstrap`")
   }
 
   # ── 2. no repo config may manage Rust either ────────────────────────────────

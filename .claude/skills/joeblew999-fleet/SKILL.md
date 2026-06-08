@@ -1,6 +1,6 @@
 ---
 name: joeblew999-fleet
-description: How to work in any joeblew999 fleet repo — the joeblew999/.github distribution flows (mise task includes, reusable CI, mise:global, this skills marketplace), the namespace=tool rule, releasing via release:github, and "distribute by reference, never copy/stamp files". Use when touching mise.toml/tasks, CI workflows, releases, rust toolchains, or onboarding a repo to .github.
+description: How to work in any joeblew999 fleet repo — the joeblew999/.github distribution flows (mise task includes, reusable CI, mise:global:bootstrap, this skills marketplace), the namespace=tool rule, releasing via release:github, and "distribute by reference, never copy/stamp files". Use when touching mise.toml/tasks, CI workflows, releases, rust toolchains, or onboarding a repo to .github.
 ---
 
 # joeblew999 fleet conventions
@@ -17,7 +17,7 @@ reinventing.** All four channels already exist:
 |---|---|---|
 | **mise tasks** | `mise.toml` → `[task_config].includes = ["git::https://github.com/joeblew999/.github.git//tasks/<ns>.toml?ref=vX"]` | `?ref=` |
 | **CI** | `.github/workflows/*.yml` → `uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@vX` (runs one `mise run <task>`) | `@ref` |
-| **global tools** | `mise run mise:global` | latest |
+| **global tools** | `mise run mise:global:bootstrap` | latest |
 | **claude skills (this)** | `claude plugin marketplace add joeblew999/.github` + install `fleet` | plugin version |
 
 Onboarding a repo = writing those small wiring lines (by hand / by you, the
