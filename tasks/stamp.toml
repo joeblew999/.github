@@ -36,7 +36,7 @@ def main [--ref: string = "main"] {
   let tpl = ($tmp | path join "templates" "mise.yaml")
   if ($tpl | path exists) {
     mkdir .github/workflows
-    open --raw $tpl | str replace --all "{{REF}}" $ref | save -f .github/workflows/mise.yaml
+    open --raw $tpl | str replace --all "__REF__" $ref | save -f .github/workflows/mise.yaml
     print "  ✓ .github/workflows/mise.yaml"
   }
 

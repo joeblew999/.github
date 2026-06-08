@@ -20,7 +20,6 @@ includes = [
   "tasks/release.toml",
   "tasks/rust.toml",
   "tasks/secrets.toml",
-  "tasks/stamp.toml",
   "tasks/wrangler.toml",
 ]
 

@@ -61,7 +61,6 @@ mise** (mise exports `RUSTUP_TOOLCHAIN`, which overrides the toolchain file).
 | `cliff:unreleased` / `cliff:show` / `cliff:repo <owner/repo>` | changelog queries |
 | `docker:login` / `docker:image -- vX.Y.Z` | ghcr auth + multi-arch build+push+verify |
 | `ci:check-toml-tasks` / `ci:check-global` / `ci:audit-lib-refs` | guards (run locally + CI) |
-| `stamp:repo` | stamp the .github wiring + claude skills into the current repo (see Stamping) |
 
 ## Working here
 
@@ -84,15 +83,24 @@ includes = [
 CI: `uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@<tag>` with
 `{ task: ci }` (or `build`). Everything CI runs is a mise task, so it runs locally first.
 
-## Stamping (onboard a repo)
+## How we stamp out to repos (the flows)
 
-`mise run stamp:repo` (run inside a consumer repo) stamps from a pinned .github:
-- **claude skills** — `.github/.claude/skills/*` → the repo's `.claude/skills/`
-- **CI workflow** — the reusable-mise-ci stub → `.github/workflows/mise.yaml`
-- prints the `[task_config].includes` block to add to the repo's `mise.toml`
+Everything is distributed **by reference and versioned** — nothing copies files
+into repos. There are several distinct mechanisms; know which is which:
 
-Skills + agent config live in `.github/.claude/` and `AGENTS.md` — this repo is
-the single source of truth; consumers stamp from it, pinned by tag.
+| What | Mechanism | Versioned by | Scope |
+|---|---|---|---|
+| **mise tasks** | `[task_config].includes = ["git::…/tasks/<ns>.toml?ref=vX"]` in the repo's `mise.toml` | `?ref=` | per repo |
+| **CI** | `.github/workflows/*.yml` → `uses: …/reusable-mise-ci.yml@vX` | `@ref` | per repo |
+| **global tools** | `mise run mise:global` | (floats to latest) | per machine |
+| **claude skills** | Claude Code plugin **marketplace** (`claude plugin marketplace add` + install) — like the `cc-skills` `mise`/`itp` plugins | plugin version | per machine/user |
+
+To bump what a repo gets: change its `?ref=`/`@ref` (mise tasks, CI) or update
+the installed plugin (skills). Old refs/versions keep working — that's the safety
+net (see the deep-refactor note above).
+
+A repo's AGENTS.md is repo-specific (describes that project). This file is the
+single source of truth for the SHARED conventions every repo's agents inherit.
 
 ## Nushell
 
