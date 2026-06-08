@@ -1,8 +1,17 @@
+## [0.38.0] - 2026-06-08
+
+### 🚀 Features
+
+- *(stamp)* Stamp .github wiring + claude skills into consumer repos; AGENTS deep-refactor directive
 ## [0.37.0] - 2026-06-08
 
 ### 🚜 Refactor
 
 - [**breaking**] Tool-based task namespaces (namespace = the tool)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.37.0
 ## [0.36.2] - 2026-06-08
 
 ### 🐛 Bug Fixes
