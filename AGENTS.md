@@ -37,6 +37,21 @@ A repo "upgrades" by bumping `?ref=`/`@ref` or its installed plugin. Old refs ar
 immutable, so nothing breaks. **Before building anything fleet-wide: search the
 fleet for the existing mechanism (grep tasks/, check known_marketplaces.json).**
 
+## How a CONSUMER adopts .github — in this order
+
+The canonical minimal example is
+[`.github-example`](https://github.com/joeblew999/.github-example) — copy its shape.
+
+1. **Skills + conventions** — `claude plugin marketplace add joeblew999/.github`, install `fleet` (or read this file).
+2. **`CLAUDE.md`** in the repo root, pointing agents at this AGENTS.md.
+3. **mise tasks** — `mise.toml` `[task_config].includes` the namespaces you need, pinned `?ref=vX`.
+4. **global tools** — `mise run mise:global` (once per machine).
+5. **Rust?** — pin in `rust-toolchain.toml` (rustup), never mise.
+6. **CI** — `.github/workflows/mise.yaml` → `uses: …/reusable-mise-ci.yml@vX` with `{ task: … }`.
+
+Then `mise run <task>` works locally and CI runs the same task. A consumer adds
+ONLY its own repo-specific tasks/tools; everything shared comes from above.
+
 ## Refactor DEEPLY — this repo is version-protected
 
 You **cannot break a consumer** by changing `main` — they pin tags. So fix cruft
