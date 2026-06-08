@@ -6,15 +6,15 @@ whole joeblew999 fleet.
 ## Order of operations — ALWAYS this order (READ FIRST)
 
 1. **EDIT** here — a task in `tasks/<ns>.toml`, the `fleet` skill, or a workflow.
-2. **VALIDATE in BOTH local and CI** — a change must pass both before you ship it:
-   - **local:** `mise run <task>` in the sandbox
-     [`.github-example`](https://github.com/joeblew999/.github-example) (it includes
-     `../.github` by *local path*, so your edit is live instantly).
-   - **CI:** push `.github` `main`, then `.github-example`'s `validate.yml` checks
-     out `.github` as a sibling and runs the same tasks on a runner. (`.github`
-     also self-validates via `tasks-toml-proof.yml`.)
-   Loop 1↔2 — **no release/tag while iterating.** Local can pass while CI fails
-   (e.g. a tool that's global on your box but absent on a runner) — so check both.
+2. **VALIDATE in BOTH local and CI** — a change must pass both before you ship it.
+   Push `.github` `main` (unversioned/rolling — no tag yet), then in the sandbox
+   [`.github-example`](https://github.com/joeblew999/.github-example) (consumes
+   `.github@main`):
+   - **local:** `mise run <task>` (clear mise's git-include cache to pull new main).
+   - **CI:** its `mise.yaml` runs the shared `reusable-mise-ci.yml@main` → the same
+     task on a clean runner. (`.github` also self-validates via `tasks-toml-proof.yml`.)
+   Loop — **no release/tag while iterating.** Local can pass while CI fails (a tool
+   global on your box but absent on a runner) — so check both.
 3. **RELEASE** only once it works: `mise run release:github -- vX.Y.Z`
    (changelog → tag → GitHub release).
 4. **CONSUMERS ADOPT** by bumping `?ref=` / `@ref` / plugin version. Old refs are
