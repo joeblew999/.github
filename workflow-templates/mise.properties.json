@@ -1,6 +1,0 @@
-{
-  "name": "mise CI (joeblew999)",
-  "description": "Run `mise run ci` across the OS matrix via the shared joeblew999/.github reusable-mise-ci workflow. The fleet's standard CI.",
-  "iconName": "octicon terminal",
-  "categories": ["Continuous integration"]
-}
