@@ -6,10 +6,15 @@ whole joeblew999 fleet.
 ## Order of operations — ALWAYS this order (READ FIRST)
 
 1. **EDIT** here — a task in `tasks/<ns>.toml`, the `fleet` skill, or a workflow.
-2. **VALIDATE** in the sandbox
-   [`.github-example`](https://github.com/joeblew999/.github-example): it includes
-   this repo by *local, unversioned path*, so `mise run <task>` there tests the
-   edit instantly. Loop 1↔2 — **no release while iterating.**
+2. **VALIDATE in BOTH local and CI** — a change must pass both before you ship it:
+   - **local:** `mise run <task>` in the sandbox
+     [`.github-example`](https://github.com/joeblew999/.github-example) (it includes
+     `../.github` by *local path*, so your edit is live instantly).
+   - **CI:** push `.github` `main`, then `.github-example`'s `validate.yml` checks
+     out `.github` as a sibling and runs the same tasks on a runner. (`.github`
+     also self-validates via `tasks-toml-proof.yml`.)
+   Loop 1↔2 — **no release/tag while iterating.** Local can pass while CI fails
+   (e.g. a tool that's global on your box but absent on a runner) — so check both.
 3. **RELEASE** only once it works: `mise run release:github -- vX.Y.Z`
    (changelog → tag → GitHub release).
 4. **CONSUMERS ADOPT** by bumping `?ref=` / `@ref` / plugin version. Old refs are

@@ -8,10 +8,12 @@ Guide: [AGENTS.md](./AGENTS.md) · Releases: [CHANGELOG.md](./CHANGELOG.md).
 How a change flows — **always in this order**:
 
 1. **Edit** here — a task in `tasks/<ns>.toml`, the `fleet` skill, or a workflow.
-2. **Validate live** in the sandbox
-   [`.github-example`](https://github.com/joeblew999/.github-example): it includes
-   this repo by *local, unversioned path*, so `mise run <task>` there tests your
-   edit instantly. **No release needed — iterate here.**
+2. **Validate — local AND CI** via the sandbox
+   [`.github-example`](https://github.com/joeblew999/.github-example):
+   *local* = `mise run <task>` there (includes `../.github` by path → instant);
+   *CI* = push `.github` `main`, its `validate.yml` checks out `.github` as a
+   sibling and runs the same tasks on a runner. **Both green before release; no
+   release while iterating.**
 3. **Release** only once it works: `mise run release:github -- vX.Y.Z`
    (changelog → tag → GitHub release).
 4. **Consumers adopt** by bumping their `?ref=` / `@ref` / plugin version.
