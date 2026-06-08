@@ -14,6 +14,7 @@ includes = [
   "tasks/docker.toml",
   "tasks/env.toml",
   "tasks/fnox.toml",
+  "tasks/gh.toml",
   "tasks/mise.toml",
   "tasks/mobile.toml",
   "tasks/prove.toml",

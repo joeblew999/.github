@@ -9,7 +9,7 @@ The short version (TOML-tasks, the v0.16+ pattern):
 vim tasks/<namespace>.toml
 
 # 2. lint the embedded nu code locally (sub-second)
-mise run ci:check-toml-tasks
+mise run ci:check-nu
 
 # 3. test the resolved task
 mise tasks info <namespace>:<task-name>

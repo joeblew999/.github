@@ -7,6 +7,10 @@ whole joeblew999 fleet.
 
 KEEP README.md Updated with the correct shell commands that .github-example repo must run and keep it idempotent !! 
 
+## Testing Example works
+
+The example's CI fetches joeblew999/.github@main on the runner, so every .github change must be pushed before CI can see it. The local-path-include trick only accelerates the local loop; it never substitutes for the push when you want CI (or the remote-pinned example) to validate.
+
 ## Cross-platform or it's broken (READ FIRST)
 
 Every repo here must work on **macOS, Linux AND Windows**. Therefore:
@@ -82,28 +86,32 @@ You **cannot break a consumer** by changing `main` — they pin tags. So fix cru
 `mise run release:github -- vX.Y.Z`. Never leave it "for later" or surface-patch.
 Being timid is the bug; the version pin is the safety net.
 
-## NAMESPACE = TOOL
+## NAMESPACE = TOOL (+ an orchestration tier)
 
-Each namespace = exactly one tool; a task NEVER lives in another tool's namespace.
-Orchestration that composes tools gets its OWN namespace (e.g. `release:`).
+Each namespace is **one tool**; a task never lives in another tool's namespace.
+A few namespaces are **orchestration/domain** — they compose several tools, and
+say so plainly: `release` (cliff+git+gh), `ci` (guards), `secrets` (fnox+gh),
+`prove` (deploy checks), `mobile` (tauri+android+ios).
 
 | Namespace | Tool / role |
 |---|---|
-| `mise:*` | mise (`global`, `sweep`, `upgrade`) |
-| `cliff:*` | git-cliff — **changelog queries only** (`unreleased`/`show`/`repo`) |
-| `release:*` | release orchestration (cliff+git+gh): `release:github`, `release:pack` |
+| `mise:*` | mise (`global:bootstrap`, `repo:bootstrap[-delete]`, `sweep`, `upgrade`) |
+| `gh:*` | gh — GitHub Actions **run** mgmt (`run-watch`, `run-clean`) |
+| `cliff:*` | git-cliff — changelog queries (`unreleased`/`show`/`repo`) |
 | `docker:*` | docker (`login`/`image`/`settings`) |
-| `ci:*` | guards + ref drift (`check-toml-tasks`/`check-global`/`audit-lib-refs [--write]`) |
-| `rust:* cf:* wrangler:* bw:* secrets:* fnox:* prove:* mobile:* env:*` | their tool/domain |
+| `bw cf fnox rust wrangler env` | each its own tool |
+| `release:*` | **orchestration** (cliff+git+gh): `release:github`, `release:pack` |
+| `ci:*` | **static guards** (`check-nu`/`check-global`) + ref drift (`audit-lib-refs [--write]`) |
+| `secrets prove mobile` | **orchestration/domain** (compose tools) |
 
 Name implies one tool but drives others? Mis-named — move it. (`cliff:release`
-was wrong → it's `release:github`.)
+→ `release:github`; `ci:watch`/`ci:clean` → `gh:run-watch`/`gh:run-clean`.)
 
 ## Tools
 
 A repo's `[tools]` lists only what's unique to it. Runtime-free binaries
 (nushell, fnox, gh, jq, usage, git-cliff) live in the **global** config
-(`mise:global`); tools needing node/ruby/rust are pinned **per-task**.
+(`mise:global:bootstrap`); tools needing node/ruby/rust are pinned **per-task**.
 **Rust = rustup + per-repo `rust-toolchain.toml`, NEVER mise** (mise exports
 `RUSTUP_TOOLCHAIN` which overrides the file); `ci:check-global` enforces this.
 
@@ -112,7 +120,7 @@ A repo's `[tools]` lists only what's unique to it. Runtime-free binaries
 1. Edit `tasks/<ns>.toml` — nushell, no pins for global tools.
 2. **RUN the task, don't just parse it** — parse-clean ≠ runtime-correct (e.g.
    `ls <string-with-glob>` fails; use `glob`; `{{…}}` in a task body is Tera, not
-   a literal). `mise run ci:check-toml-tasks` parses; you still must *run* changed tasks.
+   a literal). `mise run ci:check-nu` parses; you still must *run* changed tasks.
 3. `mise run release:github -- vX.Y.Z`.
 
 Key tasks: `mise:global`, `release:github -- vX.Y.Z [assets]`, `release:pack

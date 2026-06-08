@@ -1,0 +1,19 @@
+name: mise CI
+
+# .github dogfoods its OWN reusable workflow, on the in-repo version
+# (uses: ./…), so any change to reusable-mise-ci.yml or a task is tested the
+# exact way consumers run it: `mise run ci` across the OS matrix. This + the
+# .github-example consumer replace the old bespoke tasks-toml-proof.yml.
+# See ./README.md.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-mise-ci.yml
+    with:
+      task: ci
+      os-matrix: '["ubuntu-latest", "macos-latest", "windows-latest"]'
+      sccache: false
