@@ -1,115 +1,78 @@
 # joeblew999/.github
 
-Shared mise task library + agent config, consumed by every joeblew999 repo.
-Each `tasks/<ns>.toml` is a namespace of nushell tasks; a repo includes the ones
-it wants, **pinned by tag** (`?ref=vX.Y.Z`).
+Shared mise task library + agent conventions for the whole joeblew999 fleet.
+Each `tasks/<ns>.toml` is a namespace of nushell tasks a repo includes, pinned.
 
-## ⚠️ Refactor DEEPLY — this repo is version-protected
+## 1. The flows — how this reaches a repo (READ FIRST)
 
-**You cannot break any consumer by refactoring here.** Every repo pins a tag
-(`?ref=vX.Y.Z`); old tags are immutable, so existing consumers keep working no
-matter what `main` does. A consumer only sees your changes when it *chooses* to
-bump its `?ref=`.
+Everything is distributed **BY REFERENCE + versioned. Nothing copies files into
+repos.** If you find yourself writing code to clone/copy/"stamp" .github content
+into a repo, **STOP — you are reinventing.** The mechanism already exists:
 
-So when you see duplication, mis-named tasks, layers-on-layers, or a task in the
-wrong namespace: **fix it properly, now.** Rename, merge, delete, move across
-files — whatever it takes. Do NOT leave cruft "for later" or do a surface patch.
-Then `mise run release:github -- vX.Y.Z` and the new shape ships as a new tag.
-Breaking changes are fine — note them in the commit and bump appropriately.
+| What | Mechanism (already exists) | Versioned by | Scope |
+|---|---|---|---|
+| **mise tasks** | `[task_config].includes = ["git::…/tasks/<ns>.toml?ref=vX"]` in the repo's `mise.toml` | `?ref=` | per repo |
+| **CI** | `.github/workflows/*.yml` → `uses: …/reusable-mise-ci.yml@vX` (runs `mise run <task>`) | `@ref` | per repo |
+| **global tools** | `mise run mise:global` | latest | per machine |
+| **claude skills** | this repo IS a Claude plugin **marketplace** — `claude plugin marketplace add joeblew999/.github` + install `fleet` | plugin version | per machine |
 
-Being timid here is the bug. The version pin is the safety net; use it.
+A repo "upgrades" by bumping `?ref=`/`@ref` or its installed plugin. Old refs are
+immutable, so nothing breaks. **Before building anything fleet-wide: search the
+fleet for the existing mechanism (grep tasks/, check known_marketplaces.json).**
 
-## NAMESPACE = TOOL
+## 2. Refactor DEEPLY — this repo is version-protected
 
-Each namespace maps to exactly one tool. A task NEVER lives in another tool's
-namespace. High-level orchestration that composes several tools gets its OWN
-namespace (e.g. `release:`), it is not jammed into one of them.
+You **cannot break a consumer** by changing `main` — they pin tags. So fix cruft
+**now**: rename, merge, delete, move across files, break things. Then
+`mise run release:github -- vX.Y.Z`. Never leave it "for later" or surface-patch.
+Being timid is the bug; the version pin is the safety net.
+
+## 3. NAMESPACE = TOOL
+
+Each namespace = exactly one tool; a task NEVER lives in another tool's namespace.
+Orchestration that composes tools gets its OWN namespace (e.g. `release:`).
 
 | Namespace | Tool / role |
 |---|---|
-| `mise:*` | mise itself (`global`, `sweep`, `upgrade`) |
-| `cliff:*` | git-cliff **changelog queries only** (`unreleased`, `show`, `repo`) |
-| `release:*` | release orchestration (git-cliff + git + gh): `release:github`, `release:pack` |
-| `docker:*` | docker (`login`, `image`, `settings`) |
-| `ci:*` | CI guards (`check-toml-tasks`, `check-global`, `audit-lib-refs`, …) |
-| `rust:* cf:* wrangler:* bw:* secrets:* fnox:* prove:* mobile:* env:*` | their named tool/domain |
+| `mise:*` | mise (`global`, `sweep`, `upgrade`) |
+| `cliff:*` | git-cliff — **changelog queries only** (`unreleased`/`show`/`repo`) |
+| `release:*` | release orchestration (cliff+git+gh): `release:github`, `release:pack` |
+| `docker:*` | docker (`login`/`image`/`settings`) |
+| `ci:*` | guards (`check-toml-tasks`/`check-global`/`audit-lib-refs`) |
+| `rust:* cf:* wrangler:* bw:* secrets:* fnox:* prove:* mobile:* env:*` | their tool/domain |
 
-If a task's name implies one tool but it drives others, it's mis-named — move it.
-(`cliff:release` was wrong: it did git+gh+cliff → it's now `release:github`.)
+Name implies one tool but drives others? Mis-named — move it. (`cliff:release`
+was wrong → it's `release:github`.)
 
-## How tools work
+## 4. Tools
 
-A repo's `[tools]` lists only what's unique to it. Shared tools live in:
+A repo's `[tools]` lists only what's unique to it. Runtime-free binaries
+(nushell, fnox, gh, jq, usage, git-cliff) live in the **global** config
+(`mise:global`); tools needing node/ruby/rust are pinned **per-task**.
+**Rust = rustup + per-repo `rust-toolchain.toml`, NEVER mise** (mise exports
+`RUSTUP_TOOLCHAIN` which overrides the file); `ci:check-global` enforces this.
 
-| Tool kind | Lives in | Examples |
-|---|---|---|
-| Runtime-free binary | the **global** config — `mise run mise:global` | nushell, fnox, gh, jq, usage, git-cliff |
-| Needs node/ruby/rust | the **task** that uses it (per-task `tools`) | wrangler, bitwarden, java, wasm-pack |
+## 5. Working in THIS repo
 
-Rust is special: it is **owned by rustup + per-repo `rust-toolchain.toml`, never
-mise** (mise exports `RUSTUP_TOOLCHAIN`, which overrides the toolchain file).
-`ci:check-global` enforces this — no `rust`/`RUSTUP_TOOLCHAIN` in any mise config.
-
-## Key tasks
-
-| Task | Does |
-|---|---|
-| `mise:global` | install the global toolset (CI runs the same task) |
-| `mise:sweep` | prune orphaned tool installs |
-| `release:github -- vX.Y.Z [assets...]` | git-cliff CHANGELOG → commit → tag → push → GitHub release → upload+verify assets |
-| `release:pack [-- --dir DIR]` | tar.gz each subdir of a staging dir (goreleaser-style names) |
-| `cliff:unreleased` / `cliff:show` / `cliff:repo <owner/repo>` | changelog queries |
-| `docker:login` / `docker:image -- vX.Y.Z` | ghcr auth + multi-arch build+push+verify |
-| `ci:check-toml-tasks` / `ci:check-global` / `ci:audit-lib-refs` | guards (run locally + CI) |
-
-## Working here
-
-1. Edit `tasks/<ns>.toml` — nushell body, no pins for global tools.
-2. `mise run ci:check-toml-tasks` (CI runs the same task) — RUN the task, don't
-   just parse it (parse-clean ≠ runtime-correct; e.g. `ls path-with-glob` needs `glob`).
+1. Edit `tasks/<ns>.toml` — nushell, no pins for global tools.
+2. **RUN the task, don't just parse it** — parse-clean ≠ runtime-correct (e.g.
+   `ls <string-with-glob>` fails; use `glob`; `{{…}}` in a task body is Tera, not
+   a literal). `mise run ci:check-toml-tasks` parses; you still must *run* changed tasks.
 3. `mise run release:github -- vX.Y.Z`.
 
-## Consuming (.github wiring — add to the repo's mise.toml)
+Key tasks: `mise:global`, `release:github -- vX.Y.Z [assets]`, `release:pack
+[-- --dir D]`, `docker:image -- vX.Y.Z`, `cliff:unreleased`, `ci:check-global`.
 
-```toml
-[task_config]
-includes = [
-  "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref=<tag>",
-  "git::https://github.com/joeblew999/.github.git//tasks/<ns>.toml?ref=<tag>",
-]
-[tools]    # repo-specific only — globals come from `mise run mise:global`
-```
+## 6. Nushell
 
-CI: `uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@<tag>` with
-`{ task: ci }` (or `build`). Everything CI runs is a mise task, so it runs locally first.
+`$"($var)"` interpolates, `$"\(lit\)"` literal parens; `glob` (not `ls`) expands a
+path pattern; lists need commas; detect repo via `git remote get-url origin`.
 
-## How we stamp out to repos (the flows)
+## 7. Secrets
 
-Everything is distributed **by reference and versioned** — nothing copies files
-into repos. There are several distinct mechanisms; know which is which:
+`fnox` = local keychain (`fnox set -p keychain`); `bw:*` syncs to NodeWarden; CI
+reads GH Actions secrets, never runs fnox.
 
-| What | Mechanism | Versioned by | Scope |
-|---|---|---|---|
-| **mise tasks** | `[task_config].includes = ["git::…/tasks/<ns>.toml?ref=vX"]` in the repo's `mise.toml` | `?ref=` | per repo |
-| **CI** | `.github/workflows/*.yml` → `uses: …/reusable-mise-ci.yml@vX` | `@ref` | per repo |
-| **global tools** | `mise run mise:global` | (floats to latest) | per machine |
-| **claude skills** | Claude Code plugin **marketplace** (`claude plugin marketplace add` + install) — like the `cc-skills` `mise`/`itp` plugins | plugin version | per machine/user |
-
-To bump what a repo gets: change its `?ref=`/`@ref` (mise tasks, CI) or update
-the installed plugin (skills). Old refs/versions keep working — that's the safety
-net (see the deep-refactor note above).
-
-A repo's AGENTS.md is repo-specific (describes that project). This file is the
-single source of truth for the SHARED conventions every repo's agents inherit.
-
-## Nushell
-
-- `$"($var)"` interpolates; `$"\(lit\)"` is literal parens.
-- `glob` to expand a path pattern (`ls` does NOT glob a string path).
-- Lists need commas; `sort | uniq` to dedupe; parse-check is `nu --ide-check 1 <f>`.
-- Detect repo via `git remote get-url origin`.
-
-## Secrets
-
-`fnox` = local keychain store (`fnox set -p keychain`); `bw:*` syncs it to
-self-hosted NodeWarden; CI reads GH Actions secrets, never runs fnox.
+---
+Every consumer repo should carry a `CLAUDE.md` that points an agent here before it
+touches mise/CI/release/skills — so it works with the flows above, not against them.

@@ -1,0 +1,27 @@
+{
+  "name": "joeblew999",
+  "owner": {
+    "name": "Gerard Webb",
+    "email": "gedw99@gmail.com"
+  },
+  "metadata": {
+    "description": "joeblew999 fleet — shared Claude skills, distributed by reference and versioned (the 4th channel alongside mise task includes, reusable CI, and mise:global).",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "fleet",
+      "source": "./",
+      "strict": false,
+      "description": "How to work in a joeblew999 fleet repo: the .github distribution flows, namespace=tool, release:github, and distribute-by-reference (never copy/stamp files).",
+      "version": "0.1.0",
+      "author": {
+        "name": "Gerard Webb"
+      },
+      "license": "MIT",
+      "category": "meta",
+      "keywords": ["joeblew999", "mise", "fleet", "conventions"],
+      "skills": ["./.claude/skills/joeblew999-fleet"]
+    }
+  ]
+}
