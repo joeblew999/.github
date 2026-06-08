@@ -47,7 +47,10 @@ The canonical minimal example is
 3. **mise tasks** — `mise.toml` `[task_config].includes` the namespaces you need, pinned `?ref=vX`.
 4. **global tools** — `mise run mise:global` (once per machine).
 5. **Rust?** — pin in `rust-toolchain.toml` (rustup), never mise.
-6. **CI** — `.github/workflows/mise.yaml` → `uses: …/reusable-mise-ci.yml@vX` with `{ task: … }`.
+6. **CI** — **bootstrap:** *Actions → New workflow → "mise CI (joeblew999)"* (the
+   org **workflow-template**) — one click writes `.github/workflows/mise.yaml`
+   (a stub calling `reusable-mise-ci.yml`). **Update:** the scheduled
+   `reusable-mise-upgrade` PR bumps the pins (`ci:audit-lib-refs` audits drift).
 
 Then `mise run <task>` works locally and CI runs the same task. A consumer adds
 ONLY its own repo-specific tasks/tools; everything shared comes from above.
