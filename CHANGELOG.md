@@ -1,8 +1,17 @@
+## [0.36.0] - 2026-06-08
+
+### 🚀 Features
+
+- *(tasks)* Shared release:pack + docker:* (fleet binary/docker release)
 ## [0.35.1] - 2026-06-08
 
 ### 🐛 Bug Fixes
 
 - *(mise)* Anchor ci:check-global RUSTUP_TOOLCHAIN regex to line start
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.35.1
 ## [0.35.0] - 2026-06-08
 
 ### 🚀 Features
