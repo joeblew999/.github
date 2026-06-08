@@ -31,7 +31,8 @@ def main [
   }
   for d in $subdirs {
     let base = ($d | path basename)
-    ^tar -czf ($dir | path join $"($base).tar.gz") -C $dir $base
+    # FLAT archive (contents at the tar root, goreleaser-standard) — `-C <subdir> .`
+    ^tar -czf ($dir | path join $"($base).tar.gz") -C ($dir | path join $base) .
     print $"  ✓ ($base).tar.gz"
   }
   let n = (glob ($dir | path join "*.tar.gz") | length)
