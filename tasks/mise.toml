@@ -108,6 +108,70 @@ def main [
 description = "Install the canonical common toolset into the global mise config (mise use -g). Run locally; CI runs it too. Idempotent."
 run = "mise use -g github:nushell/nushell@latest fnox@latest gh@latest jq@latest usage@latest git-cliff@latest"
 
+# ── ci:check-global ──────────────────────────────────────────────────────────
+# Guard the mise configuration. Two invariants:
+#   1. The canonical common toolset is present in the global config.
+#   2. NEITHER the global config NOR any repo config manages Rust — i.e. no
+#      `rust = …` and no `RUSTUP_TOOLCHAIN = …`. mise selects a Rust toolchain
+#      by exporting RUSTUP_TOOLCHAIN, which is the HIGHEST-precedence override
+#      in rustup and silently defeats every repo's rust-toolchain.toml. Rust is
+#      delegated to rustup + per-repo rust-toolchain.toml; mise must stay out.
+# Run locally or in CI; exits non-zero (with a fix hint) on any violation.
+["ci:check-global"]
+description = "Guard mise config: canonical global toolset present, and no `rust`/RUSTUP_TOOLCHAIN in any mise config (rustup + rust-toolchain.toml own Rust). Fails on violation."
+run = '''
+#!/usr/bin/env nu
+
+def main [
+  --root: string = ""   # workspace root to scan for repo configs; defaults to $env.PWD
+] {
+  mut violations = []
+
+  # ── 1. global config: canonical toolset present, no Rust management ──────────
+  let global = ($nu.home-dir | path join ".config" "mise" "config.toml")
+  if ($global | path exists) {
+    let txt = (open --raw $global)
+    if ($txt | lines | any {|l| $l =~ '^\s*rust\s*=' }) {
+      $violations = ($violations | append $"($global): declares `rust` — remove it; rustup + rust-toolchain.toml own the Rust toolchain")
+    }
+    if ($txt | lines | any {|l| $l =~ 'RUSTUP_TOOLCHAIN\s*=' }) {
+      $violations = ($violations | append $"($global): sets RUSTUP_TOOLCHAIN — remove it; it overrides every repo's rust-toolchain.toml")
+    }
+    for t in ["fnox" "gh" "jq" "usage" "git-cliff" "nushell"] {
+      if not ($txt | str contains $t) {
+        $violations = ($violations | append $"($global): missing canonical tool `($t)` — run `mise run mise:global`")
+      }
+    }
+  } else {
+    $violations = ($violations | append $"($global): not found — run `mise run mise:global`")
+  }
+
+  # ── 2. no repo config may manage Rust either ────────────────────────────────
+  let root = (if ($root | is-empty) { $env.PWD } else { $root })
+  let cfgs = (
+    glob $"($root)/**/{mise,.mise}.toml"
+    | where {|p| (not ($p | str contains "/target/")) and (not ($p | str contains "/.git/")) }
+  )
+  for c in $cfgs {
+    let txt = (open --raw $c)
+    if ($txt | lines | any {|l| $l =~ '^\s*rust\s*=' }) {
+      $violations = ($violations | append $"($c): declares `rust` — remove it; pin via rust-toolchain.toml instead")
+    }
+    if ($txt | lines | any {|l| $l =~ 'RUSTUP_TOOLCHAIN\s*=' }) {
+      $violations = ($violations | append $"($c): sets RUSTUP_TOOLCHAIN — remove it; pin via rust-toolchain.toml instead")
+    }
+  }
+
+  if ($violations | is-empty) {
+    print "✓ ci:check-global — canonical global toolset present, no Rust override in any mise config"
+    return
+  }
+  print -e "✗ ci:check-global found violations:"
+  for v in $violations { print -e $"  • ($v)" }
+  exit 1
+}
+'''
+
 # ── mise:release ─────────────────────────────────────────────────────────────
 # Tag + push a new semver release of THIS lib (local-only; no CI/goreleaser).
 #   mise run mise:release -- v0.28.0
