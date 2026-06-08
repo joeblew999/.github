@@ -1,6 +1,6 @@
 name: Reusable Mise upgrade
 
-# ▸ See ./README.md for how the system works (bootstrap, matrix, isomorphic local==CI).
+# ▸ How this works (bootstrap, matrix, isomorphic local==CI): the repo ROOT README.md (SSOT).
 # Reusable workflow — every joeblew999 repo can call this from its own
 # .github/workflows/<name>.yml via:
 #

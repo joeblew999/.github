@@ -13,7 +13,7 @@ How a change flows — **always in this order**:
 2. **Validate — local AND CI** via the sandbox
    [`.github-example`](https://github.com/joeblew999/.github-example) (consumes
    `.github@main`): push `.github` `main`, then *local* = `mise run <task>` there,
-   *CI* = its `mise.yaml` runs the shared `reusable-mise-ci.yml@main`. **Both green
+   *CI* = its `mise.yml` runs the shared `reusable-mise-ci.yml@main`. **Both green
    before release; no release while iterating.**
 3. **Release** only once it works: `mise run release:github -- vX.Y.Z`
    (changelog → tag → GitHub release).

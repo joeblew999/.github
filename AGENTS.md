@@ -5,7 +5,12 @@ whole joeblew999 fleet.
 
 ## Keep .github-example repo matching 
 
-KEEP README.md Updated with the correct shell commands that .github-example repo must run and keep it idempotent !! 
+**Docs SSOT.** The root [README.md](./README.md) is the single source for how this
+repo is used + how the reusable system works. Whenever you change a bootstrap
+command, task, or the reusable flow, update README to match **exactly** what
+`.github-example` runs, and keep every command idempotent. Don't duplicate it
+elsewhere — `.github/workflows/README.md` and the `reusable-*.yml` headers just
+point here.
 
 ## Testing Example works
 
