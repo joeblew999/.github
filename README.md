@@ -1,5 +1,10 @@
 # joeblew999/.github
 
+> 🧪 **Develop/validate changes against this lib in the sandbox:**
+> [joeblew999/.github-example](https://github.com/joeblew999/.github-example) — a
+> consumer wired to a *local, unversioned* checkout, so you can iterate here and
+> test live with no release/tag cycle.
+
 Shared **mise task library** + GitHub org config. Authoring/usage guide:
 [AGENTS.md](./AGENTS.md). Per-release notes: [CHANGELOG.md](./CHANGELOG.md).
 
