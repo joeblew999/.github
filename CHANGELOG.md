@@ -1,8 +1,17 @@
+## [0.35.1] - 2026-06-08
+
+### 🐛 Bug Fixes
+
+- *(mise)* Anchor ci:check-global RUSTUP_TOOLCHAIN regex to line start
 ## [0.35.0] - 2026-06-08
 
 ### 🚀 Features
 
 - *(mise)* Add ci:check-global guard enforcing rustup-owned Rust toolchains
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.35.0
 ## [0.34.0] - 2026-06-07
 
 ### 📚 Documentation
