@@ -1,8 +1,22 @@
+## [0.39.0] - 2026-06-08
+
+### 🚀 Features
+
+- *(marketplace)* .github is the joeblew999 Claude plugin marketplace (fleet skill)
+
+### ◀️ Revert
+
+- *(stamp)* Remove reinvented stamp:repo/templates/skills-copy — the fleet already stamps by reference
+- *(stamp)* Actually remove tasks/stamp.toml + fix AGENTS heading
 ## [0.38.0] - 2026-06-08
 
 ### 🚀 Features
 
 - *(stamp)* Stamp .github wiring + claude skills into consumer repos; AGENTS deep-refactor directive
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.38.0
 ## [0.37.0] - 2026-06-08
 
 ### 🚜 Refactor
