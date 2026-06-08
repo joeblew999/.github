@@ -1,8 +1,17 @@
+## [0.36.1] - 2026-06-08
+
+### 🐛 Bug Fixes
+
+- *(release:pack)* Use glob not ls for the archive count (ls won't expand a string path)
 ## [0.36.0] - 2026-06-08
 
 ### 🚀 Features
 
 - *(tasks)* Shared release:pack + docker:* (fleet binary/docker release)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.36.0
 ## [0.35.1] - 2026-06-08
 
 ### 🐛 Bug Fixes
