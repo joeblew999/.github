@@ -1,12 +1,21 @@
 # joeblew999/.github
 
-> 🧪 **Develop/validate changes against this lib in the sandbox:**
-> [joeblew999/.github-example](https://github.com/joeblew999/.github-example) — a
-> consumer wired to a *local, unversioned* checkout, so you can iterate here and
-> test live with no release/tag cycle.
+Shared **mise task library** + **Claude plugin marketplace** + GitHub org config.
+Guide: [AGENTS.md](./AGENTS.md) · Releases: [CHANGELOG.md](./CHANGELOG.md).
 
-Shared **mise task library** + GitHub org config. Authoring/usage guide:
-[AGENTS.md](./AGENTS.md). Per-release notes: [CHANGELOG.md](./CHANGELOG.md).
+## Order of operations (READ FIRST)
+
+How a change flows — **always in this order**:
+
+1. **Edit** here — a task in `tasks/<ns>.toml`, the `fleet` skill, or a workflow.
+2. **Validate live** in the sandbox
+   [`.github-example`](https://github.com/joeblew999/.github-example): it includes
+   this repo by *local, unversioned path*, so `mise run <task>` there tests your
+   edit instantly. **No release needed — iterate here.**
+3. **Release** only once it works: `mise run release:github -- vX.Y.Z`
+   (changelog → tag → GitHub release).
+4. **Consumers adopt** by bumping their `?ref=` / `@ref` / plugin version.
+   Old refs never break (immutable) — which is why you refactor here *deeply*.
 
 ## Use it
 
