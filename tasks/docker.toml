@@ -1,0 +1,70 @@
+# tasks/docker.toml — shared Docker/ghcr release tooling for the joeblew999 fleet.
+#
+# docker:login    — auth to ghcr (generic).
+# docker:image    — build + push a MULTI-ARCH image to ghcr and verify the
+#                   manifest. Parameterized; image defaults to
+#                   ghcr.io/<owner>/<repo> from origin. The repo preps its build
+#                   context (e.g. copies per-arch binaries into .docker/) first,
+#                   then calls this.
+# docker:settings — open the ghcr package's visibility settings (UI-only).
+#
+# Consumer wiring:
+#   [task_config]
+#   includes = [ "git::https://github.com/joeblew999/.github.git//tasks/docker.toml?ref=<tag>" ]
+#
+# We generally run docker builds in GitHub Actions (easier than local multi-arch);
+# these tasks work the same locally and in CI (GHCR_TOKEN/GHCR_USER from CI env or
+# fnox keychain locally).
+
+["docker:login"]
+description = "Log docker into ghcr.io. Token from $GHCR_TOKEN (CI) or fnox keychain (local); needs write:packages."
+run = '''
+#!/usr/bin/env nu
+def main [] {
+  let tok = ($env.GHCR_TOKEN? | default (^fnox get GHCR_TOKEN | str trim))
+  let user = ($env.GHCR_USER? | default (^gh api user -q .login | str trim))
+  $tok | ^docker login ghcr.io -u $user --password-stdin
+}
+'''
+
+["docker:image"]
+description = "Build + push a multi-arch image to ghcr and verify the manifest. Usage: mise run docker:image -- vX.Y.Z [--image ghcr.io/o/r] [--dockerfile .docker/Dockerfile] [--context .docker] [--platforms linux/amd64,linux/arm64]"
+depends = ["docker:login"]
+run = '''
+#!/usr/bin/env nu
+def main [
+  tag: string,
+  --image: string = "",                              # default ghcr.io/<owner>/<repo> from origin
+  --dockerfile: string = ".docker/Dockerfile",
+  --context: string = ".docker",
+  --platforms: string = "linux/amd64,linux/arm64",
+] {
+  let img = (if ($image | is-empty) {
+    let slug = (^git remote get-url origin | str trim | str replace -r '.*github\.com[:/]' '' | str replace -r '\.git$' '')
+    $"ghcr.io/($slug)"
+  } else { $image })
+  let ref = $"($img):($tag)"
+
+  # multi-arch needs the docker-container driver (default 'docker' driver can't).
+  let has = ((do { ^docker buildx inspect jb-multiarch } | complete | get exit_code) == 0)
+  if not $has { ^docker buildx create --name jb-multiarch --driver docker-container | ignore }
+  ^docker buildx use jb-multiarch
+  ^docker buildx build --platform $platforms --push -t $ref -f $dockerfile $context
+
+  let got = (^docker manifest inspect $ref | from json | get manifests.platform.architecture | sort | uniq)
+  print $"✓ pushed ($ref) — arches: ($got | str join ', ')"
+}
+'''
+
+["docker:settings"]
+description = "Open a ghcr package's visibility settings (UI-only). Usage: mise run docker:settings -- <package>"
+run = '''
+#!/usr/bin/env nu
+def main [package: string] {
+  let user = (^gh api user -q .login | str trim)
+  let url = $"https://github.com/users/($user)/packages/container/($package)/settings"
+  let opener = (match $nu.os-info.name { "macos" => "open", "windows" => "start", _ => "xdg-open" })
+  ^$opener $url
+  print $"opened ($url)"
+}
+'''

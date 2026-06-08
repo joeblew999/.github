@@ -1,0 +1,40 @@
+# tasks/release.toml — shared binary-release PACKAGING for the joeblew999 fleet.
+#
+# release:pack archives each immediate subdir of a staging dir into a tar.gz with
+# the subdir's (goreleaser-style) name. The repo-specific BUILD that populates
+# the staging dir stays in each repo — build models differ (Go cross-compiles
+# all targets locally; Rust GUI builds per-OS in CI; Rust servers build per-arch
+# in containers). Pair with cliff:release to publish:
+#
+#   mise run release:pack -- --dir target/dist
+#   mise run cliff:release -- vX.Y.Z ...(ls target/dist/*.tar.gz | get name)
+#
+# Consumer wiring:
+#   [task_config]
+#   includes = [ "git::https://github.com/joeblew999/.github.git//tasks/release.toml?ref=<tag>" ]
+
+["release:pack"]
+description = "tar.gz each subdir of a staging dir (default: dist) into goreleaser-named archives. Usage: mise run release:pack [-- --dir target/dist]"
+run = '''
+#!/usr/bin/env nu
+def main [
+  --dir: string = "dist"   # staging dir whose immediate subdirs become archives
+] {
+  if not ($dir | path exists) {
+    print --stderr $"✗ staging dir not found: ($dir) — run the repo's build first"
+    exit 1
+  }
+  let subdirs = (ls $dir | where type == dir | get name)
+  if ($subdirs | is-empty) {
+    print --stderr $"✗ no subdirs to pack in ($dir)"
+    exit 1
+  }
+  for d in $subdirs {
+    let base = ($d | path basename)
+    ^tar -czf ($dir | path join $"($base).tar.gz") -C $dir $base
+    print $"  ✓ ($base).tar.gz"
+  }
+  let n = (ls ($dir | path join "*.tar.gz") | length)
+  print $"✓ packed ($n) archive\(s\) in ($dir)"
+}
+'''
