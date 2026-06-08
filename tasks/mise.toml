@@ -144,8 +144,8 @@ jobs:
     uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@main
     with:
       task: ci
-      os-matrix: '["ubuntu-latest"]'
-      sccache: true
+      os-matrix: '["ubuntu-latest", "macos-latest", "windows-latest"]'
+      sccache: false
 {% endraw %}'#
 
   let upgrade = r#'name: mise upgrade
