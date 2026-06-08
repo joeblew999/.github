@@ -1,8 +1,17 @@
+## [0.37.0] - 2026-06-08
+
+### 🚜 Refactor
+
+- [**breaking**] Tool-based task namespaces (namespace = the tool)
 ## [0.36.2] - 2026-06-08
 
 ### 🐛 Bug Fixes
 
 - *(release:pack)* Flat archives (contents at tar root, goreleaser-standard)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.36.2
 ## [0.36.1] - 2026-06-08
 
 ### 🐛 Bug Fixes
