@@ -719,8 +719,11 @@ def main [
 
   # ── 2. no repo config may manage Rust either ────────────────────────────────
   let root = (if ($root | is-empty) { $env.PWD } else { $root })
+  # Forward-slash the pattern — on Windows $env.PWD has backslashes, which the
+  # glob parser rejects ("failed to parse glob expression").
+  let glob_pat = ($"($root)/**/{mise,.mise}.toml" | str replace --all "\\" "/")
   let cfgs = (
-    glob $"($root)/**/{mise,.mise}.toml"
+    glob $glob_pat
     | where {|p| (not ($p | str contains "/target/")) and (not ($p | str contains "/.git/")) }
   )
   for c in $cfgs {
