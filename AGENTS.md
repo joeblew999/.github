@@ -50,7 +50,8 @@ The canonical minimal example is
 6. **CI** — **bootstrap:** *Actions → New workflow → "mise CI (joeblew999)"* (the
    org **workflow-template**) — one click writes `.github/workflows/mise.yaml`
    (a stub calling `reusable-mise-ci.yml`). **Update:** the scheduled
-   `reusable-mise-upgrade` PR bumps the pins (`ci:audit-lib-refs` audits drift).
+   `reusable-mise-upgrade` PR bumps everything in one PR — tool versions
+   (`mise:upgrade`) **and** the `?ref=`/`@ref` pins (`ci:audit-lib-refs --write`).
 
 Then `mise run <task>` works locally and CI runs the same task. A consumer adds
 ONLY its own repo-specific tasks/tools; everything shared comes from above.
@@ -73,7 +74,7 @@ Orchestration that composes tools gets its OWN namespace (e.g. `release:`).
 | `cliff:*` | git-cliff — **changelog queries only** (`unreleased`/`show`/`repo`) |
 | `release:*` | release orchestration (cliff+git+gh): `release:github`, `release:pack` |
 | `docker:*` | docker (`login`/`image`/`settings`) |
-| `ci:*` | guards (`check-toml-tasks`/`check-global`/`audit-lib-refs`) |
+| `ci:*` | guards + ref drift (`check-toml-tasks`/`check-global`/`audit-lib-refs [--write]`) |
 | `rust:* cf:* wrangler:* bw:* secrets:* fnox:* prove:* mobile:* env:*` | their tool/domain |
 
 Name implies one tool but drives others? Mis-named — move it. (`cliff:release`

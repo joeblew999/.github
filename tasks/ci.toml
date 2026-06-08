@@ -117,22 +117,25 @@ def main [
 '''
 
 # ── ci:audit-lib-refs ────────────────────────────────────────────────────────
-# Cross-repo drift audit: scan every mise.toml on this machine that
-# references joeblew999/.github via git:: URL, compare each ?ref=v...
-# pin to the latest published tag, report anything stale.
+# Drift audit + bump for every joeblew999/.github pin: the `?ref=vX` in
+# mise.toml includes AND the `uses: …@vX` in .github/workflows/*. Compares
+# each to the latest published tag.
+#   (no flag) : report stale pins, exit 1   → CI gate / local sanity
+#   --write   : rewrite stale pins to latest → the upgrade flow (reusable-mise-upgrade)
+# Rolling pins (?ref=main / @main) never match the version regex, so they're
+# left untouched. `mise outdated` only sees pinned TOOLS, not these git refs —
+# this fills the gap so ONE upgrade PR bumps tools + lib refs together.
 #
-# `mise outdated` only sees pinned TOOLS, not git URLs, so this fills
-# the gap. Run before bumping or as a periodic sanity check.
-#
-# Tools: gh (GitHub API for tags). nu comes from global config.
+# Tools: gh (GitHub API for tags; needs GH_TOKEN in CI). nu from global config.
 ["ci:audit-lib-refs"]
-description = "Audit ?ref= drift across every tracked mise.toml that includes joeblew999/.github"
+description = "Audit (or --write) ?ref=/@ref drift across mise.toml + workflows that pin joeblew999/.github"
 run = '''
 #!/usr/bin/env nu
 
 def main [
   --owner: string = "joeblew999"
   --repo: string = ".github"
+  --write            # rewrite stale pins to latest instead of just reporting
 ] {
   let tags_raw = (^gh api $"repos/($owner)/($repo)/tags?per_page=10" | from json)
   if ($tags_raw | length) == 0 {
@@ -143,41 +146,72 @@ def main [
   print $"Latest tag on ($owner)/($repo): ($latest)"
   print ""
 
-  let tracked = (^mise config ls --tracked-configs | lines | each { |l| $l | str trim } | where { |l| not ($l | is-empty) })
+  let lib = $"($owner)/($repo)"
+  let lib_esc = ($lib | str replace --all '.' '\.')
+  let uses_find = $lib_esc + '/[^@\s]+@(v[0-9]+\.[0-9]+\.[0-9]+)'
+  let uses_sub  = '(' + $lib_esc + '/[^@\s]+@)v[0-9]+\.[0-9]+\.[0-9]+'
+  let ref_find  = '\?ref=(v[0-9]+\.[0-9]+\.[0-9]+)'
+  let ref_sub   = '(\?ref=)v[0-9]+\.[0-9]+\.[0-9]+'
 
-  let lib_url = $"github.com/($owner)/($repo)"
+  # This repo's own pins: root mise.toml + workflow stubs.
+  let root = ($env.MISE_PROJECT_ROOT? | default (pwd))
+  let own = (
+    [($root | path join "mise.toml")]
+    | append (glob ($root | path join ".github/workflows/*.yml"))
+    | append (glob ($root | path join ".github/workflows/*.yaml"))
+  )
+  # AUDIT scans every tracked mise.toml on the box (read-only cross-repo sanity).
+  # --WRITE touches ONLY this repo — never rewrites other repos on your machine.
+  let files = (
+    if $write { $own } else {
+      (^mise config ls --tracked-configs
+        | lines | each { |l| $l | str trim } | where { |l| not ($l | is-empty) })
+      | append $own
+    }
+    | uniq
+    | where { |f| ($f | path exists) }
+  )
+
   mut findings = []
-
-  for cfg in $tracked {
-    if not ($cfg | path exists) { continue }
-    let raw = (try { open --raw $cfg } catch { "" })
-    if not ($raw | str contains $lib_url) { continue }
-    let refs = (
-      $raw
-      | parse --regex '\?ref=(v[0-9]+\.[0-9]+\.[0-9]+)'
-      | get capture0
+  for f in $files {
+    let raw = (try { open --raw $f } catch { "" })
+    if not ($raw | str contains $lib) { continue }
+    let pins = (
+      ($raw | parse --regex $ref_find  | get -o capture0 | default [])
+      | append ($raw | parse --regex $uses_find | get -o capture0 | default [])
       | uniq
     )
-    if ($refs | length) == 0 { continue }
-    for r in $refs {
-      if $r != $latest {
-        $findings = ($findings | append {config: $cfg, current: $r, latest: $latest})
-      }
+    for p in ($pins | where { |p| $p != $latest }) {
+      $findings = ($findings | append {file: $f, current: $p, latest: $latest})
     }
   }
 
   if ($findings | length) == 0 {
-    print $"✓ all tracked configs at ($latest)"
+    print $"✓ all pins at ($latest)"
     return
   }
 
-  let count = ($findings | length)
-  print $"⚠ ($count) stale ?ref= pin\(s\):"
-  print ""
-  $findings | print
-  print ""
-  print "To bump: edit each mise.toml's includes URLs."
-  exit 1
+  if not $write {
+    print $"⚠ ($findings | length) stale pin\(s\):"
+    print ""
+    $findings | print
+    print ""
+    print "Run `mise run ci:audit-lib-refs --write` to bump them."
+    exit 1
+  }
+
+  for f in ($findings | get file | uniq) {
+    let before = (open --raw $f)
+    let after = (
+      $before
+      | str replace --all --regex $ref_sub  $"${1}($latest)"
+      | str replace --all --regex $uses_sub $"${1}($latest)"
+    )
+    if $before != $after {
+      $after | save --force $f
+      print $"✓ ($f) → ($latest)"
+    }
+  }
 }
 '''
 

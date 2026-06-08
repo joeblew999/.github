@@ -44,20 +44,40 @@ jobs:
       - name: mise run mise:upgrade
         run: mise run mise:upgrade
 
-      - name: Open PR if mise.toml changed
+      # Bump the joeblew999/.github ref pins too — ?ref= in mise.toml and
+      # uses:…@vX in .github/workflows/* — so ONE PR covers tools + lib refs.
+      # Skipped automatically if the repo doesn't include the ci namespace.
+      - name: mise run ci:audit-lib-refs --write
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if mise tasks ls 2>/dev/null | grep -q 'ci:audit-lib-refs'; then
+            mise run ci:audit-lib-refs --write
+          else
+            echo "ci:audit-lib-refs not available (ci namespace not included) — skipping ref bump"
+          fi
+
+      - name: Open PR if anything changed
         uses: peter-evans/create-pull-request@v7
         with:
-          commit-message: "chore(mise): bump pinned tool versions"
+          commit-message: "chore(mise): bump pinned tools + joeblew999/.github refs"
           branch: ${{ inputs.pr-branch }}
           delete-branch: true
-          title: "chore(mise): bump pinned tool versions"
+          title: "chore(mise): bump pinned tools + .github refs"
           body: |
-            Automated weekly bump produced by `mise run mise:upgrade`
-            (from joeblew999/.github reusable workflow).
+            Automated weekly bump from the joeblew999/.github reusable workflow:
 
-            Diff is whatever `mise upgrade --bump --local` produced for
-            `mise.toml`. Run the same thing locally:
+            - `mise run mise:upgrade` → pinned tool versions in `mise.toml`
+            - `mise run ci:audit-lib-refs --write` → `?ref=` / `@ref` pins for
+              joeblew999/.github in `mise.toml` + `.github/workflows/*`
+              (rolling `@main` / `?ref=main` are left alone)
+
+            Reproduce locally:
 
                 mise run mise:upgrade --dry-run
-          add-paths: mise.toml
+                mise run ci:audit-lib-refs            # audit only
+                mise run ci:audit-lib-refs --write    # apply
+          add-paths: |
+            mise.toml
+            .github/workflows
           labels: dependencies, automated
