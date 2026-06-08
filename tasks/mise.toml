@@ -69,11 +69,12 @@ def main [
   let root = (if ($root | is-empty) { $env.PWD } else { $root })
   print $"→ scanning ($root) for mise configs"
 
-  # Forward-slash the pattern — Windows paths use backslashes, which glob rejects.
-  let glob_pat = ($"($root)/**/{mise,.mise}.toml" | str replace --all "\\" "/")
+  # Cross-platform glob: cd + RELATIVE forward-slash pattern; filter by path
+  # COMPONENTS via `path split` (no OS-path in the glob, no separator assumptions).
+  cd $root
   let cfgs = (
-    glob $glob_pat
-    | where {|p| (not ($p | str contains "/target/")) and (not ($p | str contains "/.git/")) }
+    glob "**/{mise,.mise}.toml"
+    | where {|p| let parts = ($p | path split); ("target" not-in $parts) and (".git" not-in $parts) }
   )
   print $"  found ($cfgs | length) live configs — re-tracking so prune stays safe"
 

@@ -719,12 +719,13 @@ def main [
 
   # ── 2. no repo config may manage Rust either ────────────────────────────────
   let root = (if ($root | is-empty) { $env.PWD } else { $root })
-  # Forward-slash the pattern — on Windows $env.PWD has backslashes, which the
-  # glob parser rejects ("failed to parse glob expression").
-  let glob_pat = ($"($root)/**/{mise,.mise}.toml" | str replace --all "\\" "/")
+  # Cross-platform glob: cd into root + a RELATIVE forward-slash pattern (never
+  # interpolate an OS path into a glob — Windows backslashes break the parser),
+  # and filter by path COMPONENTS via `path split` (no separator assumptions).
+  cd $root
   let cfgs = (
-    glob $glob_pat
-    | where {|p| (not ($p | str contains "/target/")) and (not ($p | str contains "/.git/")) }
+    glob "**/{mise,.mise}.toml"
+    | where {|p| let parts = ($p | path split); ("target" not-in $parts) and (".git" not-in $parts) }
   )
   for c in $cfgs {
     let txt = (open --raw $c)
