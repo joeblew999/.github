@@ -1,8 +1,17 @@
+## [0.35.0] - 2026-06-08
+
+### 🚀 Features
+
+- *(mise)* Add ci:check-global guard enforcing rustup-owned Rust toolchains
 ## [0.34.0] - 2026-06-07
 
 ### 📚 Documentation
 
 - Version-free <tag> in all task-header example refs (no more stale ?ref=)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.34.0
 ## [0.33.0] - 2026-06-07
 
 ### 🐛 Bug Fixes
