@@ -24,9 +24,9 @@ Every repo here must work on **macOS, Linux AND Windows**. Therefore:
   never a `.sh` file. No bash-isms, no hardcoded `/Users`, `/home`, `/opt` paths;
   derive from env + install state.
 - A task that is a **single plain command** mise runs in the default shell (e.g.
-  `mise:global` = `mise use -g …`) is fine — it's not shell-specific.
+  `mise:global:bootstrap` = `mise use -g …`) is fine — it's not shell-specific.
 - The **bootstrap before nu exists** is bare `mise` commands ONLY. nu is installed
-  by `mise run mise:global`, so the bootstrap can't be written in nu either — mise
+  by `mise run mise:global:bootstrap`, so the bootstrap can't be written in nu either — mise
   is the one cross-platform tool guaranteed present. (See README "New repo".)
 
 If you reach for a shell script, you've already broken the rule. Write a nu task.
@@ -59,7 +59,7 @@ into a repo, **STOP — you are reinventing.** The mechanism already exists:
 |---|---|---|---|
 | **mise tasks** | `[task_config].includes = ["git::…/tasks/<ns>.toml?ref=vX"]` in the repo's `mise.toml` | `?ref=` | per repo |
 | **CI** | `.github/workflows/*.yml` → `uses: …/reusable-mise-ci.yml@vX` (runs `mise run <task>`) | `@ref` | per repo |
-| **global tools** | `mise run mise:global` | latest | per machine |
+| **global tools** | `mise run mise:global:bootstrap` | latest | per machine |
 | **claude skills** | this repo IS a Claude plugin **marketplace** — `claude plugin marketplace add joeblew999/.github` + install `fleet` | plugin version | per machine |
 
 A repo "upgrades" by bumping `?ref=`/`@ref` or its installed plugin. Old refs are
@@ -74,13 +74,12 @@ The canonical minimal example is
 1. **Skills + conventions** — `claude plugin marketplace add joeblew999/.github`, install `fleet` (or read this file).
 2. **`CLAUDE.md`** in the repo root, pointing agents at this AGENTS.md.
 3. **mise tasks** — `mise.toml` `[task_config].includes` the namespaces you need, pinned `?ref=vX`.
-4. **global tools** — `mise run mise:global` (once per machine).
+4. **global tools** — `mise run mise:global:bootstrap` (once per machine).
 5. **Rust?** — pin in `rust-toolchain.toml` (rustup), never mise.
-6. **CI** — **bootstrap:** *Actions → New workflow → "mise CI (joeblew999)"* (the
-   org **workflow-template**) — one click writes `.github/workflows/mise.yaml`
-   (a stub calling `reusable-mise-ci.yml`). **Update:** the scheduled
-   `reusable-mise-upgrade` PR bumps everything in one PR — tool versions
-   (`mise:upgrade`) **and** the `?ref=`/`@ref` pins (`ci:audit-lib-refs --write`).
+6. **CI** — `mise run mise:repo:bootstrap` writes `.github/workflows/mise.yml`
+   (a stub calling `reusable-mise-ci.yml@main`). **Update:** the scheduled
+   `reusable-mise-upgrade` PR bumps tool versions (`mise:upgrade`) **and** the
+   `?ref=`/`@ref` pins (`ci:audit-lib-refs --write`) in one PR.
 
 Then `mise run <task>` works locally and CI runs the same task. A consumer adds
 ONLY its own repo-specific tasks/tools; everything shared comes from above.
@@ -134,7 +133,7 @@ A repo's `[tools]` lists only what's unique to it. Runtime-free binaries
    a literal). `mise run ci:check-nu` parses; you still must *run* changed tasks.
 3. `mise run release:github -- vX.Y.Z`.
 
-Key tasks: `mise:global`, `release:github -- vX.Y.Z [assets]`, `release:pack
+Key tasks: `mise:global:bootstrap`, `release:github -- vX.Y.Z [assets]`, `release:pack
 [-- --dir D]`, `docker:image -- vX.Y.Z`, `cliff:unreleased`, `ci:check-global`.
 
 ## Nushell
