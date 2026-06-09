@@ -1,0 +1,103 @@
+name: Reusable Mise Release
+
+# ▸ Multi-OS binary release, isomorphic with local. Same idea as reusable-mise-ci:
+# each OS in the matrix runs the SAME `mise run <build-task>` it would run locally
+# (so NO cross-compile — each native runner builds its own arch), packs assets via
+# the shared `release:pack`, and a final job attaches them all to the tag via the
+# shared `release:publish`. Call it from a repo's .github/workflows/<name>.yml on a
+# tag push:
+#
+#   on:
+#     push:
+#       tags: ['v*']
+#   jobs:
+#     release:
+#       uses: joeblew999/.github/.github/workflows/reusable-mise-release.yml@vX.Y.Z
+#       with:
+#         build-task: dist                 # mise task that stages dist/<name>/<bin>
+#         os-matrix: '["ubuntu-latest", "macos-latest"]'
+#       # GITHUB_TOKEN with contents:write is granted below — no secret needed.
+#
+# The repo defines `build-task` (default `dist`) to build for the HOST arch into
+# the pack dir; `release:pack` + `release:publish` come from tasks/release.toml.
+
+on:
+  workflow_call:
+    inputs:
+      build-task:
+        description: 'mise task that builds + stages this host''s arch into <pack-dir>/<name>/'
+        type: string
+        default: 'dist'
+      os-matrix:
+        description: 'JSON array of GH runners — one native build per arch (no cross-compile)'
+        type: string
+        default: '["ubuntu-latest", "macos-latest"]'
+      pack-dir:
+        description: 'Staging dir release:pack archives (each immediate subdir → one tar.gz)'
+        type: string
+        default: 'dist'
+      mise-version:
+        description: 'mise binary version to install'
+        type: string
+        default: '2026.5.1'
+
+jobs:
+  build:
+    name: build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.os-matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: jdx/mise-action@v4
+        with:
+          version: ${{ inputs.mise-version }}
+          install: true
+          cache: true
+          cache_key: mise-release-${{ matrix.os }}-${{ hashFiles('mise.toml') }}
+
+      # Same global toolset + build task you run locally.
+      - run: mise run mise:global:bootstrap
+      - run: mise run ${{ inputs.build-task }}
+      - run: mise run release:pack -- --dir ${{ inputs.pack-dir }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ matrix.os }}
+          path: ${{ inputs.pack-dir }}/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # git-cliff needs full history for release notes
+
+      - uses: jdx/mise-action@v4
+        with:
+          version: ${{ inputs.mise-version }}
+          install: true
+          cache: true
+          cache_key: mise-release-publish-${{ hashFiles('mise.toml') }}
+
+      - run: mise run mise:global:bootstrap
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ inputs.pack-dir }}
+          pattern: release-assets-*
+          merge-multiple: true
+
+      # release:publish creates the release for the pushed tag (if missing) and
+      # attaches every arch's tar.gz, verifying the upload count.
+      - run: mise run release:publish -- "${{ github.ref_name }}" ${{ inputs.pack-dir }}/*.tar.gz
+        env:
+          GH_TOKEN: ${{ github.token }}

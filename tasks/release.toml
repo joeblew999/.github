@@ -86,3 +86,40 @@ def main [tag?: string, ...assets: string] {
   print $"✓ released ($t): changelog + tag + GitHub release"
 }
 '''
+
+# ── release:publish ────────────────────────────────────────────────────────────
+# Publish a GitHub release for an ALREADY-EXISTING tag — the CI half of a
+# multi-OS release. release:github (above) creates the tag LOCALLY for the host
+# arch; this attaches assets to that tag from a workflow, where each OS in the
+# matrix built its own arch (no cross-compile). Idempotent: creates the release
+# if missing (matrix jobs may race), then uploads + verifies assets via --clobber.
+#   mise run release:publish -- vX.Y.Z dist/*.tar.gz
+# Used by reusable-mise-release.yml. Needs GH_TOKEN in env (the workflow sets it).
+["release:publish"]
+description = "Publish a GitHub release for an EXISTING tag: git-cliff notes + create-if-missing + verified asset upload. Usage: mise run release:publish -- vX.Y.Z [assets...]"
+run = '''
+#!/usr/bin/env nu
+def main [tag?: string, ...assets: string] {
+  let t = ($tag | default "")
+  if not ($t =~ '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$') { print -e "✗ usage: mise run release:publish -- vX.Y.Z[-suffix] [assets...]"; exit 1 }
+  let repo = (^git remote get-url origin | str trim | str replace -r '.*github\.com[:/]' '' | str replace -r '\.git$' '')
+
+  # Create the release if it doesn't exist yet (idempotent — safe to re-run).
+  let exists = ((do { ^gh release view $t --repo $repo } | complete | get exit_code) == 0)
+  if not $exists {
+    let notes = (^git-cliff --tag $t --latest --strip all)
+    $notes | ^gh release create $t --repo $repo --title $t --notes-file -
+    print $"✓ created release ($t) on ($repo)"
+  } else {
+    print $"• release ($t) already exists on ($repo) — attaching assets"
+  }
+
+  if ($assets | is-not-empty) {
+    ^gh release upload $t ...$assets --repo $repo --clobber
+    let want = ($assets | length)
+    let got = (^gh release view $t --repo $repo --json assets | from json | get assets | length)
+    if ($got < $want) { print -e $"✗ asset upload incomplete: ($got)/($want) attached to ($t)"; exit 1 }
+    print $"✓ uploaded + verified ($got) asset\(s\) to ($repo)"
+  }
+}
+'''
