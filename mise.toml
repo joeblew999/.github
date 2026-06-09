@@ -47,7 +47,7 @@ run = '''
 
 def main [] {
   # 1. orchestration→primitive composition via `mise run` stdout capture
-  #    (the exact pattern provision:* uses to capture cf:* output).
+  #    (the exact pattern cfapp:* uses to capture cf:* output).
   let c = (^mise run _probe | complete | get stdout | str trim)
   if $c != "DOGFOOD-OK" {
     print --stderr $"✗ mise-run composition broke — captured [($c)]"
@@ -66,7 +66,10 @@ def main [] {
   }
   rm -rf $stage
 
-  print $"✓ dogfood — ($nu.os-info.name): mise-run composition + release:pack exercised"
+  # 3. the README's task tables are GENERATED from tasks/ — fail if they drifted.
+  ^mise run "docs:check"
+
+  print $"✓ dogfood — ($nu.os-info.name): composition + release:pack + docs-in-sync"
 }
 '''
 
@@ -75,4 +78,72 @@ def main [] {
 run = '''
 #!/usr/bin/env nu
 print "DOGFOOD-OK"
+'''
+
+# ── docs:gen / docs:check ─────────────────────────────────────────────────────
+# The README's two-layer tables are GENERATED from tasks/*.toml — each file's
+# `# role:` header line is the SSOT. docs:gen rewrites the block between the
+# <!-- gen:tasks --> markers; docs:check (run by dogfood) fails if it's stale.
+# So a rename/add/remove of a task file can never leave the README drifting.
+[tasks."docs:gen"]
+description = "Regenerate the README two-layer tables from tasks/*.toml (# role: headers)."
+run = '''
+#!/usr/bin/env nu
+
+def task-rows [] {
+  let root = ($env.MISE_PROJECT_ROOT? | default (pwd))
+  glob ($"($root)/tasks/*.toml" | str replace --all "\\" "/")
+  | sort
+  | each {|f|
+      let base = ($f | path basename | str replace ".toml" "")
+      let layer = (if ($base | str starts-with "tool-") { "tool" } else if ($base == "mise") { "runner" } else { "orchestration" })
+      let role = (
+        open --raw $f | lines | where {|l| ($l | str trim | str starts-with "# role:") }
+        | get 0? | default "" | str replace --regex '^#\s*role:\s*' '' | str trim
+      )
+      {file: $base, layer: $layer, role: $role}
+    }
+}
+
+def gen-block [] {
+  let r = (task-rows)
+  let nl = (char newline)
+  mut o = ["### Tool layer — `tool-*.toml` (pure primitives — drive only their own tool)" "" "| file | role |" "|---|---|"]
+  for x in ($r | where layer == "tool") { $o = ($o | append $"| `($x.file)` | ($x.role) |") }
+  $o = ($o | append ["" "### Orchestration layer — plain `*.toml` (compose tool tasks)" "" "| namespace | role |" "|---|---|"])
+  for x in ($r | where layer == "orchestration") { $o = ($o | append $"| `($x.file)` | ($x.role) |") }
+  for x in ($r | where layer == "runner") { $o = ($o | append ["" $"Runner: **`($x.file)`** — ($x.role)."]) }
+  $o | str join $nl
+}
+
+def main [] {
+  let root = ($env.MISE_PROJECT_ROOT? | default (pwd))
+  let readme = ($root | path join "README.md")
+  let txt = (open --raw $readme)
+  let s = "<!-- gen:tasks -->"
+  let e = "<!-- /gen:tasks -->"
+  let before = ($txt | split row $s | get 0)
+  let after = ($txt | split row $e | last)
+  let nl = (char newline)
+  $"($before)($s)($nl)($nl)(gen-block)($nl)($nl)($e)($after)" | save --force $readme
+  print "✓ README task tables regenerated"
+}
+'''
+
+[tasks."docs:check"]
+description = "Fail if the README task tables are stale vs tasks/ (regenerate with docs:gen)."
+run = '''
+#!/usr/bin/env nu
+def main [] {
+  let readme = (($env.MISE_PROJECT_ROOT? | default (pwd)) | path join "README.md")
+  let before = (open --raw $readme)
+  ^mise run "docs:gen"            # rewrites only the <!-- gen:tasks --> block
+  let after = (open --raw $readme)
+  if $before != $after {
+    $before | save --force $readme  # restore exactly (git-state-independent)
+    print --stderr "✗ README task tables are STALE — run `mise run docs:gen` and commit."
+    exit 1
+  }
+  print "✓ README task tables in sync with tasks/"
+}
 '''

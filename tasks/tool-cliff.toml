@@ -1,4 +1,5 @@
 # tasks/cliff.toml — the cliff:* namespace: changelog QUERIES via git-cliff only.
+# role: Changelog queries — `git-cliff`
 #
 # git-cliff (orhun/git-cliff) maps conventional commits to release tags. It comes
 # from the GLOBAL mise config (`mise run mise:global:bootstrap`) — tasks pin nothing.

@@ -1,4 +1,5 @@
 # tasks/release.toml — shared binary-release PACKAGING for the joeblew999 fleet.
+# role: ship — changelog → tag → GitHub release
 #
 # release:pack archives each immediate subdir of a staging dir into a tar.gz with
 # the subdir's (goreleaser-style) name. The repo-specific BUILD that populates

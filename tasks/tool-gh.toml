@@ -1,4 +1,5 @@
 # tasks/gh.toml — TOML-task definitions for the gh:* namespace (GitHub CLI).
+# role: GitHub CLI — `gh`
 #
 # GitHub Actions RUN management via `gh`. Kept SEPARATE from ci:* (which is
 # static guards on this repo's code) — these drive GitHub, a different tool.

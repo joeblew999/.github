@@ -1,4 +1,5 @@
 # tasks/cfapp.toml — ORCHESTRATION: the full Cloudflare Worker app lifecycle.
+# role: Cloudflare Worker lifecycle — provision → access → verify
 #
 # One namespace, two phases (was provision: + prove:):
 #   cfapp:provision-*  — create resources (D1/R2/queues) + push secrets

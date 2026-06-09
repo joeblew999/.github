@@ -77,37 +77,41 @@ three). Override per repo at bootstrap — `mise run mise:repo:bootstrap --os-ma
 
 ## 3. What's inside — two layers
 
-`tasks/` is split into two layers, and the **filename tells you which**.
+`tasks/` splits into a **tool layer** (`tool-*.toml` — pure primitives that drive
+only their own tool, no `fnox`) and an **orchestration layer** (plain `*.toml` —
+compose tool tasks and own the `fnox`→`$env` bridge). The filename tells you which.
 
-### Tool layer — `tool-*.toml`  (pure primitives)
+*The tables below are **generated** from each task file's `# role:` header by
+`mise run docs:gen`, and CI fails if they drift — so they can't go stale.*
 
-Each task drives **only its own tool** + ubiquitous plumbing (`git`/`curl`/`tar`).
-No foreign tool, no `fnox` — secrets arrive in `$env` (set by the layer above).
+<!-- gen:tasks -->
 
-| file | drives |
+### Tool layer — `tool-*.toml` (pure primitives — drive only their own tool)
+
+| file | role |
 |---|---|
-| `tool-wrangler` | `wrangler` *(only — nothing else)* |
-| `tool-cf` | `wrangler` + `curl` |
-| `tool-gh` | `gh` |
-| `tool-docker` | `docker` |
-| `tool-cliff` | `git-cliff` |
-| `tool-rust` | `cargo` / `wasm-pack` |
-| `tool-fnox` | `fnox` |
+| `tool-cf` | Cloudflare CLI — `wrangler` + `curl` (HTTP) |
+| `tool-cliff` | Changelog queries — `git-cliff` |
+| `tool-docker` | Docker / ghcr — `docker` |
+| `tool-fnox` | Secrets CLI — `fnox` |
+| `tool-gh` | GitHub CLI — `gh` |
+| `tool-rust` | Rust toolchain — `cargo` / `wasm-pack` |
+| `tool-wrangler` | Wrangler CLI — `wrangler` |
 
-### Orchestration layer — plain `*.toml`  (5 lifecycle namespaces)
+### Orchestration layer — plain `*.toml` (compose tool tasks)
 
-Each composes tool tasks (`depends` / `mise run`) and owns the cross-tool work +
-the `fnox`→`$env` bridge.
+| namespace | role |
+|---|---|
+| `cfapp` | Cloudflare Worker lifecycle — provision → access → verify |
+| `ci` | verify code — parse + global-config guards + dogfood |
+| `mobile` | build mobile apps — tauri + Android/iOS |
+| `release` | ship — changelog → tag → GitHub release |
+| `secrets-bw` | manage secrets — Bitwarden/NodeWarden bridge (`secrets:bw-*`) |
+| `secrets` | manage secrets — keychain ↔ fnox ↔ GitHub |
 
-| namespace | does | by driving |
-|---|---|---|
-| `ci` | verify code | nu guards |
-| `secrets` | manage secrets | `fnox` + `gh` + `keychain` + `bw` |
-| `cfapp` | Cloudflare Worker lifecycle (provision → access → verify) | `cf:*` + `wrangler` + `curl` + `fnox` |
-| `release` | ship (changelog → tag → release) | `git-cliff` + `git` + `gh` + `tar` |
-| `mobile` | build mobile apps | `tauri` + `rustup` + `java` / `pod` / `xcode-select` |
+Runner: **`mise`** — machine + repo bootstrap, sweep, upgrade.
 
-Plus the **`mise`** runner (`global:bootstrap` / `repo:bootstrap` / `sweep` / `upgrade`).
+<!-- /gen:tasks -->
 
 **The one rule:** plumbing (`git`/`curl`/`tar`) is fine anywhere. A *tool* file
 that drives another tool's binary or reaches into `fnox` is mis-placed — push that

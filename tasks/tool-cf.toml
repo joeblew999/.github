@@ -1,4 +1,5 @@
 # tasks/cf.toml — cf:* (Cloudflare) namespace: PURE cloudflare PRIMITIVES.
+# role: Cloudflare CLI — `wrangler` + `curl` (HTTP)
 #
 # Each task drives ONLY wrangler (+ curl as HTTP plumbing). Tokens come from
 # $env — the orchestration layer (cfapp:*) sets CLOUDFLARE_API_TOKEN from

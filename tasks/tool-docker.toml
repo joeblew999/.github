@@ -1,4 +1,5 @@
 # tasks/docker.toml — shared Docker/ghcr release tooling for the joeblew999 fleet.
+# role: Docker / ghcr — `docker`
 #
 # docker:login    — auth to ghcr (generic).
 # docker:image    — build + push a MULTI-ARCH image to ghcr and verify the
