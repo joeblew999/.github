@@ -107,6 +107,7 @@ say so plainly: `release` (cliff+git+gh), `ci` (guards), `secrets` (fnox+gh),
 | `bw cf fnox rust wrangler env` | each its own tool |
 | `release:*` | **orchestration** (cliff+git+gh): `release:github`, `release:pack` |
 | `ci:*` | **static guards** (`check-nu`/`check-global`) + ref drift (`audit-lib-refs [--write]`) |
+| `provision:*` | **orchestration** — reads config/<env>.env, composes `cf:*` primitives (`d1-r2`, `queues`, `secrets`) |
 | `secrets prove mobile` | **orchestration/domain** (compose tools) |
 
 Name implies one tool but drives others? Mis-named — move it. (`cliff:release`

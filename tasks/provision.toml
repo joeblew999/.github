@@ -1,0 +1,172 @@
+# tasks/provision.toml — ORCHESTRATION: provision Cloudflare resources for the
+# active env by COMPOSING cf:* primitives.
+#
+# Layer split: cf.toml holds atomic, explicit-arg cf primitives (cf:r2-create,
+# cf:d1-create, cf:queue-create, cf:secret-put, …). provision:* reads
+# config/<env>.env and calls those primitives by name via `mise run`. Config
+# reading + idempotency policy live HERE; the raw `wrangler` calls live in cf.
+#
+# (load-env-file is repeated per task — mise can't share nu helpers across task
+# bodies, so each orchestration task inlines it. That's the distribution model.)
+#
+# Consumer wiring:
+#   [task_config]
+#   includes = [
+#     "git::https://github.com/joeblew999/.github.git//tasks/provision.toml?ref=<tag>",
+#     "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=<tag>",   # the primitives
+#   ]
+
+# ── provision:d1-r2 ──────────────────────────────────────────────────────────
+# Provision D1 + R2 for the active env. Reads METADATA_DB_NAME, BACKUP_BUCKET_NAME
+# from config/<env>.env (either may be empty → skipped). Writes the new D1 id back
+# to the env file. Idempotent — skips D1 create when METADATA_DB_ID is already set.
+["provision:d1-r2"]
+tools = { wrangler = "latest" }
+description = "Provision D1 + R2 for the active env (composes cf:r2-create + cf:d1-create + cf:d1-exec). Reads/writes config/<env>.env. Idempotent."
+run = '''
+#!/usr/bin/env nu
+
+def load-env-file [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let file = $"config/($env_name).env"
+  if not ($file | path exists) {
+    print --stderr $"ERROR: ($file) not found."
+    exit 1
+  }
+  let cfg = (
+    open --raw $file
+    | lines
+    | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+    | reduce -f {} {|line, acc|
+        let parts = ($line | split row -n 2 "=")
+        $acc | upsert ($parts | get 0) (($parts | get 1) | str trim --char '"')
+      }
+  )
+  { file: $file, cfg: $cfg }
+}
+
+def main [] {
+  let env_data = (load-env-file)
+  let cfg = $env_data.cfg
+  let file = $env_data.file
+
+  let bucket = ($cfg.BACKUP_BUCKET_NAME? | default "")
+  if ($bucket | is-empty) {
+    print "↷ R2: BACKUP_BUCKET_NAME not set — skipped"
+  } else {
+    ^mise run cf:r2-create -- $bucket
+  }
+
+  let db_name = ($cfg.METADATA_DB_NAME? | default "")
+  let existing_id = ($cfg.METADATA_DB_ID? | default "")
+  if ($db_name | is-empty) {
+    print "↷ D1: METADATA_DB_NAME not set — skipped"
+  } else if (not ($existing_id | is-empty)) {
+    print $"✓ Metadata D1 id already set \(($existing_id)\); skipping create."
+  } else {
+    let id = (^mise run cf:d1-create -- $db_name | complete | get stdout | str trim)
+    if ($id | is-empty) {
+      print --stderr "ERROR: cf:d1-create returned no id"
+      exit 1
+    }
+    let original = (open --raw $file)
+    let updated = ($original | str replace --regex '^METADATA_DB_ID=.*' $"METADATA_DB_ID=($id)" --multiline)
+    $updated | save -f $file
+    print $"✓ Created D1 '($db_name)' \(id ($id)\) and wrote to ($file)"
+  }
+
+  if (not ($db_name | is-empty)) and ("worker/schema.sql" | path exists) {
+    print $"Applying worker/schema.sql to '($db_name)' ..."
+    ^mise run cf:d1-exec -- $db_name "worker/schema.sql"
+  }
+
+  print "Done. Next: fnox CLOUDFLARE_API_TOKEN/ACCOUNT_ID set; mise run cf:access-setup"
+}
+'''
+
+# ── provision:queues ─────────────────────────────────────────────────────────
+# Provision Cloudflare Queues for the active env. Reads QUEUE_NAMES (comma-sep)
+# from config/<env>.env; calls cf:queue-create per name (idempotent). No-op if unset.
+["provision:queues"]
+tools = { wrangler = "latest" }
+description = "Provision Cloudflare Queues for the active env (composes cf:queue-create per QUEUE_NAMES). No-op if unset."
+run = '''
+#!/usr/bin/env nu
+
+def load-env-file [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let file = $"config/($env_name).env"
+  if not ($file | path exists) {
+    print --stderr $"ERROR: ($file) not found."
+    exit 1
+  }
+  open --raw $file
+  | lines
+  | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+  | reduce -f {} {|line, acc|
+      let parts = ($line | split row -n 2 "=")
+      $acc | upsert ($parts | get 0) (($parts | get 1) | str trim --char '"')
+    }
+}
+
+def main [] {
+  let cfg = (load-env-file)
+  let names = ($cfg.QUEUE_NAMES? | default "")
+  if ($names | is-empty) {
+    print "↷ Queues: QUEUE_NAMES not set — skipped"
+    return
+  }
+  let names_list = ($names | split row "," | each { |n| $n | str trim } | where { |n| not ($n | is-empty) })
+  for name in $names_list {
+    ^mise run cf:queue-create -- $name
+  }
+  print "Done. Queue bindings still need to be declared in your wrangler config."
+}
+'''
+
+# ── provision:secrets ────────────────────────────────────────────────────────
+# Push the 4 CF Access + auth secrets from fnox to the deployed Worker, mapping
+# canonical fnox names → Worker env names. Reads APP_POLICY_AUD_FNOX_KEY from
+# config/<env>.env. Composes cf:secret-put per pair.
+["provision:secrets"]
+tools = { wrangler = "latest" }
+description = "Push CF Access + auth secrets fnox → Worker (composes cf:secret-put). Reads APP_POLICY_AUD_FNOX_KEY from config/<env>.env. Run wrangler:gen first if needed."
+run = '''
+#!/usr/bin/env nu
+
+def load-env-file [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let file = $"config/($env_name).env"
+  if not ($file | path exists) {
+    print --stderr $"ERROR: ($file) not found."
+    exit 1
+  }
+  open --raw $file
+  | lines
+  | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+  | reduce -f {} {|line, acc|
+      let parts = ($line | split row -n 2 "=")
+      $acc | upsert ($parts | get 0) (($parts | get 1) | str trim --char '"')
+    }
+}
+
+def main [] {
+  let cfg = (load-env-file)
+  let policy_key = ($cfg.APP_POLICY_AUD_FNOX_KEY? | default "")
+  if ($policy_key | is-empty) {
+    print --stderr "APP_POLICY_AUD_FNOX_KEY not set in config/<env>.env"
+    exit 1
+  }
+
+  # [worker_var, fnox_key]
+  let pairs = [
+    ["ACCOUNT_ID",  "CLOUDFLARE_ACCOUNT_ID"]
+    ["API_KEY",     "CLOUDFLARE_API_TOKEN"]
+    ["TEAM_DOMAIN", "CF_ACCESS_TEAM_DOMAIN"]
+    ["POLICY_AUD",  $policy_key]
+  ]
+  for pair in $pairs {
+    ^mise run cf:secret-put -- ($pair | get 0) ($pair | get 1)
+  }
+}
+'''

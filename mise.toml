@@ -18,6 +18,7 @@ includes = [
   "tasks/mise.toml",
   "tasks/mobile.toml",
   "tasks/prove.toml",
+  "tasks/provision.toml",
   "tasks/release.toml",
   "tasks/rust.toml",
   "tasks/secrets.toml",

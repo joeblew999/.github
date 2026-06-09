@@ -63,210 +63,114 @@ def main [...args] {
 }
 '''
 
-# ── cf:provision-queues ──────────────────────────────────────────────────────
-# Provision Cloudflare Queues for the active env. Reads QUEUE_NAMES
-# (comma-separated) from config/<env>.env. Idempotent — skips queues
-# that already exist. No-op when QUEUE_NAMES is empty/unset.
-["cf:provision-queues"]
+# ── cf:d1-create ─────────────────────────────────────────────────────────────
+# PRIMITIVE: create a D1 database by name; print ONLY its id to stdout (status
+# to stderr) so an orchestrator can capture it. NOT idempotent on its own —
+# callers gate on existence (see provision:d1-r2).
+["cf:d1-create"]
 tools = { wrangler = "latest" }
-description = "Provision Cloudflare Queues for the active env. Reads QUEUE_NAMES (comma-separated) from config/<env>.env. Idempotent. No-op if QUEUE_NAMES is empty or unset."
+description = "PRIMITIVE: create D1 database <name>; prints the new database_id to stdout."
 run = '''
 #!/usr/bin/env nu
 
-def load-env-file [] {
-  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
-  let file = $"config/($env_name).env"
-  if not ($file | path exists) {
-    print --stderr $"ERROR: ($file) not found."
+def main [name: string] {
+  $env.CLOUDFLARE_API_TOKEN = (
+    if ($env.CLOUDFLARE_API_TOKEN? | default "" | is-not-empty) { $env.CLOUDFLARE_API_TOKEN }
+    else { try { ^fnox get CLOUDFLARE_API_TOKEN | str trim } catch { "" } }
+  )
+  print --stderr $"Creating D1 database '($name)' ..."
+  let out = (^wrangler d1 create $name | complete | get stdout)
+  let parsed = ($out | parse --regex '"database_id"\s*:\s*"([0-9a-f-]{36})"|database_id\s*=\s*"([0-9a-f-]{36})"')
+  if ($parsed | length) == 0 {
+    print --stderr "ERROR: could not parse database_id from output:"
+    print --stderr $out
     exit 1
   }
-  open --raw $file
-  | lines
-  | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
-  | reduce -f {} {|line, acc|
-      let parts = ($line | split row -n 2 "=")
-      let key = ($parts | get 0)
-      let val = ($parts | get 1 | str trim --char '"')
-      $acc | upsert $key $val
-    }
+  let id = ($parsed | first | get capture0? | default ($parsed | first | get capture1?))
+  print $id
 }
+'''
 
-def main [] {
-  let cfg = (load-env-file)
-  let names = ($cfg.QUEUE_NAMES? | default "")
-  if ($names | is-empty) {
-    print "↷ Queues: QUEUE_NAMES not set — skipped"
-    return
-  }
+# ── cf:d1-exec ───────────────────────────────────────────────────────────────
+# PRIMITIVE: run a SQL file against a remote D1 database (by name).
+["cf:d1-exec"]
+tools = { wrangler = "latest" }
+description = "PRIMITIVE: execute a SQL file against remote D1 <name> (wrangler d1 execute --remote --file)."
+run = '''
+#!/usr/bin/env nu
 
+def main [name: string, file: string] {
   $env.CLOUDFLARE_API_TOKEN = (
-    if ($env.CLOUDFLARE_API_TOKEN? | default "" | is-not-empty) {
-      $env.CLOUDFLARE_API_TOKEN
-    } else {
-      try { ^fnox get CLOUDFLARE_API_TOKEN | str trim } catch { "" }
-    }
+    if ($env.CLOUDFLARE_API_TOKEN? | default "" | is-not-empty) { $env.CLOUDFLARE_API_TOKEN }
+    else { try { ^fnox get CLOUDFLARE_API_TOKEN | str trim } catch { "" } }
   )
+  ^wrangler d1 execute $name --remote $"--file=($file)"
+}
+'''
 
+# ── cf:r2-create ─────────────────────────────────────────────────────────────
+# PRIMITIVE: idempotently create an R2 bucket by name.
+["cf:r2-create"]
+tools = { wrangler = "latest" }
+description = "PRIMITIVE: create R2 bucket <name> if it doesn't already exist."
+run = '''
+#!/usr/bin/env nu
+
+def main [bucket: string] {
+  $env.CLOUDFLARE_API_TOKEN = (
+    if ($env.CLOUDFLARE_API_TOKEN? | default "" | is-not-empty) { $env.CLOUDFLARE_API_TOKEN }
+    else { try { ^fnox get CLOUDFLARE_API_TOKEN | str trim } catch { "" } }
+  )
+  let listing = (try { ^wrangler r2 bucket list | complete | get stdout } catch { "" })
+  if ($listing | str contains $bucket) {
+    print $"✓ R2 bucket '($bucket)' already exists"
+  } else {
+    print $"Creating R2 bucket '($bucket)' ..."
+    ^wrangler r2 bucket create $bucket
+  }
+}
+'''
+
+# ── cf:queue-create ──────────────────────────────────────────────────────────
+# PRIMITIVE: idempotently create a Cloudflare Queue by name.
+["cf:queue-create"]
+tools = { wrangler = "latest" }
+description = "PRIMITIVE: create Cloudflare Queue <name> if it doesn't already exist."
+run = '''
+#!/usr/bin/env nu
+
+def main [name: string] {
+  $env.CLOUDFLARE_API_TOKEN = (
+    if ($env.CLOUDFLARE_API_TOKEN? | default "" | is-not-empty) { $env.CLOUDFLARE_API_TOKEN }
+    else { try { ^fnox get CLOUDFLARE_API_TOKEN | str trim } catch { "" } }
+  )
   let existing = (try { ^wrangler queues list | complete | get stdout } catch { "" })
-
-  let names_list = ($names | split row "," | each { |n| $n | str trim } | where { |n| not ($n | is-empty) })
-  for name in $names_list {
-    if ($existing | str contains $name) {
-      print $"✓ Queue '($name)' already exists"
-    } else {
-      print $"Creating queue '($name)' ..."
-      ^wrangler queues create $name
-    }
-  }
-  print "Done. Queue bindings still need to be declared in your wrangler config."
-}
-'''
-
-# ── cf:secrets-put-mapped ────────────────────────────────────────────────────
-# Push 4 CF Access + auth secrets from fnox to the deployed Worker, mapping
-# canonical fnox names → Worker env var names. Reads APP_POLICY_AUD_FNOX_KEY
-# from config/<env>.env (e.g. D1_MANAGER_POLICY_AUD).
-["cf:secrets-put-mapped"]
-tools = { wrangler = "latest" }
-description = "Push 4 CF Access + auth secrets from fnox to the deployed Worker, mapping canonical fnox names -> Worker env names. Reads APP_POLICY_AUD_FNOX_KEY from config/<env>.env (e.g. D1_MANAGER_POLICY_AUD). Depends on wrangler.toml existing — run wrangler:gen first if needed."
-run = '''
-#!/usr/bin/env nu
-
-def load-env-file [] {
-  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
-  let file = $"config/($env_name).env"
-  if not ($file | path exists) {
-    print --stderr $"ERROR: ($file) not found."
-    exit 1
-  }
-  open --raw $file
-  | lines
-  | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
-  | reduce -f {} {|line, acc|
-      let parts = ($line | split row -n 2 "=")
-      let key = ($parts | get 0)
-      let val = ($parts | get 1 | str trim --char '"')
-      $acc | upsert $key $val
-    }
-}
-
-def main [] {
-  let cfg = (load-env-file)
-  let policy_key = ($cfg.APP_POLICY_AUD_FNOX_KEY? | default "")
-  if ($policy_key | is-empty) {
-    print --stderr "APP_POLICY_AUD_FNOX_KEY not set in config/<env>.env"
-    exit 1
-  }
-
-  let pairs = [
-    ["CLOUDFLARE_ACCOUNT_ID", "ACCOUNT_ID"]
-    ["CLOUDFLARE_API_TOKEN",  "API_KEY"]
-    ["CF_ACCESS_TEAM_DOMAIN", "TEAM_DOMAIN"]
-    [$policy_key,             "POLICY_AUD"]
-  ]
-
-  for pair in $pairs {
-    let fnox_key = ($pair | get 0)
-    let worker_name = ($pair | get 1)
-    let val = (try { ^fnox get $fnox_key | str trim } catch { "" })
-    if ($val | is-empty) {
-      print --stderr $"ERROR: fnox has no value for '($fnox_key)'."
-      print --stderr $"       Set it: fnox set --global -p keychain ($fnox_key)"
-      exit 1
-    }
-    print $"→ wrangler secret put ($worker_name)  \(from fnox:($fnox_key)\)"
-    $val | ^wrangler secret put $worker_name
+  if ($existing | str contains $name) {
+    print $"✓ Queue '($name)' already exists"
+  } else {
+    print $"Creating queue '($name)' ..."
+    ^wrangler queues create $name
   }
 }
 '''
 
-# ── cf:provision-d1-r2 ───────────────────────────────────────────────────────
-# Provision Cloudflare D1 + R2 for the active env. Reads METADATA_DB_NAME +
-# BACKUP_BUCKET_NAME from config/<env>.env. Either may be empty (skipped).
-# Writes the new D1 id back to the env file. Idempotent — skips create when
-# the named resource already exists.
-["cf:provision-d1-r2"]
+# ── cf:secret-put ────────────────────────────────────────────────────────────
+# PRIMITIVE: push one fnox value to a deployed Worker secret (mapped name).
+["cf:secret-put"]
 tools = { wrangler = "latest" }
-description = "Provision Cloudflare D1 + R2 for the active env. Reads METADATA_DB_NAME, BACKUP_BUCKET_NAME from config/<env>.env. Either may be empty (skipped). Writes new METADATA_DB_ID back. Idempotent. Skips create when name already present."
+description = "PRIMITIVE: wrangler secret put <worker-var> from the fnox value <fnox-key>."
 run = '''
 #!/usr/bin/env nu
 
-def load-env-file [] {
-  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
-  let file = $"config/($env_name).env"
-  if not ($file | path exists) {
-    print --stderr $"ERROR: ($file) not found."
+def main [worker_var: string, fnox_key: string] {
+  let val = (try { ^fnox get $fnox_key | str trim } catch { "" })
+  if ($val | is-empty) {
+    print --stderr $"ERROR: fnox has no value for '($fnox_key)'."
+    print --stderr $"       Set it: fnox set --global -p keychain ($fnox_key)"
     exit 1
   }
-  let cfg = (
-    open --raw $file
-    | lines
-    | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
-    | reduce -f {} {|line, acc|
-        let parts = ($line | split row -n 2 "=")
-        let key = ($parts | get 0)
-        let val = ($parts | get 1 | str trim --char '"')
-        $acc | upsert $key $val
-      }
-  )
-  { file: $file, cfg: $cfg }
-}
-
-def main [] {
-  let env_data = (load-env-file)
-  let cfg = $env_data.cfg
-  let file = $env_data.file
-
-  $env.CLOUDFLARE_API_TOKEN = (
-    if ($env.CLOUDFLARE_API_TOKEN? | default "" | is-not-empty) {
-      $env.CLOUDFLARE_API_TOKEN
-    } else {
-      try { ^fnox get CLOUDFLARE_API_TOKEN | str trim } catch { "" }
-    }
-  )
-
-  let bucket = ($cfg.BACKUP_BUCKET_NAME? | default "")
-  if ($bucket | is-empty) {
-    print "↷ R2: BACKUP_BUCKET_NAME not set — skipped"
-  } else {
-    let listing = (try { ^wrangler r2 bucket list | complete | get stdout } catch { "" })
-    if ($listing | str contains $bucket) {
-      print $"✓ R2 bucket '($bucket)' already exists"
-    } else {
-      print $"Creating R2 bucket '($bucket)' ..."
-      ^wrangler r2 bucket create $bucket
-    }
-  }
-
-  let db_name = ($cfg.METADATA_DB_NAME? | default "")
-  let existing_id = ($cfg.METADATA_DB_ID? | default "")
-
-  if ($db_name | is-empty) {
-    print "↷ D1: METADATA_DB_NAME not set — skipped"
-  } else if (not ($existing_id | is-empty)) {
-    print $"✓ Metadata D1 id already set \(($existing_id)\); skipping create."
-  } else {
-    print $"Creating D1 database '($db_name)' ..."
-    let out = (^wrangler d1 create $db_name | complete | get stdout)
-    let parsed = ($out | parse --regex '"database_id"\s*:\s*"([0-9a-f-]{36})"|database_id\s*=\s*"([0-9a-f-]{36})"')
-    if ($parsed | length) == 0 {
-      print --stderr "ERROR: could not parse database_id from output:"
-      print --stderr $out
-      exit 1
-    }
-    let id = ($parsed | first | get capture0? | default ($parsed | first | get capture1?))
-    let original = (open --raw $file)
-    let updated = ($original | str replace --regex '^METADATA_DB_ID=.*' $"METADATA_DB_ID=($id)" --multiline)
-    $updated | save -f $file
-    print $"✓ Created D1 '($db_name)' \(id ($id)\) and wrote to ($file)"
-  }
-
-  if (not ($db_name | is-empty)) and ("worker/schema.sql" | path exists) {
-    print $"Applying worker/schema.sql to '($db_name)' ..."
-    try { ^wrangler d1 execute $db_name --remote --file=worker/schema.sql }
-  }
-
-  print "Done. Next: fnox CLOUDFLARE_API_TOKEN/ACCOUNT_ID set; mise run cf:access-setup"
+  print $"→ wrangler secret put ($worker_var)  \(from fnox:($fnox_key)\)"
+  $val | ^wrangler secret put $worker_var
 }
 '''
 
