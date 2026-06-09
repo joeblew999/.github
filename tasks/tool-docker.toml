@@ -1,6 +1,9 @@
 # tasks/docker.toml — shared Docker/ghcr release tooling for the joeblew999 fleet.
 # role: Docker / ghcr — `docker`
 #
+# docker:build    — CI-safe build-ONLY verify (no push, no login, no secrets).
+#                   Skips cleanly where docker isn't usable (macOS/Windows CI
+#                   runners), so the SAME `mise run ci` stays green on every OS.
 # docker:login    — auth to ghcr (generic).
 # docker:image    — build + push a MULTI-ARCH image to ghcr and verify the
 #                   manifest. Parameterized; image defaults to
@@ -16,6 +19,29 @@
 # We generally run docker builds in GitHub Actions (easier than local multi-arch);
 # these tasks work the same locally and in CI (GHCR_TOKEN/GHCR_USER from CI env or
 # fnox keychain locally).
+
+["docker:build"]
+description = "CI-safe build-ONLY verify (no push/login/secrets). Skips where docker is unusable (macOS/Windows runners) so one `ci` stays green on every OS. Usage: mise run docker:build [--tag t] [--dockerfile Dockerfile] [--context .]"
+run = '''
+#!/usr/bin/env nu
+def main [
+  --tag: string = "ci-build:latest",   # local image tag (not pushed)
+  --dockerfile: string = "Dockerfile",
+  --context: string = ".",
+] {
+  # Gate on docker AVAILABILITY, not OS: local Docker Desktop on macOS builds
+  # Linux images fine, but GitHub's macOS/Windows runners have no usable daemon.
+  # `docker info` = binary present AND daemon up. Skip (exit 0) when absent so the
+  # single `mise run ci` is green on every matrix cell; build where docker works.
+  let ok = ((do { ^docker info } | complete | get exit_code) == 0)
+  if not $ok {
+    print $"· docker unavailable on ($nu.os-info.name) — build skipped, fine in CI"
+    return
+  }
+  ^docker build -t $tag -f $dockerfile $context
+  print $"✓ docker build ok — ($tag)"
+}
+'''
 
 ["docker:login"]
 description = "Log docker into ghcr.io. Token from $GHCR_TOKEN (CI) or fnox keychain (local); needs write:packages."
