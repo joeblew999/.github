@@ -1,8 +1,17 @@
+## [0.46.0] - 2026-06-09
+
+### 🚜 Refactor
+
+- *(docker)* Drop DOCKER_BUILD policy enum — docker:build is just capability-gated. One lever (ci depends), not four knobs
 ## [0.45.0] - 2026-06-09
 
 ### 🚀 Features
 
 - *(docker)* $DOCKER_BUILD policy (auto|ci|local|never) — repos control local-vs-remote docker build independently via mise.toml [env]
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.45.0
 ## [0.44.0] - 2026-06-09
 
 ### 🚀 Features
