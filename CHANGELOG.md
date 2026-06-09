@@ -1,3 +1,8 @@
+## [0.45.0] - 2026-06-09
+
+### 🚀 Features
+
+- *(docker)* $DOCKER_BUILD policy (auto|ci|local|never) — repos control local-vs-remote docker build independently via mise.toml [env]
 ## [0.44.0] - 2026-06-09
 
 ### 🚀 Features
@@ -8,6 +13,10 @@
 
 - *(docker)* Docker:build gate — which-guard (no crash when binary absent on macOS runner) + require OSType=linux (skip Windows-containers daemon); avoid {{}} Tera
 - *(docker)* Remove literal double-brace from docker:build comment (Tera parsed it → __tera_one_off error at runtime)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.44.0
 ## [0.43.0] - 2026-06-09
 
 ### 🐛 Bug Fixes
