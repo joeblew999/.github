@@ -1,3 +1,8 @@
+## [0.40.1] - 2026-06-09
+
+### 📚 Documentation
+
+- Add MIGRATION.md (v0.40.0 rename tables) + link from README
 ## [0.40.0] - 2026-06-09
 
 ### 🚀 Features
@@ -45,6 +50,10 @@
 - *(README)* Restructure for flow — use → how CI works → what's inside → develop
 - *(README)* Make the consumer CI story clear — one task, local AND remote
 - *(README)* Point repos at .github-example as the canonical, CI-tested reference
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.40.0
 ## [0.39.0] - 2026-06-08
 
 ### 🚀 Features
