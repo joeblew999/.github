@@ -1,17 +1,19 @@
+## [0.41.1] - 2026-06-09
+
+### 🐛 Bug Fixes
+
+- *(docs)* Docs:check compares EOL-insensitively + .gitattributes eol=lf (Windows CRLF false-stale)
 ## [0.42.0] - 2026-06-09
 
 ### 🚀 Features
 
-- *(release)* Reusable-mise-release workflow + release:publish task
-## [0.41.0] - 2026-06-09
-
-### 🚀 Features
-
 - *(docs)* Generate README two-layer tables from tasks/ + CI guard; update skill
+- *(release)* Reusable-mise-release workflow + release:publish task
 
 ### ⚙️ Miscellaneous Tasks
 
 - *(release)* V0.41.0
+- *(release)* V0.42.0
 ## [0.40.1] - 2026-06-09
 
 ### 📚 Documentation
