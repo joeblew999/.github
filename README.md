@@ -7,6 +7,8 @@ the fleet. Every capability is a **mise task**, shared **by reference** (`?ref=`
 Agent guide: [AGENTS.md](./AGENTS.md) · history: [CHANGELOG.md](./CHANGELOG.md) ·
 example consumer: [.github-example](https://github.com/joeblew999/.github-example).
 
+**New repo?** Start at §1 below. **Upgrading an existing repo?** → [MIGRATION.md](./MIGRATION.md).
+
 ---
 
 ## 1. Use it in a repo
