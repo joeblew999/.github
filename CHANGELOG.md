@@ -1,8 +1,22 @@
+## [0.44.0] - 2026-06-09
+
+### 🚀 Features
+
+- *(docker)* Add docker:build — CI-safe build-only verify (no push/secrets), skips where docker is unusable so one ci stays green on every OS
+
+### 🐛 Bug Fixes
+
+- *(docker)* Docker:build gate — which-guard (no crash when binary absent on macOS runner) + require OSType=linux (skip Windows-containers daemon); avoid {{}} Tera
+- *(docker)* Remove literal double-brace from docker:build comment (Tera parsed it → __tera_one_off error at runtime)
 ## [0.43.0] - 2026-06-09
 
 ### 🐛 Bug Fixes
 
 - *(release)* Correct caller-grants-contents:write docs + generate mise-release.yml stub
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.43.0
 ## [0.41.2] - 2026-06-09
 
 ### 📚 Documentation
