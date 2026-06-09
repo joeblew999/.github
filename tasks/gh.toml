@@ -21,9 +21,8 @@ run = '''
 #!/usr/bin/env nu
 
 def gh-token [] {
-  let env_tok = ($env.GH_TOKEN? | default ($env.GITHUB_TOKEN? | default ""))
-  if ($env_tok | is-not-empty) { return $env_tok }
-  try { ^fnox get GITHUB_TOKEN | str trim } catch { "" }
+  # env only (CI secret / dev's gh-native-auth or fnox-exec). gh drives only gh.
+  $env.GH_TOKEN? | default ($env.GITHUB_TOKEN? | default "")
 }
 
 def origin-repo [] {
@@ -224,9 +223,8 @@ run = '''
 #!/usr/bin/env nu
 
 def gh-token [] {
-  let env_tok = ($env.GH_TOKEN? | default ($env.GITHUB_TOKEN? | default ""))
-  if ($env_tok | is-not-empty) { return $env_tok }
-  try { ^fnox get GITHUB_TOKEN | str trim } catch { "" }
+  # env only (CI secret / dev's gh-native-auth or fnox-exec). gh drives only gh.
+  $env.GH_TOKEN? | default ($env.GITHUB_TOKEN? | default "")
 }
 
 def origin-repo [] {

@@ -21,8 +21,13 @@ description = "Log docker into ghcr.io. Token from $GHCR_TOKEN (CI) or fnox keyc
 run = '''
 #!/usr/bin/env nu
 def main [] {
-  let tok = ($env.GHCR_TOKEN? | default (^fnox get GHCR_TOKEN | str trim))
-  let user = ($env.GHCR_USER? | default (^fnox get GHCR_USER | str trim))
+  # token/user from $env (CI secrets, or the dev's fnox-exec/env). docker only drives docker.
+  let tok = ($env.GHCR_TOKEN? | default "")
+  let user = ($env.GHCR_USER? | default "")
+  if ($tok | is-empty) or ($user | is-empty) {
+    print --stderr "✗ set GHCR_TOKEN + GHCR_USER in env (e.g. via fnox exec)"
+    exit 1
+  }
   $tok | ^docker login ghcr.io -u $user --password-stdin
 }
 '''
@@ -61,7 +66,7 @@ description = "Open a ghcr package's visibility settings (UI-only). Usage: mise 
 run = '''
 #!/usr/bin/env nu
 def main [package: string] {
-  let user = ($env.GHCR_USER? | default (^fnox get GHCR_USER | str trim))
+  let user = ($env.GHCR_USER? | default "")
   let url = $"https://github.com/users/($user)/packages/container/($package)/settings"
   let opener = (match $nu.os-info.name { "macos" => "open", "windows" => "start", _ => "xdg-open" })
   ^$opener $url
