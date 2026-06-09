@@ -26,8 +26,28 @@ mise run mise:repo:bootstrap     # write .github/workflows/ (the CI stub)
 mise run ci                      # verify
 ```
 
-**Add your own CI work** — define a *local* `ci` that depends on your tasks; mise
-merges it with the shared guards, so both run:
+---
+
+## 2. CI — one task, local *and* remote
+
+This is the core design. Your repo's CI is a **single mise task — `mise run ci`** —
+and it runs in **two places, identically**:
+
+| how you run it | where | OS coverage |
+|---|---|---|
+| **`mise run ci`** | your machine | **your OS** — instant, while you work |
+| **`git push`** | GitHub Actions | the **full matrix** (ubuntu + macOS + windows) |
+
+The workflow that `mise:repo:bootstrap` wrote (`.github/workflows/mise.yml`) does
+nothing but run that same `mise run ci`. So **local is one cell of remote**:
+
+> green locally ⇒ green for *that* OS in CI. Push, and the matrix runs the
+> identical task on the other OSes. **Always run it locally first** — pushing
+> untested is the only thing that breaks CI.
+
+**Make `ci` yours.** The shared `ci` runs the library's guards. Add a *local* `ci`
+that depends on your own tasks; mise **merges** them, so the guards *and* your work
+run — both locally and on the matrix:
 
 ```toml
 [tasks.ci]
@@ -40,23 +60,10 @@ print "your work here"
 '''
 ```
 
----
-
-## 2. How CI works — local == CI
-
-CI is **isomorphic**. `mise:repo:bootstrap` writes a thin stub that `uses:` the
-shared `reusable-mise-ci.yml`, which just runs `mise run ci` — *the same task you
-run locally*. Consequences:
-
-- `mise run ci` on your machine **is one cell** of the CI matrix. Green locally ⇒
-  green for that OS in CI; the matrix only adds the *other* OSes (you can't run
-  them locally).
-- The OS list lives in **one place** — the reusable's `os-matrix` input (default
-  `ubuntu + macos + windows`). Override per repo at bootstrap:
-  `mise run mise:repo:bootstrap --os-matrix '["ubuntu-latest"]'`.
-- A task can read its own OS via `$nu.os-info.name` → `macos` / `linux` / `windows`.
-- `.github` **dogfoods** itself — its CI *runs* the credential-free tasks on the
-  matrix (not just parses them), so cross-OS bugs get caught for real.
+**Pick your OSes.** The matrix is the reusable workflow's `os-matrix` (default all
+three). Override per repo at bootstrap — `mise run mise:repo:bootstrap --os-matrix
+'["ubuntu-latest"]'` — or edit the stub. A task can read its current OS with
+`$nu.os-info.name` → `macos` / `linux` / `windows`.
 
 ---
 
@@ -86,7 +93,7 @@ the `fnox`→`$env` bridge.
 
 | namespace | does | by driving |
 |---|---|---|
-| `ci` | verify code | nu guards + dogfood |
+| `ci` | verify code | nu guards |
 | `secrets` | manage secrets | `fnox` + `gh` + `keychain` + `bw` |
 | `cfapp` | Cloudflare Worker lifecycle (provision → access → verify) | `cf:*` + `wrangler` + `curl` + `fnox` |
 | `release` | ship (changelog → tag → release) | `git-cliff` + `git` + `gh` + `tar` |
@@ -104,7 +111,7 @@ sets `$env`, then `mise run`s the pure primitive (the child inherits the env).
 ## 4. Developing this repo
 
 Version pins protect consumers (an old `?ref=` is immutable), so **refactor
-deeply** — rename, merge, move. The loop:
+deeply** — rename, merge, move. The loop, mirroring §2's local-first rule:
 
 ```
 edit → mise run ci                 # locally FIRST — the same task CI runs
@@ -116,5 +123,6 @@ edit → mise run ci                 # locally FIRST — the same task CI runs
      → git push                    # triggers the OS matrix
 ```
 
-Local-first every time — pushing untested is what breaks CI. Cut a release with
-`mise run release:github -- vX.Y.Z`.
+`.github` also **dogfoods** itself — its own CI *runs* the credential-free tasks on
+the matrix (not just parses them), so cross-OS bugs surface here, not in consumers.
+Cut a release with `mise run release:github -- vX.Y.Z`.
