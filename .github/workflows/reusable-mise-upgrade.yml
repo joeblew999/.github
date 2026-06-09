@@ -42,6 +42,12 @@ jobs:
           version: ${{ inputs.mise-version }}
           install: false   # we don't need the consumer's tools, just mise itself
 
+      # mise:upgrade (and ci:audit-lib-refs) are NUSHELL tasks — install nu +
+      # the global toolset first, or they exit 127 (nu not found). Plain
+      # `mise use -g`, so it runs before nu exists.
+      - name: mise run mise:global:bootstrap
+        run: mise run mise:global:bootstrap
+
       - name: mise run mise:upgrade
         run: mise run mise:upgrade
 
