@@ -34,3 +34,47 @@ usage                    = "latest"
 git-cliff                = "latest"  # cliff:* changelog/release-intel tasks
 # lightweight CLIs fronted by their namespace — pulled from global, never pinned per-task.
 # (Heavy/niche toolchains — java/ruby/cocoapods/tauri-cli/wasm-pack — stay per-task in mobile:*/rust:*.)
+
+# ── Dogfood ──────────────────────────────────────────────────────────────────
+# .github eats its own dog food the SAME way a consumer does: a LOCAL `ci` that
+# extends the shared guards (mise MERGES same-named tasks) with a self-test that
+# EXERCISES credential-free lib tasks cross-OS — not just parses them. Runs on
+# the matrix via .github/workflows/mise.yml.
+[tasks.ci]
+depends = ["dogfood"]
+
+[tasks.dogfood]
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  # 1. orchestration→primitive composition via `mise run` stdout capture
+  #    (the exact pattern provision:* uses to capture cf:* output).
+  let c = (^mise run _probe | complete | get stdout | str trim)
+  if $c != "DOGFOOD-OK" {
+    print --stderr $"✗ mise-run composition broke — captured [($c)]"
+    exit 1
+  }
+
+  # 2. exercise the real archiver (release:pack → tar) on a throwaway fixture.
+  let stage = (mktemp -d)
+  mkdir ($stage | path join "demo_1.0.0_linux_amd64")
+  "x" | save -f ($stage | path join "demo_1.0.0_linux_amd64" "bin")
+  ^mise run release:pack -- --dir $stage
+  if not (($stage | path join "demo_1.0.0_linux_amd64.tar.gz") | path exists) {
+    print --stderr "✗ release:pack produced no archive"
+    rm -rf $stage
+    exit 1
+  }
+  rm -rf $stage
+
+  print $"✓ dogfood — ($nu.os-info.name): mise-run composition + release:pack exercised"
+}
+'''
+
+# Trivial PRIMITIVE the dogfood composes (same shape as a cf:* primitive).
+[tasks._probe]
+run = '''
+#!/usr/bin/env nu
+print "DOGFOOD-OK"
+'''
