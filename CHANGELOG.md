@@ -1,8 +1,59 @@
+## [0.40.0] - 2026-06-09
+
+### 🚀 Features
+
+- *(workflow-templates)* Bootstrap the mise CI workflow org-wide
+- *(ci)* Ci:audit-lib-refs --write + wire into reusable-mise-upgrade
+- *(mise)* Mise:repo:bootstrap[-delete] + base ci; rename bootstrap tasks
+- *(dogfood)* Make .github's CI realistic — exercise tasks, not just parse
+
+### 🐛 Bug Fixes
+
+- *(mise:repo:bootstrap)* Tera raw-block the YAML so ${{ }} survives; reword comment to contain no Tera tokens
+- *(mise:repo:bootstrap)* Run CI on all 3 OSes (ubuntu+macos+windows), sccache off
+- *(mise:repo:bootstrap)* Inherit reusable defaults; stub overrides only
+- *(ci:check-global, mise:sweep)* Forward-slash glob pattern for Windows
+- *(reusable-mise-upgrade)* Seed nu via mise:global:bootstrap before the nushell tasks
+- *(release:pack, ci:audit-lib-refs)* Windows glob bug — caught by realistic dogfood
+
+### 🚜 Refactor
+
+- *(mise:repo:bootstrap)* Generate minimal stub, no hardcoded YAML/Tera
+- *(ci:check-global, mise:sweep)* Proper relative-glob nushell
+- *(ci)* Obey our own rules — isomorphic, DRY, namespace=tool
+- *(cf)* Decompose into atomic primitives + provision orchestration
+- *(docker)* Pure namespace — GHCR_USER from env/fnox, drop the ^gh call
+- *(cf)* Strictly single-tool — drives only wrangler+curl, fnox moves up
+- *(docker, gh)* Strict purity — tokens from $env, no fnox
+- Prefix pure-tool files with tool- so the two layers are visible
+- *(orchestration)* 7 namespaces → 5 (one per lifecycle concern)
+- Remove dead env.toml (env:resolve was an orphaned hidden helper)
+
+### 📚 Documentation
+
+- Cross-ref the .github-example sandbox at top of README
+- Put 'Order of operations' front-and-center in README
+- *(AGENTS)* Put the order of operations at the very top (edit→validate→release→adopt)
+- Step 2 = validate in BOTH local and CI (local can pass while CI fails)
+- Sandbox consumes .github@main (rolling) via the proper reusable CI; fix step 2
+- *(AGENTS)* Add the CONSUMER adoption order (skills→CLAUDE.md→includes→global→rust→CI)
+- CI bootstrap = workflow-template (one click); update = mise-upgrade PR
+- *(workflows)* README explaining the reusable/recursion system + header pointers
+- *(SSOT)* Root README is the single source; AGENTS rule + reusable headers point here; fix mise.yaml→mise.yml
+- Fix stale refs (cf:secrets-put-mapped→provision:secrets, ci:check-toml-tasks→ci:check-nu, tasks-toml-proof→dogfood, mise.yaml→mise.yml)
+- *(README)* Rewrite around the two-layer model
+- *(README)* Restructure for flow — use → how CI works → what's inside → develop
+- *(README)* Make the consumer CI story clear — one task, local AND remote
+- *(README)* Point repos at .github-example as the canonical, CI-tested reference
 ## [0.39.0] - 2026-06-08
 
 ### 🚀 Features
 
 - *(marketplace)* .github is the joeblew999 Claude plugin marketplace (fleet skill)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.39.0
 
 ### ◀️ Revert
 
