@@ -39,8 +39,9 @@ If you reach for a shell script, you've already broken the rule. Write a nu task
    [`.github-example`](https://github.com/joeblew999/.github-example) (consumes
    `.github@main`):
    - **local:** `mise run <task>` (clear mise's git-include cache to pull new main).
-   - **CI:** its `mise.yaml` runs the shared `reusable-mise-ci.yml@main` → the same
-     task on a clean runner. (`.github` also self-validates via `tasks-toml-proof.yml`.)
+   - **CI:** its `mise.yml` runs the shared `reusable-mise-ci.yml@main` → the same
+     task on a clean runner. (`.github` also self-validates by **dogfooding** its
+     own `.github/workflows/mise.yml` across the OS matrix.)
    Loop — **no release/tag while iterating.** Local can pass while CI fails (a tool
    global on your box but absent on a runner) — so check both.
 3. **RELEASE** only once it works: `mise run release:github -- vX.Y.Z`

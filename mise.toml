@@ -1,6 +1,6 @@
 [task_config]
 # Self-hosting: include every tasks/*.toml file so the lib can run its
-# own ci:check-toml-tasks etc. against itself. mise doesn't auto-discover
+# own ci:check-nu etc. against itself. mise doesn't auto-discover
 # tasks/ (only mise-tasks/, mise/tasks/, .mise/tasks/), so list explicitly.
 #
 # Releases use release:github (tasks/release.toml). NAMESPACE = TOOL: cliff:* is

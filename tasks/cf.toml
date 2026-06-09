@@ -738,6 +738,6 @@ def main [] {
   print $"  ✓ CF_ACCESS_TEAM_DOMAIN  = ($team_url)"
   print $"  ✓ ($policy_aud_key)  = ($app_info.aud)"
   print ""
-  print "Next: mise run cf:secrets-put-mapped  →  mise run 10-deploy  →  mise run prove:all"
+  print "Next: mise run provision:secrets  →  mise run 10-deploy  →  mise run prove:all"
 }
 '''

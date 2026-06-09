@@ -49,7 +49,7 @@ def main [] {
     if ($out | str contains $needle) {
       print $"  ✓ ($k) present"
     } else {
-      print --stderr $"  ✗ ($k) MISSING — run cf:secrets-put-mapped"
+      print --stderr $"  ✗ ($k) MISSING — run provision:secrets"
       exit 1
     }
   }
