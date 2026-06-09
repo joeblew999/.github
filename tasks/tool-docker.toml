@@ -21,7 +21,7 @@
 # fnox keychain locally).
 
 ["docker:build"]
-description = "CI-safe build-ONLY verify (no push/login/secrets). Skips where docker is unusable (macOS/Windows runners) so one `ci` stays green on every OS. Usage: mise run docker:build [--tag t] [--dockerfile Dockerfile] [--context .]"
+description = "CI-safe build-ONLY verify (no push/login/secrets). Policy via $DOCKER_BUILD (auto|ci|local|never) controls local-vs-remote; then skips where docker can't build linux. Usage: mise run docker:build [--tag t] [--dockerfile Dockerfile] [--context .]"
 run = '''
 #!/usr/bin/env nu
 def main [
@@ -29,12 +29,25 @@ def main [
   --dockerfile: string = "Dockerfile",
   --context: string = ".",
 ] {
-  # Build a Linux image ONLY where a Linux-capable docker daemon exists, and SKIP
-  # (exit 0) otherwise — so the single `mise run ci` is green on every matrix cell:
-  #   • macOS CI runner   → no docker binary               → skip
-  #   • Windows CI runner → daemon is Windows-containers    → skip
-  #   • ubuntu CI + local Docker Desktop → OSType=linux      → build
-  # Gate is daemon CAPABILITY, not OS name (local mac Docker Desktop builds linux).
+  # POLICY (consumer sets $DOCKER_BUILD in mise.toml [env]) — independent
+  # local/remote control, the full 2x2:
+  #   auto / unset → build wherever a linux-capable daemon exists (local AND ci)
+  #   ci           → only in CI (GitHub Actions)        — local skips
+  #   local        → only OUTSIDE CI                     — remote skips
+  #   never        → never build
+  let policy = ($env.DOCKER_BUILD? | default "auto" | str downcase)
+  let in_ci = ((($env.CI? | default "") == "true") or (($env.GITHUB_ACTIONS? | default "") == "true"))
+  let want = (match $policy { "never" => false, "ci" => $in_ci, "local" => (not $in_ci), _ => true })
+  if not $want {
+    print $"· DOCKER_BUILD=($policy), in-CI=($in_ci) — build skipped by policy"
+    return
+  }
+
+  # CAPABILITY GATE — build a Linux image ONLY where a Linux-capable daemon
+  # exists, else SKIP (exit 0) so `mise run ci` stays green on every matrix cell:
+  #   • macOS CI runner   → no docker binary            → skip
+  #   • Windows CI runner → daemon is Windows-containers → skip
+  #   • ubuntu CI + local Docker Desktop → OSType=linux  → build
   # `which` first so an absent binary can't crash the task; parse `docker info`
   # text for OSType (NOT --format, whose double-brace placeholders are Tera here).
   if (which docker | is-empty) {
