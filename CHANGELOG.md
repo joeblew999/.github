@@ -1,8 +1,17 @@
+## [0.41.0] - 2026-06-09
+
+### 🚀 Features
+
+- *(docs)* Generate README two-layer tables from tasks/ + CI guard; update skill
 ## [0.40.1] - 2026-06-09
 
 ### 📚 Documentation
 
 - Add MIGRATION.md (v0.40.0 rename tables) + link from README
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.40.1
 ## [0.40.0] - 2026-06-09
 
 ### 🚀 Features
