@@ -29,13 +29,25 @@ def main [
   --dockerfile: string = "Dockerfile",
   --context: string = ".",
 ] {
-  # Gate on docker AVAILABILITY, not OS: local Docker Desktop on macOS builds
-  # Linux images fine, but GitHub's macOS/Windows runners have no usable daemon.
-  # `docker info` = binary present AND daemon up. Skip (exit 0) when absent so the
-  # single `mise run ci` is green on every matrix cell; build where docker works.
-  let ok = ((do { ^docker info } | complete | get exit_code) == 0)
-  if not $ok {
-    print $"· docker unavailable on ($nu.os-info.name) — build skipped, fine in CI"
+  # Build a Linux image ONLY where a Linux-capable docker daemon exists, and SKIP
+  # (exit 0) otherwise — so the single `mise run ci` is green on every matrix cell:
+  #   • macOS CI runner   → no docker binary               → skip
+  #   • Windows CI runner → daemon is Windows-containers    → skip
+  #   • ubuntu CI + local Docker Desktop → OSType=linux      → build
+  # Gate is daemon CAPABILITY, not OS name (local mac Docker Desktop builds linux).
+  # `which` first so an absent binary can't crash the task; parse `docker info`
+  # text for OSType (NOT --format — `{{…}}` is Tera in a mise task body).
+  if (which docker | is-empty) {
+    print $"· no docker binary on ($nu.os-info.name) — build skipped, fine in CI"
+    return
+  }
+  let info = (do { ^docker info } | complete)
+  if $info.exit_code != 0 {
+    print $"· docker daemon unavailable on ($nu.os-info.name) — build skipped, fine in CI"
+    return
+  }
+  if not ($info.stdout | str downcase | str contains "ostype: linux") {
+    print $"· docker daemon is not linux on ($nu.os-info.name) — build skipped, fine in CI"
     return
   }
   ^docker build -t $tag -f $dockerfile $context
