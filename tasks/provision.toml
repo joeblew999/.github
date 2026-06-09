@@ -50,6 +50,9 @@ def main [] {
   let cfg = $env_data.cfg
   let file = $env_data.file
 
+  # orchestration provides the token from fnox; pure cf:* primitives read it from env.
+  $env.CLOUDFLARE_API_TOKEN = (try { ^fnox get CLOUDFLARE_API_TOKEN | str trim } catch { ($env.CLOUDFLARE_API_TOKEN? | default "") })
+
   let bucket = ($cfg.BACKUP_BUCKET_NAME? | default "")
   if ($bucket | is-empty) {
     print "↷ R2: BACKUP_BUCKET_NAME not set — skipped"
@@ -80,7 +83,7 @@ def main [] {
     ^mise run cf:d1-exec -- $db_name "worker/schema.sql"
   }
 
-  print "Done. Next: fnox CLOUDFLARE_API_TOKEN/ACCOUNT_ID set; mise run cf:access-setup"
+  print "Done. Next: fnox CLOUDFLARE_API_TOKEN/ACCOUNT_ID set; mise run provision:access-setup"
 }
 '''
 
@@ -116,6 +119,8 @@ def main [] {
     print "↷ Queues: QUEUE_NAMES not set — skipped"
     return
   }
+  # orchestration provides the token from fnox; pure cf:* primitives read it from env.
+  $env.CLOUDFLARE_API_TOKEN = (try { ^fnox get CLOUDFLARE_API_TOKEN | str trim } catch { ($env.CLOUDFLARE_API_TOKEN? | default "") })
   let names_list = ($names | split row "," | each { |n| $n | str trim } | where { |n| not ($n | is-empty) })
   for name in $names_list {
     ^mise run cf:queue-create -- $name
@@ -166,7 +171,581 @@ def main [] {
     ["POLICY_AUD",  $policy_key]
   ]
   for pair in $pairs {
-    ^mise run cf:secret-put -- ($pair | get 0) ($pair | get 1)
+    # orchestration owns the fnox→env bridge; cf:secret-put reads $env.CF_SECRET_VALUE.
+    $env.CF_SECRET_VALUE = (^fnox get ($pair | get 1) | str trim)
+    ^mise run cf:secret-put -- ($pair | get 0)
   }
+}
+'''
+
+# ─── CF Access orchestration ─────────────────────────────────────────────────
+# Moved from cf.toml: these read+write fnox and curl the CF Access API — cohesive
+# multi-step flows, so they belong in the orchestration layer, not the cf tool file.
+
+# ── provision:access-revoke ─────────────────────────────────────────────────────────
+# Revoke ALL active CF Access sessions for the Worker. Kicks everyone out
+# (they re-login if still on the allowlist). Reads WORKER_NAME + CF_SUBDOMAIN
+# from config/<env>.env. Uses the app-level revoke_tokens endpoint (works
+# with the same scope provision:access-setup needs).
+["provision:access-revoke"]
+description = "Revoke ALL active CF Access sessions for the Worker (kicks everyone out — they can re-login if still on the allowlist). Reads WORKER_NAME + CF_SUBDOMAIN from config/<env>.env. Requires CLOUDFLARE_API_TOKEN with Access: Apps and Policies: Edit (same scope as provision:access-setup)."
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let env_file = $"config/($env_name).env"
+  if not ($env_file | path exists) {
+    print --stderr $"ERROR: ($env_file) not found."
+    exit 1
+  }
+  let cfg = (
+    open --raw $env_file
+    | lines
+    | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+    | reduce -f {} {|line, acc|
+        let parts = ($line | split row -n 2 "=")
+        $acc | upsert ($parts | get 0) (($parts | get 1) | str trim --char '"')
+      }
+  )
+
+  let worker = ($cfg.WORKER_NAME? | default "")
+  let subdomain = ($cfg.CF_SUBDOMAIN? | default "")
+  if ($worker | is-empty) or ($subdomain | is-empty) {
+    print --stderr $"WORKER_NAME and CF_SUBDOMAIN must both be set in ($env_file)"
+    exit 1
+  }
+  let app_domain = $"($worker).($subdomain).workers.dev"
+
+  let token = (^fnox get CLOUDFLARE_API_TOKEN | str trim)
+  let account = (^fnox get CLOUDFLARE_ACCOUNT_ID | str trim)
+  let api = $"https://api.cloudflare.com/client/v4/accounts/($account)"
+  let auth_hdr = $"Authorization: Bearer ($token)"
+
+  print $"→ Looking up Access App for ($app_domain)"
+  let apps_resp = (^curl -sS -H $auth_hdr $"($api)/access/apps" | from json)
+  if not ($apps_resp.success? | default false) {
+    let msg = ($apps_resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+    print --stderr $"✗ apps list failed: ($msg)"
+    exit 1
+  }
+  let app = ($apps_resp.result | default [] | where domain == $app_domain | first)
+  if ($app | is-empty) {
+    print --stderr $"✗ no Access App found for ($app_domain) — run provision:access-setup first"
+    exit 1
+  }
+  print $"  app_id = ($app.id)"
+
+  print $"→ Revoking ALL active sessions for ($app_domain)"
+  let resp = (^curl -sS -X POST -H $auth_hdr $"($api)/access/apps/($app.id)/revoke_tokens" | from json)
+  if ($resp.success? | default false) {
+    print $"  ✓ all active sessions revoked — users on the allowlist must re-authenticate"
+  } else {
+    let msg = ($resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+    print --stderr $"✗ revoke failed: ($msg)"
+    exit 1
+  }
+}
+'''
+
+# ── provision:service-token-revoke ──────────────────────────────────────────────────
+# Revoke this Worker's CF Access service token: deletes the token at CF
+# (immediately invalidates all uses), removes the policy include, and
+# clears CLOUDFLARE_ACCESS_CLIENT_ID/SECRET from fnox. Idempotent.
+["provision:service-token-revoke"]
+description = "Revoke this Worker's CF Access service token: deletes the token at CF (immediately invalidates all uses), removes its 'Include' rule from the operator-only policy, and clears CLOUDFLARE_ACCESS_CLIENT_ID/SECRET from fnox. Idempotent — safe to run when nothing exists. Reads WORKER_NAME from config/<env>.env."
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let env_file = $"config/($env_name).env"
+  if not ($env_file | path exists) {
+    print --stderr $"ERROR: ($env_file) not found."
+    exit 1
+  }
+  let cfg = (
+    open --raw $env_file
+    | lines
+    | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+    | reduce -f {} {|line, acc|
+        let parts = ($line | split row -n 2 "=")
+        $acc | upsert ($parts | get 0) (($parts | get 1) | str trim --char '"')
+      }
+  )
+
+  let worker = ($cfg.WORKER_NAME? | default "")
+  let subdomain = ($cfg.CF_SUBDOMAIN? | default "")
+  if ($worker | is-empty) or ($subdomain | is-empty) {
+    print --stderr $"WORKER_NAME and CF_SUBDOMAIN must both be set in ($env_file)"
+    exit 1
+  }
+  let token_name = $"($worker)-automation"
+  let app_domain = $"($worker).($subdomain).workers.dev"
+
+  let api_token = (^fnox get CLOUDFLARE_API_TOKEN | str trim)
+  let account = (^fnox get CLOUDFLARE_ACCOUNT_ID | str trim)
+  let api = $"https://api.cloudflare.com/client/v4/accounts/($account)"
+  let auth_hdr = $"Authorization: Bearer ($api_token)"
+  let json_hdr = "Content-Type: application/json"
+
+  print $"→ Looking up service token: ($token_name)"
+  let toks_resp = (^curl -sS -H $auth_hdr $"($api)/access/service_tokens" | from json)
+  if not ($toks_resp.success? | default false) {
+    let msg = ($toks_resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+    print --stderr $"✗ list service_tokens failed: ($msg)"
+    exit 1
+  }
+  let token = ($toks_resp.result | default [] | where name == $token_name | first)
+
+  print $"→ Looking up Access App for ($app_domain)"
+  let apps_resp = (^curl -sS -H $auth_hdr $"($api)/access/apps" | from json)
+  let app = ($apps_resp.result? | default [] | where domain == $app_domain | first)
+
+  if not ($app | is-empty) {
+    let policies_resp = (^curl -sS -H $auth_hdr $"($api)/access/apps/($app.id)/policies" | from json)
+    let policies = ($policies_resp.result | default [])
+
+    let st_policy = ($policies | where name == "service-token-only" | first)
+    if not ($st_policy | is-empty) {
+      print $"→ Deleting service-token-only policy id=($st_policy.id)"
+      let resp = (^curl -sS -X DELETE -H $auth_hdr $"($api)/access/apps/($app.id)/policies/($st_policy.id)" | from json)
+      if ($resp.success? | default false) {
+        print $"  ✓ deleted"
+      } else {
+        let msg = ($resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+        print --stderr $"  ⚠ delete failed: ($msg)"
+      }
+    } else {
+      print $"  ✓ no service-token-only policy (nothing to delete)"
+    }
+
+    if not ($token | is-empty) {
+      for p in ($policies | where decision == "allow") {
+        let has_include = (
+          $p.include? | default [] | any { |i| ($i.service_token?.token_id?) == $token.id }
+        )
+        if $has_include {
+          print $"→ Scrubbing stale token from allow-policy '($p.name)'"
+          let cleaned = (
+            $p.include | where { |i| ($i.service_token?.token_id?) != $token.id }
+          )
+          let pbody = {
+            name: $p.name,
+            decision: $p.decision,
+            include: $cleaned
+          } | to json
+          let upd = (^curl -sS -X PUT -H $auth_hdr -H $json_hdr -d $pbody $"($api)/access/apps/($app.id)/policies/($p.id)" | from json)
+          if ($upd.success? | default false) { print $"  ✓ cleaned" }
+        }
+      }
+    }
+  }
+
+  if not ($token | is-empty) {
+    print $"→ Deleting service token uuid=($token.id) at CF"
+    let del = (^curl -sS -X DELETE -H $auth_hdr $"($api)/access/service_tokens/($token.id)" | from json)
+    if ($del.success? | default false) {
+      print $"  ✓ token deleted — all uses of its credentials now fail with 401"
+    } else {
+      let msg = ($del.errors? | default [] | each {|e| $e.message?} | str join ", ")
+      print --stderr $"  ⚠ token delete failed: ($msg)"
+    }
+  } else {
+    print $"  ✓ no token at CF (nothing to delete)"
+  }
+
+  print "→ Clearing fnox creds"
+  let had_id = (try { ^fnox get CLOUDFLARE_ACCESS_CLIENT_ID | str trim } catch { "" })
+  let had_secret = (try { ^fnox get CLOUDFLARE_ACCESS_CLIENT_SECRET | str trim } catch { "" })
+  if not ($had_id | is-empty) {
+    try { ^fnox remove --global CLOUDFLARE_ACCESS_CLIENT_ID } catch { }
+    print "  ✓ removed CLOUDFLARE_ACCESS_CLIENT_ID"
+  }
+  if not ($had_secret | is-empty) {
+    try { ^fnox remove --global CLOUDFLARE_ACCESS_CLIENT_SECRET } catch { }
+    print "  ✓ removed CLOUDFLARE_ACCESS_CLIENT_SECRET"
+  }
+
+  print ""
+  print "✓ Service token revoked. Re-create with: mise run provision:service-token-setup"
+}
+'''
+
+# ── provision:service-token-setup ───────────────────────────────────────────────────
+# One-shot CF Access service token setup: ensure a per-Worker service
+# token exists and has its own non_identity policy on the Access App.
+# Stores CLOUDFLARE_ACCESS_CLIENT_ID/SECRET in fnox so wrangler dev with
+# remote bindings, Playwright, etc. authenticate non-interactively.
+["provision:service-token-setup"]
+description = "One-shot CF Access service token setup: ensure a per-Worker service token exists and is allowed by the app's operator-only policy. Stores CLOUDFLARE_ACCESS_CLIENT_ID + _SECRET in fnox so wrangler/vite-plugin/Playwright can authenticate non-interactively. Idempotent. Requires CLOUDFLARE_API_TOKEN with Access:Edit. Run provision:access-setup first."
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let env_file = $"config/($env_name).env"
+  if not ($env_file | path exists) {
+    print --stderr $"ERROR: ($env_file) not found."
+    exit 1
+  }
+  let cfg = (
+    open --raw $env_file
+    | lines
+    | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+    | reduce -f {} {|line, acc|
+        let parts = ($line | split row -n 2 "=")
+        $acc | upsert ($parts | get 0) (($parts | get 1) | str trim --char '"')
+      }
+  )
+
+  let worker = ($cfg.WORKER_NAME? | default "")
+  let subdomain = ($cfg.CF_SUBDOMAIN? | default "")
+  if ($worker | is-empty) or ($subdomain | is-empty) {
+    print --stderr $"WORKER_NAME or CF_SUBDOMAIN not set in ($env_file)"
+    exit 1
+  }
+
+  let token_name = $"($worker)-automation"
+  let app_domain = $"($worker).($subdomain).workers.dev"
+
+  let api_token = (^fnox get CLOUDFLARE_API_TOKEN | str trim)
+  let account = (^fnox get CLOUDFLARE_ACCOUNT_ID | str trim)
+  let api = $"https://api.cloudflare.com/client/v4/accounts/($account)"
+  let auth_hdr = $"Authorization: Bearer ($api_token)"
+  let json_hdr = "Content-Type: application/json"
+
+  let existing_client_id = (try { ^fnox get CLOUDFLARE_ACCESS_CLIENT_ID | str trim } catch { "" })
+  let existing_secret    = (try { ^fnox get CLOUDFLARE_ACCESS_CLIENT_SECRET | str trim } catch { "" })
+
+  let token_uuid = if (not ($existing_client_id | is-empty)) and (not ($existing_secret | is-empty)) {
+    print $"→ fnox already has CLOUDFLARE_ACCESS_CLIENT_ID + _SECRET; reusing"
+    let list_resp = (^curl -sS -H $auth_hdr $"($api)/access/service_tokens" | from json)
+    if not ($list_resp.success? | default false) {
+      let msg = ($list_resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+      print --stderr $"✗ list service_tokens failed: ($msg)"
+      exit 1
+    }
+    let match = ($list_resp.result | default [] | where client_id == $existing_client_id | first)
+    if ($match | is-empty) {
+      print --stderr $"✗ fnox client_id ($existing_client_id) not found at CF — token may have been deleted."
+      print --stderr "  Either delete the fnox values and re-run to create a fresh token,"
+      print --stderr "  or restore the token via the CF dashboard."
+      exit 1
+    }
+    print $"  uuid = ($match.id)"
+    $match.id
+  } else {
+    print $"→ Creating new service token: ($token_name)"
+    let list_resp = (^curl -sS -H $auth_hdr $"($api)/access/service_tokens" | from json)
+    if not ($list_resp.success? | default false) {
+      let msg = ($list_resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+      print --stderr $"✗ list service_tokens failed: ($msg)"
+      exit 1
+    }
+    let stale = ($list_resp.result | default [] | where name == $token_name | first)
+    if not ($stale | is-empty) {
+      print --stderr $"✗ A service token named '($token_name)' already exists at CF \(uuid=($stale.id), client_id=($stale.client_id)\)"
+      print --stderr $"  but fnox doesn't have the matching secret. The CF API only returns secrets at creation."
+      print --stderr $"  Resolve by either:"
+      print --stderr $"    a\) Delete it: curl -X DELETE -H ... ($api)/access/service_tokens/($stale.id)"
+      print --stderr $"    b\) Rotate it: curl -X POST -H ... ($api)/access/service_tokens/($stale.id)/rotate"
+      print --stderr $"       \(then put the new client_secret into fnox\)"
+      exit 1
+    }
+    let body = { name: $token_name, duration: "8760h" } | to json
+    let resp = (^curl -sS -X POST -H $auth_hdr -H $json_hdr -d $body $"($api)/access/service_tokens" | from json)
+    if not ($resp.success? | default false) {
+      let msg = ($resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+      print --stderr $"✗ create service_token failed: ($msg)"
+      exit 1
+    }
+    let r = $resp.result
+    print $"  created uuid=($r.id) client_id=($r.client_id)"
+    $r.client_id     | ^fnox set --global -p keychain CLOUDFLARE_ACCESS_CLIENT_ID
+    $r.client_secret | ^fnox set --global -p keychain CLOUDFLARE_ACCESS_CLIENT_SECRET
+    print $"  ✓ stored CLIENT_ID + _SECRET in fnox keychain"
+    $r.id
+  }
+
+  print $"→ Ensuring service-token-only policy on Access App"
+  let apps_resp = (^curl -sS -H $auth_hdr $"($api)/access/apps" | from json)
+  if not ($apps_resp.success? | default false) {
+    let msg = ($apps_resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+    print --stderr $"✗ apps list failed: ($msg)"
+    exit 1
+  }
+  let app = ($apps_resp.result | default [] | where domain == $app_domain | first)
+  if ($app | is-empty) {
+    print --stderr $"✗ no Access App for ($app_domain) — run provision:access-setup first."
+    exit 1
+  }
+
+  let policies_resp = (^curl -sS -H $auth_hdr $"($api)/access/apps/($app.id)/policies" | from json)
+  let policies = ($policies_resp.result | default [])
+
+  let stale_in_allow = (
+    $policies
+    | where decision == "allow"
+    | each { |p|
+        let has = ($p.include? | default [] | any { |i| ($i.service_token?.token_id?) == $token_uuid })
+        if $has { {policy: $p} } else { null }
+      }
+    | compact
+  )
+  for entry in $stale_in_allow {
+    let p = $entry.policy
+    print $"  → scrubbing stale service_token from allow-policy '($p.name)' \(v0.13.0 leftover\)"
+    let cleaned = (
+      $p.include
+      | where { |i| ($i.service_token?.token_id?) != $token_uuid }
+    )
+    let pbody = {
+      name: $p.name,
+      decision: $p.decision,
+      include: $cleaned
+    } | to json
+    let upd = (^curl -sS -X PUT -H $auth_hdr -H $json_hdr -d $pbody $"($api)/access/apps/($app.id)/policies/($p.id)" | from json)
+    if ($upd.success? | default false) {
+      print $"    ✓ cleaned"
+    } else {
+      let msg = ($upd.errors? | default [] | each {|e| $e.message?} | str join ", ")
+      print $"    ⚠ cleanup failed: ($msg)"
+    }
+  }
+
+  let st_policy = ($policies | where name == "service-token-only" | first)
+  let target_includes = [{ service_token: { token_id: $token_uuid } }]
+  let target_body = {
+    name: "service-token-only",
+    decision: "non_identity",
+    include: $target_includes
+  } | to json
+
+  if ($st_policy | is-empty) {
+    print $"  → creating new service-token-only policy \(non_identity\)"
+    let resp = (^curl -sS -X POST -H $auth_hdr -H $json_hdr -d $target_body $"($api)/access/apps/($app.id)/policies" | from json)
+    if not ($resp.success? | default false) {
+      let msg = ($resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+      print --stderr $"✗ create service-token-only policy failed: ($msg)"
+      exit 1
+    }
+    print $"  ✓ created policy id=($resp.result.id)"
+  } else {
+    let current_uuid = ($st_policy.include? | default [] | each { |i| $i.service_token?.token_id? } | compact | first)
+    if ($current_uuid == $token_uuid) and ($st_policy.decision == "non_identity") {
+      print $"  ✓ policy already correct \(non_identity, uuid=($token_uuid)\)"
+    } else {
+      print $"  → updating service-token-only policy"
+      let upd = (^curl -sS -X PUT -H $auth_hdr -H $json_hdr -d $target_body $"($api)/access/apps/($app.id)/policies/($st_policy.id)" | from json)
+      if not ($upd.success? | default false) {
+        let msg = ($upd.errors? | default [] | each {|e| $e.message?} | str join ", ")
+        print --stderr $"✗ policy update failed: ($msg)"
+        exit 1
+      }
+      print $"  ✓ policy updated"
+    }
+  }
+
+  print ""
+  print "✓ Service token ready. mise run dev / Playwright automation will now authenticate via:"
+  print "    CLOUDFLARE_ACCESS_CLIENT_ID, CLOUDFLARE_ACCESS_CLIENT_SECRET (from fnox)"
+}
+'''
+
+# ── provision:access-setup ──────────────────────────────────────────────────────────
+# One-shot CF Access setup: ensure GitHub IdP + Access App for this Worker
+# exist; write TEAM_DOMAIN + the per-app POLICY_AUD to fnox. Auto-revokes
+# sessions for emails dropped from OPERATOR_EMAIL. Idempotent.
+["provision:access-setup"]
+description = "One-shot CF Access setup: ensure GitHub IdP + Access App for this Worker exist; write TEAM_DOMAIN + the per-app POLICY_AUD to fnox. Auto-revokes sessions for emails dropped from OPERATOR_EMAIL. Idempotent. Requires CLOUDFLARE_API_TOKEN with Access:Edit + Access:Organizations:Read + Account.Settings:Read."
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let env_file = $"config/($env_name).env"
+  if not ($env_file | path exists) {
+    print --stderr $"ERROR: ($env_file) not found."
+    exit 1
+  }
+  let cfg = (
+    open --raw $env_file
+    | lines
+    | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+    | reduce -f {} {|line, acc|
+        let parts = ($line | split row -n 2 "=")
+        $acc | upsert ($parts | get 0) (($parts | get 1) | str trim --char '"')
+      }
+  )
+
+  let worker = ($cfg.WORKER_NAME? | default "")
+  let subdomain = ($cfg.CF_SUBDOMAIN? | default "")
+  let policy_aud_key = ($cfg.APP_POLICY_AUD_FNOX_KEY? | default "")
+  if ($worker | is-empty) {
+    print --stderr $"WORKER_NAME not set in ($env_file)"
+    exit 1
+  }
+  if ($subdomain | is-empty) {
+    print --stderr $"CF_SUBDOMAIN not set in ($env_file)"
+    exit 1
+  }
+  if ($policy_aud_key | is-empty) {
+    print --stderr $"APP_POLICY_AUD_FNOX_KEY not set in ($env_file) \(e.g. D1_MANAGER_POLICY_AUD\)"
+    exit 1
+  }
+
+  let token = (^fnox get CLOUDFLARE_API_TOKEN | str trim)
+  let account = (^fnox get CLOUDFLARE_ACCOUNT_ID | str trim)
+  let app_domain = $"($worker).($subdomain).workers.dev"
+  let app_name = $worker
+  let api = $"https://api.cloudflare.com/client/v4/accounts/($account)"
+  let auth_hdr = $"Authorization: Bearer ($token)"
+  let json_hdr = "Content-Type: application/json"
+
+  print "→ Checking Team Domain"
+  let orgs_resp = (^curl -sS -H $auth_hdr $"($api)/access/organizations" | from json)
+  if not ($orgs_resp.success? | default false) {
+    let msg = ($orgs_resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+    print --stderr $"✗ access/organizations failed: ($msg)"
+    exit 1
+  }
+  let team_url = $"https://($orgs_resp.result.auth_domain)"
+  print $"  team_domain = ($team_url)"
+
+  print "→ Listing existing Access Apps"
+  let apps_resp = (^curl -sS -H $auth_hdr $"($api)/access/apps" | from json)
+  if not ($apps_resp.success? | default false) {
+    let msg = ($apps_resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+    print --stderr $"✗ apps list failed: ($msg)"
+    exit 1
+  }
+  let apps = ($apps_resp.result | default [])
+
+  print "→ Resolving Identity Provider UUID"
+  mut gh_idp_id = (try { ^fnox get CF_ACCESS_GITHUB_IDP_ID | str trim } catch { "" })
+  if not ($gh_idp_id | is-empty) {
+    print $"  idp_id = ($gh_idp_id)  \(from fnox cache\)"
+  } else {
+    let inferred = (
+      $apps
+      | each { |a| $a.allowed_idps? | default [] }
+      | flatten
+      | first
+    )
+    if ($inferred | is-empty) {
+      print --stderr "✗ No existing Access App has an IdP set — can't infer the IdP UUID."
+      print --stderr "  Create at least one app + IdP via dashboard once:"
+      print --stderr "  https://one.dash.cloudflare.com/?to=/:account/access/authentication"
+      print --stderr "  Then: fnox set --global -p keychain CF_ACCESS_GITHUB_IDP_ID <uuid>"
+      exit 1
+    }
+    $gh_idp_id = $inferred
+    print $"  idp_id = ($gh_idp_id)  \(inherited from an existing app — caching to fnox\)"
+    $gh_idp_id | ^fnox set --global -p keychain CF_ACCESS_GITHUB_IDP_ID
+  }
+
+  print $"→ Looking for existing Access App for ($app_domain)"
+  let existing_app = ($apps | where domain == $app_domain | first)
+
+  let app_info = if ($existing_app | is-empty) {
+    print $"→ Creating Access Application for ($app_domain)"
+    let body = {
+      name: $app_name,
+      domain: $app_domain,
+      type: "self_hosted",
+      session_duration: "24h",
+      auto_redirect_to_identity: true,
+      allowed_idps: [$gh_idp_id]
+    } | to json
+    let resp = (^curl -sS -X POST -H $auth_hdr -H $json_hdr -d $body $"($api)/access/apps" | from json)
+    if not ($resp.success? | default false) {
+      let msg = ($resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+      print --stderr $"✗ create app failed: ($msg)"
+      exit 1
+    }
+    print $"  created app id=($resp.result.id) aud=($resp.result.aud)"
+    {id: $resp.result.id, aud: $resp.result.aud}
+  } else {
+    print $"  found existing app aud=($existing_app.aud)"
+    {id: $existing_app.id, aud: $existing_app.aud}
+  }
+
+  let operator_email = ($cfg.OPERATOR_EMAIL? | default "")
+  if not ($operator_email | is-empty) {
+    let target_emails = ($operator_email | split row "," | each { |e| $e | str trim } | sort)
+    print $"→ Ensuring allow policy for ($target_emails | str join ', ')"
+    let policies_resp = (^curl -sS -H $auth_hdr $"($api)/access/apps/($app_info.id)/policies" | from json)
+    let operator_policies = (
+      $policies_resp.result
+      | default []
+      | where decision == "allow" and name == "operator-only"
+    )
+    let policy_count = ($operator_policies | length)
+    if ($policy_count > 1) {
+      print $"  ⚠ found ($policy_count) policies named 'operator-only' — using first; please delete duplicates via CF dashboard or API"
+    }
+
+    let pbody = {
+      name: "operator-only",
+      decision: "allow",
+      include: ($target_emails | each { |e| {email: {email: $e}} })
+    } | to json
+
+    if ($policy_count == 0) {
+      print "  → no existing policy, creating"
+      let resp = (^curl -sS -X POST -H $auth_hdr -H $json_hdr -d $pbody $"($api)/access/apps/($app_info.id)/policies" | from json)
+      if ($resp.success? | default false) {
+        print $"  ✓ created allow policy with ($target_emails | length) email\(s\)"
+      } else {
+        let msg = ($resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+        print $"  ⚠ policy create failed: ($msg)"
+      }
+    } else {
+      let existing = ($operator_policies | first)
+      let existing_emails = (
+        $existing.include?
+        | default []
+        | each { |i| $i.email?.email? }
+        | compact
+        | sort
+      )
+      if ($existing_emails == $target_emails) {
+        print $"  ✓ policy already matches \(($target_emails | length) email\(s\)\)"
+      } else {
+        print $"  → updating policy ($existing.id): ($existing_emails | str join ', ') → ($target_emails | str join ', ')"
+        let resp = (^curl -sS -X PUT -H $auth_hdr -H $json_hdr -d $pbody $"($api)/access/apps/($app_info.id)/policies/($existing.id)" | from json)
+        if ($resp.success? | default false) {
+          print $"  ✓ updated allow policy"
+          let removed = ($existing_emails | where { |e| not ($e in $target_emails) })
+          if not ($removed | is-empty) {
+            print $"  → revoking all active sessions for this Worker \(removed: ($removed | str join ', ')\)"
+            let rresp = (^curl -sS -X POST -H $auth_hdr $"($api)/access/apps/($app_info.id)/revoke_tokens" | from json)
+            if ($rresp.success? | default false) {
+              print $"    ✓ revoked — remaining allowlisted users must re-authenticate"
+            } else {
+              let msg = ($rresp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+              print $"    ⚠ revoke failed: ($msg)"
+            }
+          }
+        } else {
+          let msg = ($resp.errors? | default [] | each {|e| $e.message?} | str join ", ")
+          print $"  ⚠ policy update failed: ($msg)"
+        }
+      }
+    }
+  } else {
+    print $"→ OPERATOR_EMAIL unset in ($env_file) — skipping policy creation"
+    print "  \(Login through OAuth will 403 until you add a policy. cf:prove:access-policy will catch this.\)"
+  }
+
+  print ""
+  print "→ Writing values back to fnox"
+  $team_url | ^fnox set --global -p keychain CF_ACCESS_TEAM_DOMAIN
+  $app_info.aud | ^fnox set --global -p keychain $policy_aud_key
+  print $"  ✓ CF_ACCESS_TEAM_DOMAIN  = ($team_url)"
+  print $"  ✓ ($policy_aud_key)  = ($app_info.aud)"
+  print ""
+  print "Next: mise run provision:secrets  →  mise run 10-deploy  →  mise run prove:all"
 }
 '''

@@ -165,7 +165,7 @@ def main [] {
   let apps_resp = (^curl -sS -H $auth $"($api)/access/apps" | from json)
   let app = ($apps_resp.result | where domain == $app_domain | first)
   if ($app | is-empty) {
-    print --stderr $"✗ no Access App found for ($app_domain) — run cf:access-setup first"
+    print --stderr $"✗ no Access App found for ($app_domain) — run provision:access-setup first"
     exit 1
   }
   let app_id = $app.id
@@ -175,7 +175,7 @@ def main [] {
   let allow_count = ($allow_policies | length)
   if $allow_count < 1 {
     print --stderr $"✗ Access App ($app_domain) has no allow policy. Login would 403 after OAuth."
-    print --stderr "  Re-run cf:access-setup with OPERATOR_EMAIL set in config/<env>.env."
+    print --stderr "  Re-run provision:access-setup with OPERATOR_EMAIL set in config/<env>.env."
     exit 1
   }
   print $"✓ Access App ($app_domain) has ($allow_count) allow policy/policies"
