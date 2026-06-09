@@ -12,11 +12,20 @@ name: Reusable Mise Release
 #       tags: ['v*']
 #   jobs:
 #     release:
+#       permissions:
+#         contents: write                # REQUIRED on the CALLER — see below.
 #       uses: joeblew999/.github/.github/workflows/reusable-mise-release.yml@vX.Y.Z
 #       with:
 #         build-task: dist                 # mise task that stages dist/<name>/<bin>
 #         os-matrix: '["ubuntu-latest", "macos-latest"]'
-#       # GITHUB_TOKEN with contents:write is granted below — no secret needed.
+#
+# PERMISSIONS: the publish job creates a GitHub release, which needs a
+# `contents: write` token. A reusable workflow CANNOT elevate the caller's token —
+# it can only narrow it — so the publish job's own `permissions:` block (below) is
+# a CEILING, not a grant. The caller's `release:` job MUST set
+# `permissions: contents: write` itself, or publish hits `startup_failure`. No PAT
+# or secret is needed — the default `GITHUB_TOKEN` suffices once the caller grants
+# it. (`mise run mise:repo:bootstrap --release` writes a stub with this baked in.)
 #
 # The repo defines `build-task` (default `dist`) to build for the HOST arch into
 # the pack dir; `release:pack` + `release:publish` come from tasks/release.toml.

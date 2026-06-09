@@ -91,6 +91,15 @@ You **cannot break a consumer** by changing `main` — they pin tags. So fix cru
 `mise run release:github -- vX.Y.Z`. Never leave it "for later" or surface-patch.
 Being timid is the bug; the version pin is the safety net.
 
+**…but tags are APPEND-ONLY — that safety net only holds if tags never move.**
+NEVER delete or re-point a published tag. A consumer may be pinned to *any* tag
+(`?ref=vX`, `uses: …@vX`); deleting it 404s their includes and kills their CI —
+this already happened (deleting `v0.42.0` broke a live consumer). A bad release is
+**superseded by a higher version, never deleted** — even if it's red, even if it's
+mis-numbered, leave it. And **only tag AFTER the OS matrix is green** (local green
+is one cell, not the whole matrix) — a tag you'd want to delete is a tag you
+shouldn't have cut.
+
 ## NAMESPACE = TOOL (+ an orchestration tier)
 
 **Two layers, visible in the filenames:**
