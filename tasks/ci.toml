@@ -180,10 +180,11 @@ def main [
 
   # This repo's own pins: root mise.toml + workflow stubs.
   let root = ($env.MISE_PROJECT_ROOT? | default (pwd))
+  # Forward-slash the glob patterns — Windows path join → backslashes that glob rejects.
   let own = (
     [($root | path join "mise.toml")]
-    | append (glob ($root | path join ".github/workflows/*.yml"))
-    | append (glob ($root | path join ".github/workflows/*.yaml"))
+    | append (glob ($"($root)/.github/workflows/*.yml" | str replace --all "\\" "/"))
+    | append (glob ($"($root)/.github/workflows/*.yaml" | str replace --all "\\" "/"))
   )
   # AUDIT scans every tracked mise.toml on the box (read-only cross-repo sanity).
   # --WRITE touches ONLY this repo — never rewrites other repos on your machine.

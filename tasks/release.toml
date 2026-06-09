@@ -35,8 +35,8 @@ def main [
     ^tar -czf ($dir | path join $"($base).tar.gz") -C ($dir | path join $base) .
     print $"  ✓ ($base).tar.gz"
   }
-  let n = (glob ($dir | path join "*.tar.gz") | length)
-  print $"✓ packed ($n) archive\(s\) in ($dir)"
+  # one archive per subdir — no glob needed (and `glob` chokes on Windows backslash paths).
+  print $"✓ packed ($subdirs | length) archive\(s\) in ($dir)"
 }
 '''
 
