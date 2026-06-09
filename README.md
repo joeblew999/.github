@@ -1,90 +1,37 @@
 # joeblew999/.github
 
-Shared **mise task library** + **Claude plugin marketplace** + GitHub org config
-for the whole fleet. Agent guide: [AGENTS.md](./AGENTS.md) · [CHANGELOG.md](./CHANGELOG.md).
+Shared **mise task library** + Claude plugin marketplace + GitHub org config for
+the fleet. Every capability is a **mise task**, shared **by reference** (`?ref=` /
+`@ref`, never copied), and **runs the same locally as in CI**.
 
-Everything is a **mise task**, distributed **by reference** (`?ref=`/`@ref`, never
-copied), and runs **the same locally and in CI**.
+Agent guide: [AGENTS.md](./AGENTS.md) · history: [CHANGELOG.md](./CHANGELOG.md) ·
+example consumer: [.github-example](https://github.com/joeblew999/.github-example).
 
-## Two layers
+---
 
-The `tasks/` dir is split into two layers — and the filenames show which is which.
+## 1. Use it in a repo
 
-### 1. Tool layer — `tool-*.toml` (pure primitives)
-
-Each task drives **only its own tool** + ubiquitous plumbing (`git`/`curl`/`tar`).
-**No foreign tool, no `fnox`** — secrets arrive in `$env` (set by the layer above).
-
-| file | drives |
-|---|---|
-| `tool-wrangler` | `wrangler` *(only — nothing else)* |
-| `tool-cf` | `wrangler` + `curl` |
-| `tool-gh` | `gh` (+ `git`) |
-| `tool-docker` | `docker` (+ `git`) |
-| `tool-cliff` | `git-cliff` (+ `git`) |
-| `tool-rust` | `cargo` / `wasm-pack` |
-| `tool-fnox` | `fnox` (+ its keychain backend) |
-
-### 2. Orchestration layer — plain `*.toml`
-
-These **compose** tool tasks (via `depends` / `mise run`) and own the cross-tool
-work + the `fnox`→`$env` bridge.
-
-Five namespaces, one per lifecycle concern:
-
-| file | composes | role |
-|---|---|---|
-| `ci` | `nu` guards + dogfood | **verify code** — parse + global-config guards + self-test |
-| `secrets` (+ `secrets-bw`) | `fnox` + `gh` + `keychain` + `bw` | **manage secrets** — sync keychain ↔ fnox ↔ GitHub ↔ Bitwarden |
-| `cfapp` | `cf:*` (via `mise run`) + `fnox` + `curl` + `wrangler` | **Cloudflare Worker app** — provision (D1/R2/queues/secrets) + Access + verify the deployed worker |
-| `release` | `git-cliff` + `git` + `gh` + `tar` | **ship** — changelog → tag → GitHub release (+ `release:pack`) |
-| `mobile` | `tauri`/`rustup` + `java`/`pod`/`xcode-select` | **build mobile** (Android + iOS) |
-
-Plus the runner: **`mise`** (`global:bootstrap`/`repo:bootstrap`/`sweep`/`upgrade`).
-
-**The rule:** `git`/`curl`/`tar` are plumbing — usable anywhere. A *tool* file
-driving another tool's binary, or reaching into `fnox`, is mis-placed → move that
-work up to an orchestration file. Secrets flow **down**: orchestration reads
-`fnox`, sets `$env`, then `mise run`s the pure primitive (child inherits env).
-
-## New repo — what a dev runs
+Add the task files you want to `mise.toml`, then run four commands:
 
 ```sh
-# 1. add the includes to mise.toml (pin ?ref= to the latest tag):
-#    [task_config]
-#    includes = [
-#      "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref=<tag>",
-#      "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=<tag>",
-#    ]
+# mise.toml — pin ?ref= to the latest tag:
+# [task_config]
+# includes = [
+#   "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref=<tag>",
+#   "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=<tag>",
+# ]
 mise trust                       # load the config + includes
-mise run mise:global:bootstrap   # seed the machine's toolset (nu, gh, …)
-mise run mise:repo:bootstrap     # write this repo's .github/workflows
+mise run mise:global:bootstrap   # seed the machine toolset (nu, gh, …) — once per machine
+mise run mise:repo:bootstrap     # write .github/workflows/ (the CI stub)
 mise run ci                      # verify
 ```
 
-Working example: [.github-example](https://github.com/joeblew999/.github-example).
-
-## CI is isomorphic — local == one matrix cell
-
-The reusable workflows (`reusable-mise-ci.yml` / `reusable-mise-upgrade.yml`) are
-the **engine**; repos don't copy them, they `uses:` them. `mise run mise:repo:bootstrap`
-writes a thin stub that calls the reusable, which just runs `mise run ci` — **the
-same task you run locally**.
-
-- `mise run ci` on your machine **is** one cell of the CI run. Green locally ⇒ green
-  for that OS in CI. The matrix only adds the *other* OSes (you can't run them locally).
-- The OS list lives once: the `os-matrix` input (default `ubuntu + macos + windows`).
-  The stub inherits it; override at bootstrap with `--os-matrix '["ubuntu-latest"]'`.
-- A task that needs its OS reads `$nu.os-info.name` → `macos`/`linux`/`windows`.
-- `.github` **dogfoods**: its own CI *runs* the credential-free tasks on the matrix
-  (composition + `release:pack`), so real cross-OS bugs get caught — not just parsed.
-
-**Extend `ci` in your repo** — define a local `ci` that depends on your work; mise
-merges it with the shared guards:
+**Add your own CI work** — define a *local* `ci` that depends on your tasks; mise
+merges it with the shared guards, so both run:
 
 ```toml
 [tasks.ci]
-depends = ["test"]   # → shared guards + your task
+depends = ["test"]
 
 [tasks.test]
 run = '''
@@ -93,17 +40,81 @@ print "your work here"
 '''
 ```
 
-## Dev cycle (changing the lib)
+---
+
+## 2. How CI works — local == CI
+
+CI is **isomorphic**. `mise:repo:bootstrap` writes a thin stub that `uses:` the
+shared `reusable-mise-ci.yml`, which just runs `mise run ci` — *the same task you
+run locally*. Consequences:
+
+- `mise run ci` on your machine **is one cell** of the CI matrix. Green locally ⇒
+  green for that OS in CI; the matrix only adds the *other* OSes (you can't run
+  them locally).
+- The OS list lives in **one place** — the reusable's `os-matrix` input (default
+  `ubuntu + macos + windows`). Override per repo at bootstrap:
+  `mise run mise:repo:bootstrap --os-matrix '["ubuntu-latest"]'`.
+- A task can read its own OS via `$nu.os-info.name` → `macos` / `linux` / `windows`.
+- `.github` **dogfoods** itself — its CI *runs* the credential-free tasks on the
+  matrix (not just parses them), so cross-OS bugs get caught for real.
+
+---
+
+## 3. What's inside — two layers
+
+`tasks/` is split into two layers, and the **filename tells you which**.
+
+### Tool layer — `tool-*.toml`  (pure primitives)
+
+Each task drives **only its own tool** + ubiquitous plumbing (`git`/`curl`/`tar`).
+No foreign tool, no `fnox` — secrets arrive in `$env` (set by the layer above).
+
+| file | drives |
+|---|---|
+| `tool-wrangler` | `wrangler` *(only — nothing else)* |
+| `tool-cf` | `wrangler` + `curl` |
+| `tool-gh` | `gh` |
+| `tool-docker` | `docker` |
+| `tool-cliff` | `git-cliff` |
+| `tool-rust` | `cargo` / `wasm-pack` |
+| `tool-fnox` | `fnox` |
+
+### Orchestration layer — plain `*.toml`  (5 lifecycle namespaces)
+
+Each composes tool tasks (`depends` / `mise run`) and owns the cross-tool work +
+the `fnox`→`$env` bridge.
+
+| namespace | does | by driving |
+|---|---|---|
+| `ci` | verify code | nu guards + dogfood |
+| `secrets` | manage secrets | `fnox` + `gh` + `keychain` + `bw` |
+| `cfapp` | Cloudflare Worker lifecycle (provision → access → verify) | `cf:*` + `wrangler` + `curl` + `fnox` |
+| `release` | ship (changelog → tag → release) | `git-cliff` + `git` + `gh` + `tar` |
+| `mobile` | build mobile apps | `tauri` + `rustup` + `java` / `pod` / `xcode-select` |
+
+Plus the **`mise`** runner (`global:bootstrap` / `repo:bootstrap` / `sweep` / `upgrade`).
+
+**The one rule:** plumbing (`git`/`curl`/`tar`) is fine anywhere. A *tool* file
+that drives another tool's binary or reaches into `fnox` is mis-placed — push that
+up to an orchestration file. Secrets flow **down**: orchestration reads `fnox`,
+sets `$env`, then `mise run`s the pure primitive (the child inherits the env).
+
+---
+
+## 4. Developing this repo
+
+Version pins protect consumers (an old `?ref=` is immutable), so **refactor
+deeply** — rename, merge, move. The loop:
 
 ```
-edit .github  →  mise run ci            # locally FIRST — same task CI runs
-              →  git push               # .github main
-# then in a consumer (e.g. .github-example):
-              →  purge mise's include cache   # ?ref=main is cached
-              →  mise run mise:repo:bootstrap-delete && mise run mise:repo:bootstrap
-              →  mise run ci            # locally green, THEN
-              →  git push              # triggers the OS matrix
+edit → mise run ci                 # locally FIRST — the same task CI runs
+     → git push                    # .github main (rolling, untagged)
+# then validate as a real consumer, in .github-example:
+     → purge mise's include cache  # ?ref=main is cached
+     → mise run mise:repo:bootstrap-delete && mise run mise:repo:bootstrap
+     → mise run ci                 # local green, THEN
+     → git push                    # triggers the OS matrix
 ```
 
-Local-first every time — pushing untested is what breaks CI. Releases are
-version-protected, so refactor **deeply**: `mise run release:github -- vX.Y.Z`.
+Local-first every time — pushing untested is what breaks CI. Cut a release with
+`mise run release:github -- vX.Y.Z`.
