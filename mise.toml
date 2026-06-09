@@ -12,7 +12,6 @@ includes = [
   "tasks/ci.toml",
   "tasks/tool-cliff.toml",
   "tasks/tool-docker.toml",
-  "tasks/env.toml",
   "tasks/tool-fnox.toml",
   "tasks/tool-gh.toml",
   "tasks/mise.toml",

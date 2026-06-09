@@ -40,7 +40,7 @@ Five namespaces, one per lifecycle concern:
 | `release` | `git-cliff` + `git` + `gh` + `tar` | **ship** — changelog → tag → GitHub release (+ `release:pack`) |
 | `mobile` | `tauri`/`rustup` + `java`/`pod`/`xcode-select` | **build mobile** (Android + iOS) |
 
-Plus two that are neither: **`mise`** (the runner) and **`env`** (a pure-nu util).
+Plus the runner: **`mise`** (`global:bootstrap`/`repo:bootstrap`/`sweep`/`upgrade`).
 
 **The rule:** `git`/`curl`/`tar` are plumbing — usable anywhere. A *tool* file
 driving another tool's binary, or reaching into `fnox`, is mis-placed → move that

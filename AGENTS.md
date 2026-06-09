@@ -111,7 +111,6 @@ Being timid is the bug; the version pin is the safety net.
 | `release:*` | **orchestration** — ship: `release:github`, `release:pack` (cliff+git+gh+tar) |
 | `mobile:*` | **orchestration** — mobile build/setup (tauri+android+ios) |
 | `mise:*` | **runner** — `global:bootstrap`, `repo:bootstrap[-delete]`, `sweep`, `upgrade` |
-| `env:*` | **util** — pure-nu env resolution |
 
 A tool task that needs a foreign domain tool, or reaches into `fnox`, is mis-placed
 — move that work up to an orchestration file.
