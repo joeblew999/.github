@@ -1,9 +1,18 @@
+## [0.43.0] - 2026-06-09
+
+### 🐛 Bug Fixes
+
+- *(release)* Correct caller-grants-contents:write docs + generate mise-release.yml stub
 ## [0.41.2] - 2026-06-09
 
 ### 📚 Documentation
 
 - *(migration)* Point repos at v0.41.1 (additive from v0.40.x) + withdraw note for v0.41.0/v0.42.0
 - Regenerate CHANGELOG from cliff (drop withdrawn v0.41.0/v0.42.0) + make MIGRATION version-stable (defer per-version detail to CHANGELOG)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.41.2
 ## [0.41.1] - 2026-06-09
 
 ### 🚀 Features
