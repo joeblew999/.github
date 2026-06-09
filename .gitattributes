@@ -1,0 +1,7 @@
+# Force LF for text the tooling rewrites, so cross-OS checkout (Windows = CRLF by
+# default) doesn't make generated files differ byte-for-byte from their generator.
+# docs:gen writes README.md with LF; this keeps the checked-out copy LF too.
+*.md   text eol=lf
+*.toml text eol=lf
+*.nu   text eol=lf
+*.yml  text eol=lf

@@ -139,8 +139,12 @@ def main [] {
   let before = (open --raw $readme)
   ^mise run "docs:gen"            # rewrites only the <!-- gen:tasks --> block
   let after = (open --raw $readme)
-  if $before != $after {
-    $before | save --force $readme  # restore exactly (git-state-independent)
+  # Compare line-ending-insensitively: Windows checks out CRLF but docs:gen
+  # writes LF, so a raw compare false-positives "stale". Content is what matters.
+  let norm = {|s| $s | str replace --all "\r\n" "\n" }
+  let stale = ((do $norm $before) != (do $norm $after))
+  $before | save --force $readme    # always restore raw bytes (git-state-independent)
+  if $stale {
     print --stderr "✗ README task tables are STALE — run `mise run docs:gen` and commit."
     exit 1
   }
