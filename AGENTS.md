@@ -99,25 +99,22 @@ Being timid is the bug; the version pin is the safety net.
   `tool-wrangler`, `tool-fnox`) = **pure tool primitives.** Each task drives ONLY
   its own domain tool (+ ubiquitous plumbing: `git`/`curl`/`tar`). **No cross-tool
   calls, no `fnox`** — secrets come from `$env` (the orchestration layer sets them).
-- **plain `*.toml`** (`ci`, `release`, `secrets`, `prove`, `provision`, `mobile`,
-  `bw`, `mise`, `env`) = **orchestration / domain / runner.** They compose tool
-  tasks (`mise run`/`depends`) and own the `fnox`→`$env` bridge. `bw` is the
-  bitwarden↔keychain *bridge*; `mise` is the runner; `env` is a pure-nu util.
+- **plain `*.toml`** = **orchestration / runner / util.** Five orchestration
+  namespaces, one per lifecycle concern, + the runner + a util:
+
+| Namespace | Layer / role |
+|---|---|
+| `cf gh docker cliff rust wrangler fnox` | **tool** primitives (in `tool-*.toml`) — own domain tool + plumbing only |
+| `ci:*` | **orchestration** — verify code: `check-nu`/`check-global`/`audit-lib-refs` + dogfood |
+| `secrets:*` | **orchestration** — manage secrets: keychain ↔ fnox ↔ gh ↔ bitwarden (`secrets-bw.toml` = `secrets:bw-*`) |
+| `cfapp:*` | **orchestration** — Cloudflare Worker lifecycle: `cfapp:provision-*` + `cfapp:access-*` + `cfapp:verify-*` |
+| `release:*` | **orchestration** — ship: `release:github`, `release:pack` (cliff+git+gh+tar) |
+| `mobile:*` | **orchestration** — mobile build/setup (tauri+android+ios) |
+| `mise:*` | **runner** — `global:bootstrap`, `repo:bootstrap[-delete]`, `sweep`, `upgrade` |
+| `env:*` | **util** — pure-nu env resolution |
 
 A tool task that needs a foreign domain tool, or reaches into `fnox`, is mis-placed
 — move that work up to an orchestration file.
-
-| Namespace | Tool / role |
-|---|---|
-| `mise:*` | mise (`global:bootstrap`, `repo:bootstrap[-delete]`, `sweep`, `upgrade`) |
-| `gh:*` | gh — GitHub Actions **run** mgmt (`run-watch`, `run-clean`) |
-| `cliff:*` | git-cliff — changelog queries (`unreleased`/`show`/`repo`) |
-| `docker:*` | docker (`login`/`image`/`settings`) |
-| `bw cf fnox rust wrangler env` | each its own tool |
-| `release:*` | **orchestration** (cliff+git+gh): `release:github`, `release:pack` |
-| `ci:*` | **static guards** (`check-nu`/`check-global`) + ref drift (`audit-lib-refs [--write]`) |
-| `provision:*` | **orchestration** — reads config/<env>.env, composes `cf:*` primitives (`d1-r2`, `queues`, `secrets`) |
-| `secrets prove mobile` | **orchestration/domain** (compose tools) |
 
 Name implies one tool but drives others? Mis-named — move it. (`cliff:release`
 → `release:github`; `ci:watch`/`ci:clean` → `gh:run-watch`/`gh:run-clean`.)
@@ -148,7 +145,7 @@ path pattern; lists need commas; detect repo via `git remote get-url origin`.
 
 ## Secrets
 
-`fnox` = local keychain (`fnox set -p keychain`); `bw:*` syncs to NodeWarden; CI
+`fnox` = local keychain (`fnox set -p keychain`); `secrets:bw-*` syncs to NodeWarden; CI
 reads GH Actions secrets, never runs fnox.
 
 ---

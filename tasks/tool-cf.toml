@@ -1,7 +1,7 @@
 # tasks/cf.toml — cf:* (Cloudflare) namespace: PURE cloudflare PRIMITIVES.
 #
 # Each task drives ONLY wrangler (+ curl as HTTP plumbing). Tokens come from
-# $env — the orchestration layer (provision:*) sets CLOUDFLARE_API_TOKEN from
+# $env — the orchestration layer (cfapp:*) sets CLOUDFLARE_API_TOKEN from
 # fnox; wrangler reads it automatically. NO fnox/gh here. The cross-tool CF
 # Access flows moved to provision.toml (orchestration).
 #
@@ -63,7 +63,7 @@ def main [...args] {
 # ── cf:d1-create ─────────────────────────────────────────────────────────────
 # PRIMITIVE: create a D1 database by name; print ONLY its id to stdout (status
 # to stderr) so an orchestrator can capture it. NOT idempotent on its own —
-# callers gate on existence (see provision:d1-r2).
+# callers gate on existence (see cfapp:provision-d1-r2).
 ["cf:d1-create"]
 tools = { wrangler = "latest" }
 description = "PRIMITIVE: create D1 database <name>; prints the new database_id to stdout."
@@ -72,7 +72,7 @@ run = '''
 
 def main [name: string] {
   # wrangler reads CLOUDFLARE_API_TOKEN from env; the orchestration layer
-  # (provision:*) provides it from fnox. This task drives ONLY wrangler.
+  # (cfapp:*) provides it from fnox. This task drives ONLY wrangler.
   print --stderr $"Creating D1 database '($name)' ..."
   let out = (^wrangler d1 create $name | complete | get stdout)
   let parsed = ($out | parse --regex '"database_id"\s*:\s*"([0-9a-f-]{36})"|database_id\s*=\s*"([0-9a-f-]{36})"')
@@ -96,7 +96,7 @@ run = '''
 
 def main [name: string, file: string] {
   # wrangler reads CLOUDFLARE_API_TOKEN from env; the orchestration layer
-  # (provision:*) provides it from fnox. This task drives ONLY wrangler.
+  # (cfapp:*) provides it from fnox. This task drives ONLY wrangler.
   ^wrangler d1 execute $name --remote $"--file=($file)"
 }
 '''
@@ -111,7 +111,7 @@ run = '''
 
 def main [bucket: string] {
   # wrangler reads CLOUDFLARE_API_TOKEN from env; the orchestration layer
-  # (provision:*) provides it from fnox. This task drives ONLY wrangler.
+  # (cfapp:*) provides it from fnox. This task drives ONLY wrangler.
   let listing = (try { ^wrangler r2 bucket list | complete | get stdout } catch { "" })
   if ($listing | str contains $bucket) {
     print $"✓ R2 bucket '($bucket)' already exists"
@@ -132,7 +132,7 @@ run = '''
 
 def main [name: string] {
   # wrangler reads CLOUDFLARE_API_TOKEN from env; the orchestration layer
-  # (provision:*) provides it from fnox. This task drives ONLY wrangler.
+  # (cfapp:*) provides it from fnox. This task drives ONLY wrangler.
   let existing = (try { ^wrangler queues list | complete | get stdout } catch { "" })
   if ($existing | str contains $name) {
     print $"✓ Queue '($name)' already exists"

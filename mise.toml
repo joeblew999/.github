@@ -7,7 +7,7 @@
 # git-cliff only; release:* is the release orchestration (cliff+git+gh); ci:* is
 # all CI guards; docker:* is docker. No task lives in another tool's namespace.
 includes = [
-  "tasks/bw.toml",
+  "tasks/secrets-bw.toml",
   "tasks/tool-cf.toml",
   "tasks/ci.toml",
   "tasks/tool-cliff.toml",
@@ -17,8 +17,7 @@ includes = [
   "tasks/tool-gh.toml",
   "tasks/mise.toml",
   "tasks/mobile.toml",
-  "tasks/prove.toml",
-  "tasks/provision.toml",
+  "tasks/cfapp.toml",
   "tasks/release.toml",
   "tasks/tool-rust.toml",
   "tasks/secrets.toml",

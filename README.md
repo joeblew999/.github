@@ -30,15 +30,15 @@ Each task drives **only its own tool** + ubiquitous plumbing (`git`/`curl`/`tar`
 These **compose** tool tasks (via `depends` / `mise run`) and own the cross-tool
 work + the `fnox`→`$env` bridge.
 
+Five namespaces, one per lifecycle concern:
+
 | file | composes | role |
 |---|---|---|
-| `ci` | `nu` guards + dogfood | CI umbrella (parse + global-config guards + self-test) |
-| `release` | `git-cliff` + `git` + `gh` + `tar` | changelog → tag → GitHub release (+ `release:pack`) |
-| `secrets` | `fnox` + `gh` + `keychain` | secret sync: keychain ↔ fnox ↔ GitHub |
-| `prove` | `wrangler` + `curl` + `fnox` | post-deploy verification of the live Worker |
-| `provision` | `cf:*` (via `mise run`) + `fnox` + `curl` | Cloudflare provisioning (D1/R2/queues/secrets) + Access |
-| `mobile` | `tauri`/`rustup` + `java`/`pod`/`xcode-select` | mobile build/setup (Android + iOS) |
-| `bw` | `bw` + `fnox` | bitwarden ↔ keychain **bridge** |
+| `ci` | `nu` guards + dogfood | **verify code** — parse + global-config guards + self-test |
+| `secrets` (+ `secrets-bw`) | `fnox` + `gh` + `keychain` + `bw` | **manage secrets** — sync keychain ↔ fnox ↔ GitHub ↔ Bitwarden |
+| `cfapp` | `cf:*` (via `mise run`) + `fnox` + `curl` + `wrangler` | **Cloudflare Worker app** — provision (D1/R2/queues/secrets) + Access + verify the deployed worker |
+| `release` | `git-cliff` + `git` + `gh` + `tar` | **ship** — changelog → tag → GitHub release (+ `release:pack`) |
+| `mobile` | `tauri`/`rustup` + `java`/`pod`/`xcode-select` | **build mobile** (Android + iOS) |
 
 Plus two that are neither: **`mise`** (the runner) and **`env`** (a pure-nu util).
 

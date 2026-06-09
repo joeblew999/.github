@@ -1,10 +1,14 @@
-# tasks/provision.toml — ORCHESTRATION: provision Cloudflare resources for the
-# active env by COMPOSING cf:* primitives.
+# tasks/cfapp.toml — ORCHESTRATION: the full Cloudflare Worker app lifecycle.
 #
-# Layer split: cf.toml holds atomic, explicit-arg cf primitives (cf:r2-create,
-# cf:d1-create, cf:queue-create, cf:secret-put, …). provision:* reads
-# config/<env>.env and calls those primitives by name via `mise run`. Config
-# reading + idempotency policy live HERE; the raw `wrangler` calls live in cf.
+# One namespace, two phases (was provision: + prove:):
+#   cfapp:provision-*  — create resources (D1/R2/queues) + push secrets
+#   cfapp:access-* / cfapp:service-token-*  — set up / revoke CF Access
+#   cfapp:verify-*     — assert the DEPLOYED worker (bindings, secrets, Access)
+#
+# Layer split: tool-cf.toml holds atomic cf PRIMITIVES (cf:r2-create, cf:d1-create,
+# …). cfapp:* reads config/<env>.env, owns the fnox→$env token bridge, and calls
+# the primitives via `mise run` (child inherits the env). Raw wrangler/curl lives
+# in tool-cf; config + policy + fnox live HERE.
 #
 # (load-env-file is repeated per task — mise can't share nu helpers across task
 # bodies, so each orchestration task inlines it. That's the distribution model.)
@@ -12,15 +16,15 @@
 # Consumer wiring:
 #   [task_config]
 #   includes = [
-#     "git::https://github.com/joeblew999/.github.git//tasks/provision.toml?ref=<tag>",
+#     "git::https://github.com/joeblew999/.github.git//tasks/cfapp.toml?ref=<tag>",
 #     "git::https://github.com/joeblew999/.github.git//tasks/tool-cf.toml?ref=<tag>",   # the primitives
 #   ]
 
-# ── provision:d1-r2 ──────────────────────────────────────────────────────────
+# ── cfapp:provision-d1-r2 ──────────────────────────────────────────────────────────
 # Provision D1 + R2 for the active env. Reads METADATA_DB_NAME, BACKUP_BUCKET_NAME
 # from config/<env>.env (either may be empty → skipped). Writes the new D1 id back
 # to the env file. Idempotent — skips D1 create when METADATA_DB_ID is already set.
-["provision:d1-r2"]
+["cfapp:provision-d1-r2"]
 tools = { wrangler = "latest" }
 description = "Provision D1 + R2 for the active env (composes cf:r2-create + cf:d1-create + cf:d1-exec). Reads/writes config/<env>.env. Idempotent."
 run = '''
@@ -83,14 +87,14 @@ def main [] {
     ^mise run cf:d1-exec -- $db_name "worker/schema.sql"
   }
 
-  print "Done. Next: fnox CLOUDFLARE_API_TOKEN/ACCOUNT_ID set; mise run provision:access-setup"
+  print "Done. Next: fnox CLOUDFLARE_API_TOKEN/ACCOUNT_ID set; mise run cfapp:access-setup"
 }
 '''
 
-# ── provision:queues ─────────────────────────────────────────────────────────
+# ── cfapp:provision-queues ─────────────────────────────────────────────────────────
 # Provision Cloudflare Queues for the active env. Reads QUEUE_NAMES (comma-sep)
 # from config/<env>.env; calls cf:queue-create per name (idempotent). No-op if unset.
-["provision:queues"]
+["cfapp:provision-queues"]
 tools = { wrangler = "latest" }
 description = "Provision Cloudflare Queues for the active env (composes cf:queue-create per QUEUE_NAMES). No-op if unset."
 run = '''
@@ -129,11 +133,11 @@ def main [] {
 }
 '''
 
-# ── provision:secrets ────────────────────────────────────────────────────────
+# ── cfapp:provision-secrets ────────────────────────────────────────────────────────
 # Push the 4 CF Access + auth secrets from fnox to the deployed Worker, mapping
 # canonical fnox names → Worker env names. Reads APP_POLICY_AUD_FNOX_KEY from
 # config/<env>.env. Composes cf:secret-put per pair.
-["provision:secrets"]
+["cfapp:provision-secrets"]
 tools = { wrangler = "latest" }
 description = "Push CF Access + auth secrets fnox → Worker (composes cf:secret-put). Reads APP_POLICY_AUD_FNOX_KEY from config/<env>.env. Run wrangler:gen first if needed."
 run = '''
@@ -182,13 +186,13 @@ def main [] {
 # Moved from cf.toml: these read+write fnox and curl the CF Access API — cohesive
 # multi-step flows, so they belong in the orchestration layer, not the cf tool file.
 
-# ── provision:access-revoke ─────────────────────────────────────────────────────────
+# ── cfapp:access-revoke ─────────────────────────────────────────────────────────
 # Revoke ALL active CF Access sessions for the Worker. Kicks everyone out
 # (they re-login if still on the allowlist). Reads WORKER_NAME + CF_SUBDOMAIN
 # from config/<env>.env. Uses the app-level revoke_tokens endpoint (works
-# with the same scope provision:access-setup needs).
-["provision:access-revoke"]
-description = "Revoke ALL active CF Access sessions for the Worker (kicks everyone out — they can re-login if still on the allowlist). Reads WORKER_NAME + CF_SUBDOMAIN from config/<env>.env. Requires CLOUDFLARE_API_TOKEN with Access: Apps and Policies: Edit (same scope as provision:access-setup)."
+# with the same scope cfapp:access-setup needs).
+["cfapp:access-revoke"]
+description = "Revoke ALL active CF Access sessions for the Worker (kicks everyone out — they can re-login if still on the allowlist). Reads WORKER_NAME + CF_SUBDOMAIN from config/<env>.env. Requires CLOUDFLARE_API_TOKEN with Access: Apps and Policies: Edit (same scope as cfapp:access-setup)."
 run = '''
 #!/usr/bin/env nu
 
@@ -231,7 +235,7 @@ def main [] {
   }
   let app = ($apps_resp.result | default [] | where domain == $app_domain | first)
   if ($app | is-empty) {
-    print --stderr $"✗ no Access App found for ($app_domain) — run provision:access-setup first"
+    print --stderr $"✗ no Access App found for ($app_domain) — run cfapp:access-setup first"
     exit 1
   }
   print $"  app_id = ($app.id)"
@@ -248,11 +252,11 @@ def main [] {
 }
 '''
 
-# ── provision:service-token-revoke ──────────────────────────────────────────────────
+# ── cfapp:service-token-revoke ──────────────────────────────────────────────────
 # Revoke this Worker's CF Access service token: deletes the token at CF
 # (immediately invalidates all uses), removes the policy include, and
 # clears CLOUDFLARE_ACCESS_CLIENT_ID/SECRET from fnox. Idempotent.
-["provision:service-token-revoke"]
+["cfapp:service-token-revoke"]
 description = "Revoke this Worker's CF Access service token: deletes the token at CF (immediately invalidates all uses), removes its 'Include' rule from the operator-only policy, and clears CLOUDFLARE_ACCESS_CLIENT_ID/SECRET from fnox. Idempotent — safe to run when nothing exists. Reads WORKER_NAME from config/<env>.env."
 run = '''
 #!/usr/bin/env nu
@@ -368,17 +372,17 @@ def main [] {
   }
 
   print ""
-  print "✓ Service token revoked. Re-create with: mise run provision:service-token-setup"
+  print "✓ Service token revoked. Re-create with: mise run cfapp:service-token-setup"
 }
 '''
 
-# ── provision:service-token-setup ───────────────────────────────────────────────────
+# ── cfapp:service-token-setup ───────────────────────────────────────────────────
 # One-shot CF Access service token setup: ensure a per-Worker service
 # token exists and has its own non_identity policy on the Access App.
 # Stores CLOUDFLARE_ACCESS_CLIENT_ID/SECRET in fnox so wrangler dev with
 # remote bindings, Playwright, etc. authenticate non-interactively.
-["provision:service-token-setup"]
-description = "One-shot CF Access service token setup: ensure a per-Worker service token exists and is allowed by the app's operator-only policy. Stores CLOUDFLARE_ACCESS_CLIENT_ID + _SECRET in fnox so wrangler/vite-plugin/Playwright can authenticate non-interactively. Idempotent. Requires CLOUDFLARE_API_TOKEN with Access:Edit. Run provision:access-setup first."
+["cfapp:service-token-setup"]
+description = "One-shot CF Access service token setup: ensure a per-Worker service token exists and is allowed by the app's operator-only policy. Stores CLOUDFLARE_ACCESS_CLIENT_ID + _SECRET in fnox so wrangler/vite-plugin/Playwright can authenticate non-interactively. Idempotent. Requires CLOUDFLARE_API_TOKEN with Access:Edit. Run cfapp:access-setup first."
 run = '''
 #!/usr/bin/env nu
 
@@ -477,7 +481,7 @@ def main [] {
   }
   let app = ($apps_resp.result | default [] | where domain == $app_domain | first)
   if ($app | is-empty) {
-    print --stderr $"✗ no Access App for ($app_domain) — run provision:access-setup first."
+    print --stderr $"✗ no Access App for ($app_domain) — run cfapp:access-setup first."
     exit 1
   }
 
@@ -553,11 +557,11 @@ def main [] {
 }
 '''
 
-# ── provision:access-setup ──────────────────────────────────────────────────────────
+# ── cfapp:access-setup ──────────────────────────────────────────────────────────
 # One-shot CF Access setup: ensure GitHub IdP + Access App for this Worker
 # exist; write TEAM_DOMAIN + the per-app POLICY_AUD to fnox. Auto-revokes
 # sessions for emails dropped from OPERATOR_EMAIL. Idempotent.
-["provision:access-setup"]
+["cfapp:access-setup"]
 description = "One-shot CF Access setup: ensure GitHub IdP + Access App for this Worker exist; write TEAM_DOMAIN + the per-app POLICY_AUD to fnox. Auto-revokes sessions for emails dropped from OPERATOR_EMAIL. Idempotent. Requires CLOUDFLARE_API_TOKEN with Access:Edit + Access:Organizations:Read + Account.Settings:Read."
 run = '''
 #!/usr/bin/env nu
@@ -736,7 +740,7 @@ def main [] {
     }
   } else {
     print $"→ OPERATOR_EMAIL unset in ($env_file) — skipping policy creation"
-    print "  \(Login through OAuth will 403 until you add a policy. cf:prove:access-policy will catch this.\)"
+    print "  \(Login through OAuth will 403 until you add a policy. cfapp:verify-access-policy will catch this.\)"
   }
 
   print ""
@@ -746,6 +750,181 @@ def main [] {
   print $"  ✓ CF_ACCESS_TEAM_DOMAIN  = ($team_url)"
   print $"  ✓ ($policy_aud_key)  = ($app_info.aud)"
   print ""
-  print "Next: mise run provision:secrets  →  mise run 10-deploy  →  mise run prove:all"
+  print "Next: mise run cfapp:provision-secrets  →  mise run 10-deploy  →  mise run prove:all"
+}
+'''
+
+# ── cfapp:verify-bindings ───────────────────────────────────────────────────────────
+# Confirm the deployed Worker's bindings via wrangler --dry-run (no upload).
+# Catches drift between wrangler.toml.template and the resources actually
+# created.
+["cfapp:verify-bindings"]
+description = "Confirm the deployed Worker's bindings via wrangler --dry-run (no upload). Catches drift between wrangler.toml.template and the resources actually created."
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  print "→ wrangler deploy --dry-run"
+  let raw = (^wrangler deploy --dry-run --outdir build/dryrun | complete | get stdout)
+  $raw
+  | lines
+  | where { |l| ($l =~ '^Binding') or ($l =~ '^Total Upload') or ($l =~ 'env\.') or ($l =~ '^\s+env\.') }
+  | first 20
+  | str join "\n"
+  | print
+}
+'''
+
+# ── cfapp:verify-secrets ────────────────────────────────────────────────────────────
+# List secrets on the deployed Worker, assert all 4 expected names are
+# present (ACCOUNT_ID, API_KEY, TEAM_DOMAIN, POLICY_AUD).
+["cfapp:verify-secrets"]
+description = "List secrets on the deployed Worker, assert all 4 expected names present (ACCOUNT_ID, API_KEY, TEAM_DOMAIN, POLICY_AUD)."
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let out = (^wrangler secret list | complete | get stdout)
+  print $out
+  print ""
+  for k in ["ACCOUNT_ID", "API_KEY", "TEAM_DOMAIN", "POLICY_AUD"] {
+    let needle = $'"($k)"'
+    if ($out | str contains $needle) {
+      print $"  ✓ ($k) present"
+    } else {
+      print --stderr $"  ✗ ($k) MISSING — run cfapp:provision-secrets"
+      exit 1
+    }
+  }
+}
+'''
+
+# ── cfapp:verify-deployed ───────────────────────────────────────────────────────────
+# Smoke-test the deployed Worker — expect 302 to CF Access challenge with
+# the AUD stored in fnox under APP_POLICY_AUD_FNOX_KEY.
+["cfapp:verify-deployed"]
+description = "Smoke-test the deployed Worker — expect 302 to CF Access challenge with the AUD stored in fnox under APP_POLICY_AUD_FNOX_KEY."
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let file = $"config/($env_name).env"
+  if not ($file | path exists) {
+    print --stderr $"ERROR: ($file) not found."
+    exit 1
+  }
+  let cfg = (
+    open --raw $file
+    | lines
+    | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+    | reduce -f {} {|line, acc|
+        let parts = ($line | split row -n 2 "=")
+        $acc | upsert ($parts | get 0) (($parts | get 1) | str trim --char '"')
+      }
+  )
+
+  let worker = ($cfg.WORKER_NAME? | default "")
+  let subdomain = ($cfg.CF_SUBDOMAIN? | default "")
+  let aud_key = ($cfg.APP_POLICY_AUD_FNOX_KEY? | default "")
+  if ($worker | is-empty) or ($subdomain | is-empty) or ($aud_key | is-empty) {
+    print --stderr "WORKER_NAME, CF_SUBDOMAIN, APP_POLICY_AUD_FNOX_KEY all required in config"
+    exit 1
+  }
+
+  let url = $"https://($worker).($subdomain).workers.dev"
+  let expected_aud = (^fnox get $aud_key | str trim)
+
+  print $"GET ($url)"
+  let raw_headers = (^curl -sI $url | str replace --all "\r" "")
+  let lines = ($raw_headers | lines)
+  let status = ($lines | first)
+  let loc = (
+    $lines
+    | where { |l| ($l | str downcase | str starts-with "location:") }
+    | first
+    | default ""
+    | str replace --regex '(?i)^location:\s*' ''
+    | str trim
+  )
+  print $"  ($status)"
+  let preview = ($loc | str substring 0..120)
+  print $"  location: ($preview)..."
+
+  if not ($status =~ '^HTTP/[0-9.]+\s+302') {
+    print --stderr $"✗ expected 302, got: ($status)"
+    exit 1
+  }
+  if not ($loc | str contains "/cdn-cgi/access/login/") {
+    print --stderr "✗ location is not a CF Access challenge URL"
+    exit 1
+  }
+  if not ($loc | str contains $"kid=($expected_aud)") {
+    print --stderr $"✗ challenge AUD does not match fnox:($aud_key)"
+    exit 1
+  }
+  print "✓ CF Access is gating with the correct app AUD"
+}
+'''
+
+# ── cfapp:verify-access-policy ──────────────────────────────────────────────────────
+# Verify the CF Access App for this Worker has at least one allow policy.
+# Without one, login 403s after OAuth.
+["cfapp:verify-access-policy"]
+description = "Verify the CF Access App for this Worker has at least one allow policy. Without one, login 403s after OAuth."
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let file = $"config/($env_name).env"
+  if not ($file | path exists) {
+    print --stderr $"ERROR: ($file) not found."
+    exit 1
+  }
+  let cfg = (
+    open --raw $file
+    | lines
+    | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+    | reduce -f {} {|line, acc|
+        let parts = ($line | split row -n 2 "=")
+        $acc | upsert ($parts | get 0) (($parts | get 1) | str trim --char '"')
+      }
+  )
+
+  let worker = ($cfg.WORKER_NAME? | default "")
+  let subdomain = ($cfg.CF_SUBDOMAIN? | default "")
+  if ($worker | is-empty) or ($subdomain | is-empty) {
+    print --stderr "WORKER_NAME, CF_SUBDOMAIN required in config"
+    exit 1
+  }
+
+  let token = (^fnox get CLOUDFLARE_API_TOKEN | str trim)
+  let account = (^fnox get CLOUDFLARE_ACCOUNT_ID | str trim)
+  let app_domain = $"($worker).($subdomain).workers.dev"
+  let api = $"https://api.cloudflare.com/client/v4/accounts/($account)"
+  let auth = $"Authorization: Bearer ($token)"
+
+  let apps_resp = (^curl -sS -H $auth $"($api)/access/apps" | from json)
+  let app = ($apps_resp.result | where domain == $app_domain | first)
+  if ($app | is-empty) {
+    print --stderr $"✗ no Access App found for ($app_domain) — run cfapp:access-setup first"
+    exit 1
+  }
+  let app_id = $app.id
+
+  let pol_resp = (^curl -sS -H $auth $"($api)/access/apps/($app_id)/policies" | from json)
+  let allow_policies = ($pol_resp.result | where decision == "allow")
+  let allow_count = ($allow_policies | length)
+  if $allow_count < 1 {
+    print --stderr $"✗ Access App ($app_domain) has no allow policy. Login would 403 after OAuth."
+    print --stderr "  Re-run cfapp:access-setup with OPERATOR_EMAIL set in config/<env>.env."
+    exit 1
+  }
+  print $"✓ Access App ($app_domain) has ($allow_count) allow policy/policies"
+  for p in $allow_policies {
+    let include_keys = ($p.include | each { |i| $i | columns | first } | str join ",")
+    print $"  - ($p.name): ($p.decision) [($include_keys)]"
+  }
 }
 '''
