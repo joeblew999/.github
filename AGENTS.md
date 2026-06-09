@@ -94,10 +94,18 @@ Being timid is the bug; the version pin is the safety net.
 
 ## NAMESPACE = TOOL (+ an orchestration tier)
 
-Each namespace is **one tool**; a task never lives in another tool's namespace.
-A few namespaces are **orchestration/domain** — they compose several tools, and
-say so plainly: `release` (cliff+git+gh), `ci` (guards), `secrets` (fnox+gh),
-`prove` (deploy checks), `mobile` (tauri+android+ios).
+**Two layers, visible in the filenames:**
+- **`tool-*.toml`** (`tool-cf`, `tool-gh`, `tool-docker`, `tool-cliff`, `tool-rust`,
+  `tool-wrangler`, `tool-fnox`) = **pure tool primitives.** Each task drives ONLY
+  its own domain tool (+ ubiquitous plumbing: `git`/`curl`/`tar`). **No cross-tool
+  calls, no `fnox`** — secrets come from `$env` (the orchestration layer sets them).
+- **plain `*.toml`** (`ci`, `release`, `secrets`, `prove`, `provision`, `mobile`,
+  `bw`, `mise`, `env`) = **orchestration / domain / runner.** They compose tool
+  tasks (`mise run`/`depends`) and own the `fnox`→`$env` bridge. `bw` is the
+  bitwarden↔keychain *bridge*; `mise` is the runner; `env` is a pure-nu util.
+
+A tool task that needs a foreign domain tool, or reaches into `fnox`, is mis-placed
+— move that work up to an orchestration file.
 
 | Namespace | Tool / role |
 |---|---|

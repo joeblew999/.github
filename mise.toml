@@ -8,21 +8,21 @@
 # all CI guards; docker:* is docker. No task lives in another tool's namespace.
 includes = [
   "tasks/bw.toml",
-  "tasks/cf.toml",
+  "tasks/tool-cf.toml",
   "tasks/ci.toml",
-  "tasks/cliff.toml",
-  "tasks/docker.toml",
+  "tasks/tool-cliff.toml",
+  "tasks/tool-docker.toml",
   "tasks/env.toml",
-  "tasks/fnox.toml",
-  "tasks/gh.toml",
+  "tasks/tool-fnox.toml",
+  "tasks/tool-gh.toml",
   "tasks/mise.toml",
   "tasks/mobile.toml",
   "tasks/prove.toml",
   "tasks/provision.toml",
   "tasks/release.toml",
-  "tasks/rust.toml",
+  "tasks/tool-rust.toml",
   "tasks/secrets.toml",
-  "tasks/wrangler.toml",
+  "tasks/tool-wrangler.toml",
 ]
 
 [tools]

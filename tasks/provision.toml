@@ -13,7 +13,7 @@
 #   [task_config]
 #   includes = [
 #     "git::https://github.com/joeblew999/.github.git//tasks/provision.toml?ref=<tag>",
-#     "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=<tag>",   # the primitives
+#     "git::https://github.com/joeblew999/.github.git//tasks/tool-cf.toml?ref=<tag>",   # the primitives
 #   ]
 
 # ── provision:d1-r2 ──────────────────────────────────────────────────────────
