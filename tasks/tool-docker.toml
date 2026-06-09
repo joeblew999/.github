@@ -36,7 +36,7 @@ def main [
   #   • ubuntu CI + local Docker Desktop → OSType=linux      → build
   # Gate is daemon CAPABILITY, not OS name (local mac Docker Desktop builds linux).
   # `which` first so an absent binary can't crash the task; parse `docker info`
-  # text for OSType (NOT --format — `{{…}}` is Tera in a mise task body).
+  # text for OSType (NOT --format, whose double-brace placeholders are Tera here).
   if (which docker | is-empty) {
     print $"· no docker binary on ($nu.os-info.name) — build skipped, fine in CI"
     return
