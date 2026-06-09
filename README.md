@@ -26,6 +26,12 @@ mise run mise:repo:bootstrap     # write .github/workflows/ (the CI stub)
 mise run ci                      # verify
 ```
 
+> **Copy [`.github-example`](https://github.com/joeblew999/.github-example).** It's
+> the canonical consumer — every change to `.github` is validated **against it**
+> (locally *and* on the matrix) before release, so its `mise.toml` includes, the
+> bootstrapped workflow, and the local-`ci` extension are always current and
+> correct. When you're unsure how a repo should wire something up, look there first.
+
 ---
 
 ## 2. CI — one task, local *and* remote
