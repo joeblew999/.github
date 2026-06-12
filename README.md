@@ -81,12 +81,17 @@ obvious default-if-unset:
 |---|---|---|---|
 | **what runs** | `[tasks.ci].depends` | the two guards only | immediately |
 | docker **local vs remote** | `[env] DOCKER_BUILD` | `auto` — wherever a linux daemon exists | immediately |
-| **which OSes** the matrix runs | `[env] CI_OS_MATRIX` | all 3 (ubuntu + macOS + windows) | re-bootstrap |
-| task · sccache · binary release | `[env] CI_TASK · CI_SCCACHE · CI_RELEASE` | `ci` · `true` · off | re-bootstrap |
+| **which OSes CI runs** | `[env] CI_OS_MATRIX` | all 3 (ubuntu + macOS + windows) | re-bootstrap |
+| CI task · sccache | `[env] CI_TASK · CI_SCCACHE` | `ci` · `true` | re-bootstrap |
+| **publish binaries on tag** | `[env] CI_RELEASE` | off | re-bootstrap |
+| **which OSes publish** | `[env] CI_RELEASE_OS_MATRIX` | ubuntu + macOS (no windows) | re-bootstrap |
+| build-task for publish | `[env] CI_BUILD_TASK` | `dist` | re-bootstrap |
 
 The `CI_*` ones need a re-bootstrap because GitHub reads the matrix from the workflow
 *before* mise starts — so bootstrap projects them there. You still only edit
-`mise.toml`. (Flags like `--os-matrix` still work for a one-off.)
+`mise.toml`. (Flags like `--os-matrix` / `--release-os-matrix` work for a one-off.)
+Note the two OS knobs are independent: **CI** verifies on all 3 OSes by default, but
+**publish** defaults to ubuntu + macOS — set `CI_RELEASE_OS_MATRIX` to add windows.
 
 > **Verify vs publish.** `ci` *verifies* on every push (cheap, no secrets) — and the
 > matrix compiles a native binary per OS. *Publishing* downloadable binaries/images

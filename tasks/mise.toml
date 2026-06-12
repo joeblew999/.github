@@ -128,9 +128,10 @@ def main [
   --task: string = ""        # override the mise task (reusable default: ci)
   --os-matrix: string = ""   # override runners, e.g. '["ubuntu-latest"]' (reusable default: all 3 OSes)
   --sccache: string = ""     # override sccache: "true"/"false" (reusable default: true)
-  --release                  # ALSO write mise-release.yml (tag-push binary release; opt-in)
-  --build-task: string = ""  # with --release: the build task (reusable default: dist)
-  --ref: string = ""         # @ref for the reusable workflows (default: this repo's own ?ref=)
+  --release                       # ALSO write mise-release.yml (tag-push binary release; opt-in)
+  --build-task: string = ""       # with --release: the build task (reusable default: dist)
+  --release-os-matrix: string = "" # with --release: which OSes publish binaries (reusable default: ubuntu+macos)
+  --ref: string = ""              # @ref for the reusable workflows (default: this repo's own ?ref=)
 ] {
   let root = ($env.MISE_PROJECT_ROOT? | default (pwd))
   let dir = ($root | path join ".github" "workflows")
@@ -146,6 +147,7 @@ def main [
   let eff_sccache = (if ($sccache   | is-not-empty) { $sccache }   else { $env.CI_SCCACHE?   | default "" })
   let eff_release = ($release or (($env.CI_RELEASE? | default "" | str downcase) == "true"))
   let eff_build   = (if ($build_task | is-not-empty) { $build_task } else { $env.CI_BUILD_TASK? | default "" })
+  let eff_rel_os  = (if ($release_os_matrix | is-not-empty) { $release_os_matrix } else { $env.CI_RELEASE_OS_MATRIX? | default "" })
 
   # PIN the reusable workflows to the SAME ref this repo pins its task includes to —
   # so a repo on ?ref=v0.48.0 gets `@v0.48.0` in its CI workflow, not a floating
@@ -235,9 +237,10 @@ def main [
       "      contents: write"
       $"    uses: joeblew999/.github/.github/workflows/reusable-mise-release.yml@($eff_ref)"
     ]
-    let rel = (if ($eff_build | is-not-empty) {
-      $rel_base | append "    with:" | append $"      build-task: ($eff_build)"
-    } else { $rel_base })
+    mut rel_with = []
+    if ($eff_build  | is-not-empty) { $rel_with = ($rel_with | append $"      build-task: ($eff_build)") }
+    if ($eff_rel_os | is-not-empty) { $rel_with = ($rel_with | append $"      os-matrix: '($eff_rel_os)'") }
+    let rel = (if ($rel_with | is-not-empty) { $rel_base | append "    with:" | append $rel_with } else { $rel_base })
     (($rel | append "") | str join "\n") | save --force ($dir | path join "mise-release.yml")
     $wrote = "mise.yml + mise-upgrade.yml + mise-release.yml"
   }
