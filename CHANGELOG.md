@@ -1,8 +1,17 @@
+## [0.55.0] - 2026-06-12
+
+### 🚀 Features
+
+- *(docker)* Docker:pull — consumer-side login-from-$GHCR_TOKEN + pull (optionally --run) a PRIVATE image; CR/LF-trimmed so uncloud-injected creds work. docker:login hardened the same way
 ## [0.54.0] - 2026-06-12
 
 ### 🚀 Features
 
 - *(release)* Release:publish adds a 📦 Install footer to notes — binaries (assets) + docker pull/run URL + GHCR package link, so devs find the artifacts on the release page
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.54.0
 ## [0.53.0] - 2026-06-12
 
 ### 🚀 Features
