@@ -1,3 +1,8 @@
+## [0.53.0] - 2026-06-12
+
+### 🚀 Features
+
+- *(docker)* Unify Dockerfile config — $CI_DOCKERFILE/$CI_DOCKER_CONTEXT/$CI_DOCKER_PLATFORMS (default Dockerfile/./linux-amd64) shared by docker:build + docker:image; release image job reads env + adds QEMU for multi-arch. README documents it.
 ## [0.52.0] - 2026-06-12
 
 ### 🚀 Features
@@ -7,6 +12,10 @@
 ### 🐛 Bug Fixes
 
 - *(docker)* Sanitize derived GHCR image name (lowercase + strip leading ._- so a repo like .github-example → github-example; was 'invalid reference format')
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.52.0
 ## [0.51.0] - 2026-06-12
 
 ### 🐛 Bug Fixes
