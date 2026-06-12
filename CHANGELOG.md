@@ -1,8 +1,17 @@
+## [0.47.0] - 2026-06-12
+
+### 🚀 Features
+
+- *(docker)* Restore $DOCKER_BUILD gate (auto|ci|local|never), default auto — single ci command keeps local/remote control; README+skill document the two optional dials (DOCKER_BUILD env + --os-matrix) under sensible defaults
 ## [0.46.0] - 2026-06-09
 
 ### 🚜 Refactor
 
 - *(docker)* Drop DOCKER_BUILD policy enum — docker:build is just capability-gated. One lever (ci depends), not four knobs
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.46.0
 ## [0.45.0] - 2026-06-09
 
 ### 🚀 Features
