@@ -1,8 +1,17 @@
+## [0.48.0] - 2026-06-12
+
+### 🚀 Features
+
+- *(bootstrap)* Persist settings in mise.toml [env] (CI_OS_MATRIX/CI_TASK/CI_SCCACHE/CI_RELEASE/CI_BUILD_TASK) so re-bootstrap reproduces dev overrides; flags win one-off; never writes mise.toml. docs: all tuning lives in mise.toml
 ## [0.47.0] - 2026-06-12
 
 ### 🚀 Features
 
 - *(docker)* Restore $DOCKER_BUILD gate (auto|ci|local|never), default auto — single ci command keeps local/remote control; README+skill document the two optional dials (DOCKER_BUILD env + --os-matrix) under sensible defaults
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.47.0
 ## [0.46.0] - 2026-06-09
 
 ### 🚜 Refactor
