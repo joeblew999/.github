@@ -1,8 +1,17 @@
+## [0.51.0] - 2026-06-12
+
+### 🐛 Bug Fixes
+
+- *(release)* Release:github idempotent + self-recovering (tag-without-Release re-runs to completion; delegates create/upload to release:publish). dogfood: run docker:build to catch Tera-render errors ci:check-nu misses
 ## [0.50.0] - 2026-06-12
 
 ### 🚀 Features
 
 - *(bootstrap)* Add CI_RELEASE_OS_MATRIX (which OSes publish binaries; flag --release-os-matrix); README documents all defaults incl release-OS (ubuntu+macos, no windows)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.50.0
 ## [0.49.0] - 2026-06-12
 
 ### 🐛 Bug Fixes
