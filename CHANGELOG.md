@@ -1,8 +1,21 @@
+## [0.56.0] - 2026-06-12
+
+### 🚀 Features
+
+- *(docker:pull)* Conditional login — skip if no GHCR_TOKEN, reuse existing docker auth (or public image), so an already-logged-in dev runs it with no creds
+
+### 📚 Documentation
+
+- Clarify .github-example is the full feature SHOWCASE (CI-tested proof), not a starter template — real repos take the subset they need
 ## [0.55.0] - 2026-06-12
 
 ### 🚀 Features
 
 - *(docker)* Docker:pull — consumer-side login-from-$GHCR_TOKEN + pull (optionally --run) a PRIVATE image; CR/LF-trimmed so uncloud-injected creds work. docker:login hardened the same way
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.55.0
 ## [0.54.0] - 2026-06-12
 
 ### 🚀 Features
