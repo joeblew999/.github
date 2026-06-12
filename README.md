@@ -68,22 +68,25 @@ to `includes`, then `rust:test` / `docker:build` to `depends`. The
 [`.github-example`](https://github.com/joeblew999/.github-example) does exactly this
 — copy it.
 
-**Sensible defaults; tune in `mise.toml`.** Out of the box (no env) it just works:
-`ci` runs every task wherever it can, on all three OSes. **All tuning lives in
-`mise.toml`** — you never hand-edit the generated workflow, and **re-bootstrap always
-preserves your settings** (bootstrap reads `[env]`; it never writes `mise.toml`):
+**Zero config = a sensible default.** Set nothing and `mise run ci` runs just the
+guards (`ci:check-global` + `ci:check-nu`) — on your OS locally, on all three OSes on
+push. Identical, green out of the box. Nothing compiles or builds until *you* add it.
 
-| to control… | set in `mise.toml`… | applies |
-|---|---|---|
-| **what runs** (local + remote) | `[tasks.ci].depends` | immediately |
-| a task **local vs remote** | `[env]` `DOCKER_BUILD = "ci"` (`auto`·`ci`·`local`·`never`) | immediately |
-| **which OSes** the matrix runs | `[env]` `CI_OS_MATRIX = '[...]'` | after `mise run mise:repo:bootstrap` |
+**All CI data is in `mise.toml`** — one file. You never hand-edit the generated
+workflow, and **re-bootstrap preserves your settings** (bootstrap *reads* `[env]` and
+projects it into the workflow; it never *writes* `mise.toml`). Every knob has an
+obvious default-if-unset:
 
-`CI_OS_MATRIX` (and `CI_TASK`, `CI_RELEASE`, …) needs a re-bootstrap only because
-GitHub reads the matrix from the workflow file *before* mise starts — so bootstrap
-**projects** your `[env]` value into the stub. You still only edit `mise.toml`;
-re-bootstrap regenerates the workflow *from it*, so your overrides survive. (Flags
-like `--os-matrix` still work for a one-off.)
+| to control… | set in `mise.toml`… | default if unset | applies |
+|---|---|---|---|
+| **what runs** | `[tasks.ci].depends` | the two guards only | immediately |
+| docker **local vs remote** | `[env] DOCKER_BUILD` | `auto` — wherever a linux daemon exists | immediately |
+| **which OSes** the matrix runs | `[env] CI_OS_MATRIX` | all 3 (ubuntu + macOS + windows) | re-bootstrap |
+| task · sccache · binary release | `[env] CI_TASK · CI_SCCACHE · CI_RELEASE` | `ci` · `true` · off | re-bootstrap |
+
+The `CI_*` ones need a re-bootstrap because GitHub reads the matrix from the workflow
+*before* mise starts — so bootstrap projects them there. You still only edit
+`mise.toml`. (Flags like `--os-matrix` still work for a one-off.)
 
 > **Verify vs publish.** `ci` *verifies* on every push (cheap, no secrets) — and the
 > matrix compiles a native binary per OS. *Publishing* downloadable binaries/images
