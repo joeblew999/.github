@@ -88,7 +88,12 @@ def main [
   --platforms: string = "linux/amd64,linux/arm64",
 ] {
   let img = (if ($image | is-empty) {
-    let slug = (^git remote get-url origin | str trim | str replace -r '.*github\.com[:/]' '' | str replace -r '\.git$' '')
+    # GHCR refs must be lowercase, and a path component can't start with . / _ / -
+    # (so a repo named `.github-example` → `github-example`). Sanitize the derived
+    # name; pass --image explicitly to override.
+    let slug = (^git remote get-url origin | str trim
+      | str replace -r '.*github\.com[:/]' '' | str replace -r '\.git$' ''
+      | str downcase | split row "/" | each {|p| $p | str replace -r '^[._-]+' '' } | str join "/")
     $"ghcr.io/($slug)"
   } else { $image })
   let ref = $"($img):($tag)"
