@@ -1,8 +1,21 @@
+## [0.49.0] - 2026-06-12
+
+### 🐛 Bug Fixes
+
+- *(bootstrap)* Pin reusable workflow @ref to the repo's OWN ?ref= (was hardcoded @main) — a versioned repo now gets @vX in its CI workflow, not floating main. --ref/CI_REF override; parses mise.toml includes; example (?ref=main) stays @main
+
+### 📚 Documentation
+
+- *(README §2)* Add zero-config default + per-knob default-if-unset table — a dev gets the full data model + defaults from the README
 ## [0.48.0] - 2026-06-12
 
 ### 🚀 Features
 
 - *(bootstrap)* Persist settings in mise.toml [env] (CI_OS_MATRIX/CI_TASK/CI_SCCACHE/CI_RELEASE/CI_BUILD_TASK) so re-bootstrap reproduces dev overrides; flags win one-off; never writes mise.toml. docs: all tuning lives in mise.toml
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.48.0
 ## [0.47.0] - 2026-06-12
 
 ### 🚀 Features
