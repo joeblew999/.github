@@ -21,7 +21,7 @@
 # fnox keychain locally).
 
 ["docker:build"]
-description = "CI-safe build-ONLY verify (no push/login/secrets). Builds where a linux docker daemon exists, skips elsewhere so one `ci` stays green on every OS. Usage: mise run docker:build [--tag t] [--dockerfile Dockerfile] [--context .]"
+description = "CI-safe build-ONLY verify (no push/login/secrets). $DOCKER_BUILD (auto|ci|local|never) controls local-vs-remote; default auto builds wherever a linux daemon exists, skips elsewhere so one `ci` stays green on every OS. Usage: mise run docker:build [--tag t] [--dockerfile Dockerfile] [--context .]"
 run = '''
 #!/usr/bin/env nu
 def main [
@@ -29,13 +29,22 @@ def main [
   --dockerfile: string = "Dockerfile",
   --context: string = ".",
 ] {
-  # Build a linux image where a linux-capable daemon exists; SKIP (exit 0)
-  # otherwise — so this one task is green on every cell (local + the matrix):
-  #   • no docker binary (e.g. macOS runner)           → skip
-  #   • Windows-containers daemon (Windows runner)      → skip
-  #   • ubuntu runner + local Docker Desktop (OSType=linux) → build
-  # `which` first so an absent binary can't crash the task; read `docker info`
-  # TEXT for OSType (not --format, whose double-brace placeholders are Tera here).
+  # WHERE — $DOCKER_BUILD (consumer sets it in mise.toml [env]); default `auto`
+  # so a repo that sets nothing just works:
+  #   auto / unset → build wherever capable (local AND remote)
+  #   ci    → remote only (CI=true) · local → local only · never → never
+  let policy = ($env.DOCKER_BUILD? | default "auto" | str downcase)
+  let in_ci = ((($env.CI? | default "") == "true") or (($env.GITHUB_ACTIONS? | default "") == "true"))
+  if not (match $policy { "never" => false, "ci" => $in_ci, "local" => (not $in_ci), _ => true }) {
+    print $"· DOCKER_BUILD=($policy), in-CI=($in_ci) — build skipped by policy"
+    return
+  }
+
+  # CAN it — a linux image needs a linux-capable daemon, else SKIP (exit 0) so ci
+  # stays green: no binary (macOS runner) → skip; Windows-containers daemon → skip;
+  # ubuntu runner / local Docker Desktop (OSType=linux) → build. `which` first so
+  # an absent binary can't crash; read `docker info` TEXT (not --format — its
+  # double-brace placeholders are Tera in a mise task body).
   if (which docker | is-empty) {
     print $"· no docker daemon on ($nu.os-info.name) — build skipped, fine in CI"
     return

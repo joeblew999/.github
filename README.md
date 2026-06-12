@@ -53,25 +53,38 @@ nothing but run that same `mise run ci`. So **local is one cell of remote**:
 > identical task on the other OSes. **Always run it locally first** — pushing
 > untested is the only thing that breaks CI.
 
-**Make `ci` yours.** The shared `ci` runs the library's guards. Add a *local* `ci`
-that depends on your own tasks; mise **merges** them, so the guards *and* your work
-run — both locally and on the matrix:
+**The main lever: `[tasks.ci].depends`.** The shared `ci` runs the library's guards;
+add a *local* `ci` that `depends` on your own tasks and mise **merges** them, so
+`mise run ci` runs the guards *and* your work — locally and on the matrix. **That
+list IS your CI** — add a task to build/check it, remove it to stop:
 
 ```toml
 [tasks.ci]
-depends = ["test"]
-
-[tasks.test]
-run = '''
-#!/usr/bin/env nu
-print "your work here"
-'''
+depends = ["test", "rust:test", "docker:build"]   # ← edit this list = change CI
 ```
 
-**Pick your OSes.** The matrix is the reusable workflow's `os-matrix` (default all
-three). Override per repo at bootstrap — `mise run mise:repo:bootstrap --os-matrix
-'["ubuntu-latest"]'` — or edit the stub. A task can read its current OS with
-`$nu.os-info.name` → `macos` / `linux` / `windows`.
+Want a Rust toolchain compiled or a container built? Add `tool-rust` / `tool-docker`
+to `includes`, then `rust:test` / `docker:build` to `depends`. The
+[`.github-example`](https://github.com/joeblew999/.github-example) does exactly this
+— copy it.
+
+**Sensible defaults; tune later.** Out of the box (no flags, no env) it just works:
+`ci` runs every task wherever it can, on all three OSes. Two optional dials, each in
+the one place it has to live — the single `mise run ci` command never changes:
+
+| to control… | set… | where | re-bootstrap? |
+|---|---|---|---|
+| a heavy task **local vs remote** | `DOCKER_BUILD = "ci"` (`auto`·`ci`·`local`·`never`) | `mise.toml` `[env]` | no |
+| **which OSes** the matrix runs | `--os-matrix '["ubuntu-latest"]'` | the workflow | yes |
+
+`DOCKER_BUILD` lives in `mise.toml` because a task reads it at runtime; the OS list
+lives in the workflow because **GitHub picks the matrix before mise even starts.**
+That's a layer boundary, not two competing knobs.
+
+> **Verify vs publish.** `ci` *verifies* on every push (cheap, no secrets) — and the
+> matrix compiles a native binary per OS. *Publishing* downloadable binaries/images
+> is a **separate opt-in** — `mise run mise:repo:bootstrap --release` — which runs on
+> a git **tag**, not every push, with its own os-matrix.
 
 ---
 

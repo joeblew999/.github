@@ -41,12 +41,24 @@ orchestration reads `fnox`, sets `$env`, then `mise run`s the pure primitive
 file's `# role:` header (`mise run docs:gen`; CI fails if stale) — so add a
 `# role:` line to any new task file.
 
-## CI runs the same task local AND remote
+## CI: one `mise run ci`, local AND remote — main lever is `[tasks.ci].depends`
 
-A repo's CI is one task — `mise run ci`. It runs on **your machine** (your OS,
-instant) and on the **GitHub matrix** (ubuntu+macos+windows) — identical. So run
-`mise run ci` **locally first**; green locally ⇒ green for that OS in CI. Extend
-it by defining a local `ci` that `depends` on your tasks (mise merges them).
+A repo's CI is one task — `mise run ci` — run identically on **your machine** and
+the **GitHub matrix** (ubuntu+macos+windows). Run it **locally first**; green
+locally ⇒ green for that OS in CI. The lever is a local `ci` that `depends` on your
+tasks (mise merges with the shared guards): that list IS the CI. Each task
+self-skips where it can't run; `rust:test` compiles a native binary per matrix OS.
+
+Two **optional** dials, each where it must live — the single command never changes:
+- **local vs remote** for a heavy task → `DOCKER_BUILD = "ci"` (`auto`·`ci`·`local`·
+  `never`) in `mise.toml` `[env]` — the task reads it at runtime (`$env.CI`). Default
+  `auto` = build wherever capable.
+- **which OSes** the matrix runs → `--os-matrix` at `mise:repo:bootstrap` (it lives
+  in the workflow because GitHub picks the matrix before mise starts).
+
+`ci` *verifies* every push; *publishing* binaries/images is a separate opt-in
+(`mise:repo:bootstrap --release`, on a git **tag**). Copy
+[`.github-example`](https://github.com/joeblew999/.github-example).
 
 ## Rust toolchain
 
