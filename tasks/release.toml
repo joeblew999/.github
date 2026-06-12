@@ -117,8 +117,24 @@ def main [tag?: string, ...assets: string] {
   # Create the release if it doesn't exist yet (idempotent — safe to re-run).
   let exists = ((do { ^gh release view $t --repo $repo } | complete | get exit_code) == 0)
   if not $exists {
-    let notes = (^git-cliff --tag $t --latest --strip all)
-    $notes | ^gh release create $t --repo $repo --title $t --notes-file -
+    let base = (^git-cliff --tag $t --latest --strip all)
+    # ── 📦 Install footer — surface the artifacts so a dev finds them on the
+    #    release page: binaries are the attached Assets; the docker image URL +
+    #    pull/run commands are added when this repo publishes one (CI_DOCKER_IMAGE).
+    let nl = (char newline)
+    mut foot = ["" "---" "" "### 📦 Install"]
+    if ($assets | is-not-empty) {
+      $foot = ($foot | append "" | append "**Binaries** — download for your OS from the **Assets** below.")
+    }
+    if (($env.CI_DOCKER_IMAGE? | default "" | str downcase) == "true") {
+      let slug  = ($repo | str downcase | split row "/" | each {|p| $p | str replace -r '^[._-]+' '' } | str join "/")
+      let image = $"ghcr.io/($slug)"
+      let pkg   = ($slug | split row "/" | last)
+      $foot = ($foot | append "" | append "**Docker image:**" | append "```sh"
+        | append $"docker pull ($image):($t)" | append $"docker run --rm ($image):($t)" | append "```"
+        | append $"Package: https://github.com/($repo)/pkgs/container/($pkg)")
+    }
+    ($base + $nl + ($foot | str join $nl)) | ^gh release create $t --repo $repo --title $t --notes-file -
     print $"✓ created release ($t) on ($repo)"
   } else {
     print $"• release ($t) already exists on ($repo) — attaching assets"
