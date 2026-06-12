@@ -68,18 +68,22 @@ to `includes`, then `rust:test` / `docker:build` to `depends`. The
 [`.github-example`](https://github.com/joeblew999/.github-example) does exactly this
 — copy it.
 
-**Sensible defaults; tune later.** Out of the box (no flags, no env) it just works:
-`ci` runs every task wherever it can, on all three OSes. Two optional dials, each in
-the one place it has to live — the single `mise run ci` command never changes:
+**Sensible defaults; tune in `mise.toml`.** Out of the box (no env) it just works:
+`ci` runs every task wherever it can, on all three OSes. **All tuning lives in
+`mise.toml`** — you never hand-edit the generated workflow, and **re-bootstrap always
+preserves your settings** (bootstrap reads `[env]`; it never writes `mise.toml`):
 
-| to control… | set… | where | re-bootstrap? |
-|---|---|---|---|
-| a heavy task **local vs remote** | `DOCKER_BUILD = "ci"` (`auto`·`ci`·`local`·`never`) | `mise.toml` `[env]` | no |
-| **which OSes** the matrix runs | `--os-matrix '["ubuntu-latest"]'` | the workflow | yes |
+| to control… | set in `mise.toml`… | applies |
+|---|---|---|
+| **what runs** (local + remote) | `[tasks.ci].depends` | immediately |
+| a task **local vs remote** | `[env]` `DOCKER_BUILD = "ci"` (`auto`·`ci`·`local`·`never`) | immediately |
+| **which OSes** the matrix runs | `[env]` `CI_OS_MATRIX = '[...]'` | after `mise run mise:repo:bootstrap` |
 
-`DOCKER_BUILD` lives in `mise.toml` because a task reads it at runtime; the OS list
-lives in the workflow because **GitHub picks the matrix before mise even starts.**
-That's a layer boundary, not two competing knobs.
+`CI_OS_MATRIX` (and `CI_TASK`, `CI_RELEASE`, …) needs a re-bootstrap only because
+GitHub reads the matrix from the workflow file *before* mise starts — so bootstrap
+**projects** your `[env]` value into the stub. You still only edit `mise.toml`;
+re-bootstrap regenerates the workflow *from it*, so your overrides survive. (Flags
+like `--os-matrix` still work for a one-off.)
 
 > **Verify vs publish.** `ci` *verifies* on every push (cheap, no secrets) — and the
 > matrix compiles a native binary per OS. *Publishing* downloadable binaries/images

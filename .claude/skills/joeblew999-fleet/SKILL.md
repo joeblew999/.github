@@ -49,12 +49,14 @@ locally ⇒ green for that OS in CI. The lever is a local `ci` that `depends` on
 tasks (mise merges with the shared guards): that list IS the CI. Each task
 self-skips where it can't run; `rust:test` compiles a native binary per matrix OS.
 
-Two **optional** dials, each where it must live — the single command never changes:
-- **local vs remote** for a heavy task → `DOCKER_BUILD = "ci"` (`auto`·`ci`·`local`·
-  `never`) in `mise.toml` `[env]` — the task reads it at runtime (`$env.CI`). Default
-  `auto` = build wherever capable.
-- **which OSes** the matrix runs → `--os-matrix` at `mise:repo:bootstrap` (it lives
-  in the workflow because GitHub picks the matrix before mise starts).
+**All tuning lives in `mise.toml`** — you never hand-edit the workflow, and
+**re-bootstrap preserves it** (bootstrap reads `[env]`, never writes `mise.toml`):
+- **local vs remote** for a heavy task → `[env]` `DOCKER_BUILD = "ci"` (`auto`·`ci`·
+  `local`·`never`); the task reads `$env.CI` at runtime. Default `auto`.
+- **which OSes** the matrix runs → `[env]` `CI_OS_MATRIX = '[...]'` (also `CI_TASK`,
+  `CI_RELEASE`, `CI_BUILD_TASK`). Bootstrap **projects** these into the workflow, so
+  apply with a re-bootstrap (GitHub reads the matrix before mise starts). Flags
+  (`--os-matrix`, …) still work for a one-off.
 
 `ci` *verifies* every push; *publishing* binaries/images is a separate opt-in
 (`mise:repo:bootstrap --release`, on a git **tag**). Copy
