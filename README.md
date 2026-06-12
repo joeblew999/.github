@@ -28,11 +28,14 @@ mise run mise:repo:bootstrap     # write .github/workflows/ (the CI stub)
 mise run ci                      # verify
 ```
 
-> **Copy [`.github-example`](https://github.com/joeblew999/.github-example).** It's
-> the canonical consumer — every change to `.github` is validated **against it**
-> (locally *and* on the matrix) before release, so its `mise.toml` includes, the
-> bootstrapped workflow, and the local-`ci` extension are always current and
-> correct. When you're unsure how a repo should wire something up, look there first.
+> **Reference [`.github-example`](https://github.com/joeblew999/.github-example).**
+> It's the canonical consumer — every `.github` change is validated against it
+> (locally *and* on the matrix) before release, so its wiring is always current. But
+> it's the **full feature showcase** (Rust + docker + binary/image publishing), there
+> to keep every capability CI-tested — **not a starter template to copy wholesale.**
+> A real repo takes only the subset it needs: the bare minimum is two includes
+> (`mise.toml` + `ci.toml`) and `[tasks.ci].depends`. Add a `tool-*` include / `[env]`
+> knob only for a feature you actually want.
 
 ---
 
