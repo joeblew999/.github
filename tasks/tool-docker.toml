@@ -21,13 +21,13 @@
 # fnox keychain locally).
 
 ["docker:build"]
-description = "CI-safe build-ONLY verify (no push/login/secrets). $DOCKER_BUILD (auto|ci|local|never) controls local-vs-remote; default auto builds wherever a linux daemon exists, skips elsewhere so one `ci` stays green on every OS. Usage: mise run docker:build [--tag t] [--dockerfile Dockerfile] [--context .]"
+description = "CI-safe build-ONLY verify (no push/login/secrets). $DOCKER_BUILD (auto|ci|local|never) = local-vs-remote; $CI_DOCKERFILE / $CI_DOCKER_CONTEXT (default Dockerfile / .) = which Dockerfile. Builds wherever a linux daemon exists, else skips so one `ci` stays green on every OS."
 run = '''
 #!/usr/bin/env nu
 def main [
   --tag: string = "ci-build:latest",   # local image tag (not pushed)
-  --dockerfile: string = "Dockerfile",
-  --context: string = ".",
+  --dockerfile: string = "",           # default: $CI_DOCKERFILE or "Dockerfile"
+  --context: string = "",              # default: $CI_DOCKER_CONTEXT or "."
 ] {
   # WHERE — $DOCKER_BUILD (consumer sets it in mise.toml [env]); default `auto`
   # so a repo that sets nothing just works:
@@ -54,8 +54,12 @@ def main [
     print $"· no linux docker daemon on ($nu.os-info.name) — build skipped, fine in CI"
     return
   }
-  ^docker build -t $tag -f $dockerfile $context
-  print $"✓ docker build ok — ($tag)"
+  # WHICH Dockerfile — one knob ($CI_DOCKERFILE / $CI_DOCKER_CONTEXT) shared with
+  # docker:image, so build-verify and publish use the SAME file. Flag wins.
+  let df  = (if ($dockerfile | is-not-empty) { $dockerfile } else { $env.CI_DOCKERFILE?    | default "Dockerfile" })
+  let ctx = (if ($context    | is-not-empty) { $context }    else { $env.CI_DOCKER_CONTEXT? | default "." })
+  ^docker build -t $tag -f $df $ctx
+  print $"✓ docker build ok — ($tag) [($df)]"
 }
 '''
 
@@ -76,17 +80,20 @@ def main [] {
 '''
 
 ["docker:image"]
-description = "Build + push a multi-arch image to ghcr and verify the manifest. Usage: mise run docker:image -- vX.Y.Z [--image ghcr.io/o/r] [--dockerfile .docker/Dockerfile] [--context .docker] [--platforms linux/amd64,linux/arm64]"
+description = "Build + push an image to ghcr and verify the manifest. Image derived from origin (sanitized). $CI_DOCKERFILE / $CI_DOCKER_CONTEXT / $CI_DOCKER_PLATFORMS (default Dockerfile / . / linux/amd64) — shared with docker:build. Usage: mise run docker:image -- vX.Y.Z [--image] [--dockerfile] [--context] [--platforms]"
 depends = ["docker:login"]
 run = '''
 #!/usr/bin/env nu
 def main [
   tag: string,
-  --image: string = "",                              # default ghcr.io/<owner>/<repo> from origin
-  --dockerfile: string = ".docker/Dockerfile",
-  --context: string = ".docker",
-  --platforms: string = "linux/amd64,linux/arm64",
+  --image: string = "",        # default ghcr.io/<owner>/<repo> from origin (sanitized)
+  --dockerfile: string = "",   # default: $CI_DOCKERFILE or "Dockerfile"
+  --context: string = "",      # default: $CI_DOCKER_CONTEXT or "."
+  --platforms: string = "",    # default: $CI_DOCKER_PLATFORMS or "linux/amd64" (multi-arch needs QEMU)
 ] {
+  let df    = (if ($dockerfile | is-not-empty) { $dockerfile } else { $env.CI_DOCKERFILE?      | default "Dockerfile" })
+  let ctx   = (if ($context    | is-not-empty) { $context }    else { $env.CI_DOCKER_CONTEXT?   | default "." })
+  let plats = (if ($platforms  | is-not-empty) { $platforms }  else { $env.CI_DOCKER_PLATFORMS? | default "linux/amd64" })
   let img = (if ($image | is-empty) {
     # GHCR refs must be lowercase, and a path component can't start with . / _ / -
     # (so a repo named `.github-example` → `github-example`). Sanitize the derived
@@ -98,14 +105,15 @@ def main [
   } else { $image })
   let ref = $"($img):($tag)"
 
-  # multi-arch needs the docker-container driver (default 'docker' driver can't).
+  # buildx with the docker-container driver (the default 'docker' driver can't
+  # --push a manifest). Multi-arch (arm64) additionally needs QEMU on the runner.
   let has = ((do { ^docker buildx inspect jb-multiarch } | complete | get exit_code) == 0)
   if not $has { ^docker buildx create --name jb-multiarch --driver docker-container | ignore }
   ^docker buildx use jb-multiarch
-  ^docker buildx build --platform $platforms --push -t $ref -f $dockerfile $context
+  ^docker buildx build --platform $plats --push -t $ref -f $df $ctx
 
   let got = (^docker manifest inspect $ref | from json | get manifests.platform.architecture | sort | uniq)
-  print $"✓ pushed ($ref) — arches: ($got | str join ', ')"
+  print $"✓ pushed ($ref) [($df)] — arches: ($got | str join ', ')"
 }
 '''
 

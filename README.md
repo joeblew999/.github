@@ -86,6 +86,7 @@ obvious default-if-unset:
 | **publish binaries on tag** | `[env] CI_RELEASE` | off | re-bootstrap |
 | **which OSes publish** | `[env] CI_RELEASE_OS_MATRIX` | ubuntu + macOS (no windows) | re-bootstrap |
 | **publish a runnable GHCR image** | `[env] CI_DOCKER_IMAGE` | off | re-bootstrap |
+| **which Dockerfile** (build + publish) | `[env] CI_DOCKERFILE · CI_DOCKER_CONTEXT · CI_DOCKER_PLATFORMS` | `Dockerfile` · `.` · `linux/amd64` | immediately |
 | build-task for publish | `[env] CI_BUILD_TASK` | `dist` | re-bootstrap |
 
 The `CI_*` ones need a re-bootstrap because GitHub reads the matrix from the workflow

@@ -53,18 +53,6 @@ on:
         description: 'ALSO build + push a docker image to GHCR on this tag (caller must grant packages:write)'
         type: boolean
         default: false
-      dockerfile:
-        description: 'Dockerfile path for the image job'
-        type: string
-        default: 'Dockerfile'
-      docker-context:
-        description: 'Build context dir for the image job'
-        type: string
-        default: '.'
-      docker-platforms:
-        description: 'Image platforms (single-arch builds native, no QEMU)'
-        type: string
-        default: 'linux/amd64'
 
 jobs:
   build:
@@ -140,6 +128,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Enables multi-arch (arm64) builds when the repo sets CI_DOCKER_PLATFORMS;
+      # harmless for the single-arch default.
+      - uses: docker/setup-qemu-action@v3
+
       - uses: jdx/mise-action@v4
         with:
           version: ${{ inputs.mise-version }}
@@ -149,7 +141,9 @@ jobs:
 
       - run: mise run mise:global:bootstrap
 
-      - run: mise run docker:image -- "${{ github.ref_name }}" --dockerfile "${{ inputs.dockerfile }}" --context "${{ inputs.docker-context }}" --platforms "${{ inputs.docker-platforms }}"
+      # docker:image reads $CI_DOCKERFILE / $CI_DOCKER_CONTEXT / $CI_DOCKER_PLATFORMS
+      # from the repo's mise.toml [env] (default Dockerfile / . / linux/amd64).
+      - run: mise run docker:image -- "${{ github.ref_name }}"
         env:
           GHCR_TOKEN: ${{ github.token }}
           GHCR_USER: ${{ github.actor }}
