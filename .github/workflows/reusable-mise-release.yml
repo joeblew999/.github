@@ -49,6 +49,22 @@ on:
         description: 'mise binary version to install'
         type: string
         default: '2026.5.1'
+      docker-image:
+        description: 'ALSO build + push a docker image to GHCR on this tag (caller must grant packages:write)'
+        type: boolean
+        default: false
+      dockerfile:
+        description: 'Dockerfile path for the image job'
+        type: string
+        default: 'Dockerfile'
+      docker-context:
+        description: 'Build context dir for the image job'
+        type: string
+        default: '.'
+      docker-platforms:
+        description: 'Image platforms (single-arch builds native, no QEMU)'
+        type: string
+        default: 'linux/amd64'
 
 jobs:
   build:
@@ -110,3 +126,30 @@ jobs:
       - run: mise run release:publish -- "${{ github.ref_name }}" ${{ inputs.pack-dir }}/*.tar.gz
         env:
           GH_TOKEN: ${{ github.token }}
+
+  # Optional: build + push a RUNNABLE docker image to GHCR on the tag. Off unless
+  # the caller sets `docker-image: true` (and grants `packages: write`). Image name
+  # is derived from origin → ghcr.io/<owner>/<repo>:<tag>. Auth = default GITHUB_TOKEN.
+  image:
+    name: image (ghcr)
+    if: ${{ inputs.docker-image }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: jdx/mise-action@v4
+        with:
+          version: ${{ inputs.mise-version }}
+          install: true
+          cache: true
+          cache_key: mise-release-image-${{ hashFiles('mise.toml') }}
+
+      - run: mise run mise:global:bootstrap
+
+      - run: mise run docker:image -- "${{ github.ref_name }}" --dockerfile "${{ inputs.dockerfile }}" --context "${{ inputs.docker-context }}" --platforms "${{ inputs.docker-platforms }}"
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USER: ${{ github.actor }}

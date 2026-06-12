@@ -85,6 +85,7 @@ obvious default-if-unset:
 | CI task · sccache | `[env] CI_TASK · CI_SCCACHE` | `ci` · `true` | re-bootstrap |
 | **publish binaries on tag** | `[env] CI_RELEASE` | off | re-bootstrap |
 | **which OSes publish** | `[env] CI_RELEASE_OS_MATRIX` | ubuntu + macOS (no windows) | re-bootstrap |
+| **publish a runnable GHCR image** | `[env] CI_DOCKER_IMAGE` | off | re-bootstrap |
 | build-task for publish | `[env] CI_BUILD_TASK` | `dist` | re-bootstrap |
 
 The `CI_*` ones need a re-bootstrap because GitHub reads the matrix from the workflow
