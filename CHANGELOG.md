@@ -1,8 +1,21 @@
+## [0.52.0] - 2026-06-12
+
+### 🚀 Features
+
+- *(release)* CI_DOCKER_IMAGE — on tag, also build+push a runnable GHCR image (reusable-mise-release image job, packages:write baked into the stub). README documents it.
+
+### 🐛 Bug Fixes
+
+- *(docker)* Sanitize derived GHCR image name (lowercase + strip leading ._- so a repo like .github-example → github-example; was 'invalid reference format')
 ## [0.51.0] - 2026-06-12
 
 ### 🐛 Bug Fixes
 
 - *(release)* Release:github idempotent + self-recovering (tag-without-Release re-runs to completion; delegates create/upload to release:publish). dogfood: run docker:build to catch Tera-render errors ci:check-nu misses
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.51.0
 ## [0.50.0] - 2026-06-12
 
 ### 🚀 Features
