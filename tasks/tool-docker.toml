@@ -5,6 +5,8 @@
 #                   Skips cleanly where docker isn't usable (macOS/Windows CI
 #                   runners), so the SAME `mise run ci` stays green on every OS.
 # docker:login    — auth to ghcr (generic).
+# docker:pull     — consumer-side: login from $GHCR_TOKEN + pull (optionally run) a
+#                   PRIVATE image; CR/LF-trimmed for uncloud-injected env.
 # docker:image    — build + push a MULTI-ARCH image to ghcr and verify the
 #                   manifest. Parameterized; image defaults to
 #                   ghcr.io/<owner>/<repo> from origin. The repo preps its build
@@ -69,13 +71,50 @@ run = '''
 #!/usr/bin/env nu
 def main [] {
   # token/user from $env (CI secrets, or the dev's fnox-exec/env). docker only drives docker.
-  let tok = ($env.GHCR_TOKEN? | default "")
-  let user = ($env.GHCR_USER? | default "")
+  # `str trim` — uncloud appends \n to injected env values, which breaks `docker login`.
+  let tok = ($env.GHCR_TOKEN? | default "" | str trim)
+  let user = ($env.GHCR_USER? | default "" | str trim)
   if ($tok | is-empty) or ($user | is-empty) {
     print --stderr "✗ set GHCR_TOKEN + GHCR_USER in env (e.g. via fnox exec)"
     exit 1
   }
   $tok | ^docker login ghcr.io -u $user --password-stdin
+}
+'''
+
+# ── docker:pull ──────────────────────────────────────────────────────────────
+# Consumer-side: pull (and optionally RUN) a PRIVATE GHCR image with one command —
+# logs in from $GHCR_TOKEN/$GHCR_USER (fnox locally; injected secret on a server /
+# vm-uncloud) then pulls. Token is CR/LF-trimmed so uncloud's appended \n can't
+# break login. A read:packages token can pull any of the owner's private images.
+["docker:pull"]
+description = "Pull (and optionally run) a private GHCR image: login from $GHCR_TOKEN/$GHCR_USER (CR/LF-trimmed for uncloud) + docker pull. Image derived from origin (sanitized) or --image. Usage: mise run docker:pull -- vX.Y.Z [--image ghcr.io/o/r] [--run]"
+run = '''
+#!/usr/bin/env nu
+def main [
+  tag: string,
+  --image: string = "",   # default ghcr.io/<owner>/<repo> from origin (sanitized)
+  --run,                  # also `docker run --rm` it after pulling
+] {
+  # GHCR auth from env (fnox locally; injected on a server). Trim CR/LF — uncloud
+  # appends \n to injected values, which otherwise breaks `docker login`.
+  let tok  = ($env.GHCR_TOKEN? | default "" | str trim)
+  let user = ($env.GHCR_USER?  | default "" | str trim)
+  if ($tok | is-empty) or ($user | is-empty) {
+    print --stderr "✗ set GHCR_TOKEN + GHCR_USER (e.g. `fnox exec -- mise run docker:pull -- vX.Y.Z`) to pull a private image"
+    exit 1
+  }
+  let img = (if ($image | is-not-empty) { $image } else {
+    let slug = (^git remote get-url origin | str trim
+      | str replace -r '.*github\.com[:/]' '' | str replace -r '\.git$' ''
+      | str downcase | split row "/" | each {|p| $p | str replace -r '^[._-]+' '' } | str join "/")
+    $"ghcr.io/($slug)"
+  })
+  let ref = $"($img):($tag)"
+  $tok | ^docker login ghcr.io -u $user --password-stdin
+  ^docker pull $ref
+  print $"✓ pulled ($ref)"
+  if $run { ^docker run --rm $ref }
 }
 '''
 
