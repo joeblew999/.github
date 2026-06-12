@@ -1,8 +1,17 @@
+## [0.54.0] - 2026-06-12
+
+### 🚀 Features
+
+- *(release)* Release:publish adds a 📦 Install footer to notes — binaries (assets) + docker pull/run URL + GHCR package link, so devs find the artifacts on the release page
 ## [0.53.0] - 2026-06-12
 
 ### 🚀 Features
 
 - *(docker)* Unify Dockerfile config — $CI_DOCKERFILE/$CI_DOCKER_CONTEXT/$CI_DOCKER_PLATFORMS (default Dockerfile/./linux-amd64) shared by docker:build + docker:image; release image job reads env + adds QEMU for multi-arch. README documents it.
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.53.0
 ## [0.52.0] - 2026-06-12
 
 ### 🚀 Features
