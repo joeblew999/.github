@@ -69,7 +69,15 @@ def main [] {
   # 3. the README's task tables are GENERATED from tasks/ — fail if they drifted.
   ^mise run "docs:check"
 
-  print $"✓ dogfood — ($nu.os-info.name): composition + release:pack + docs-in-sync"
+  # 4. RUN docker:build (parse-check can't render Tera; only `mise run` does — this
+  #    catches the double-brace-in-a-task-body class of bug). It builds on the ubuntu
+  #    cell and capability-skips on macOS/Windows — either way the body is executed.
+  let df = (mktemp -d)
+  "FROM alpine:3.20\nCMD [\"true\"]\n" | save -f ($df | path join "Dockerfile")
+  ^mise run docker:build -- --dockerfile ($df | path join "Dockerfile") --context $df
+  rm -rf $df
+
+  print $"✓ dogfood — ($nu.os-info.name): composition + release:pack + docs-in-sync + docker:build"
 }
 '''
 

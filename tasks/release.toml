@@ -50,39 +50,49 @@ def main [
 #   mise run release:github -- vX.Y.Z                 # changelog + tag + release
 #   mise run release:github -- vX.Y.Z dist/*.tar.gz   # ...and upload binaries
 ["release:github"]
-description = "Release driver: git-cliff changelog + tag + push + gh release create + verified asset upload. Usage: mise run release:github -- vX.Y.Z [assets...]"
+description = "Release driver: git-cliff changelog + tag + push, then publish via release:publish. IDEMPOTENT + self-recovering — if a prior run left a tag without a Release, re-running completes it. Usage: mise run release:github -- vX.Y.Z [assets...]"
 run = '''
 #!/usr/bin/env nu
 def main [tag?: string, ...assets: string] {
   let t = ($tag | default "")
   # vX.Y.Z, with an optional fork-distinct suffix (e.g. v1.0.0-jb.1).
   if not ($t =~ '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$') { print -e "✗ usage: mise run release:github -- vX.Y.Z[-suffix] [assets...]"; exit 1 }
-  let branch = (^git rev-parse --abbrev-ref HEAD | str trim)
-  if ($branch == "HEAD") { print -e "✗ detached HEAD — checkout a branch first"; exit 1 }
-  if (^git status --porcelain | str trim | is-not-empty) { print -e "✗ working tree dirty — commit your work first (build artifacts must be gitignored)"; exit 1 }
-  if (^git tag -l $t | str trim | is-not-empty) { print -e $"✗ tag ($t) already exists"; exit 1 }
 
   # Target OUR repo explicitly so a fork releases to itself, not its parent.
   let repo = (^git remote get-url origin | str trim | str replace -r '.*github\.com[:/]' '' | str replace -r '\.git$' '')
 
+  let tag_local  = (^git tag -l $t | str trim | is-not-empty)
+  let tag_remote = (^git ls-remote --tags origin $t | str trim | is-not-empty)
+  let tag_exists = ($tag_local or $tag_remote)
+  let rel_exists = ((do { ^gh release view $t --repo $repo } | complete | get exit_code) == 0)
+
+  if $rel_exists { print -e $"✗ ($t) is already released — bump the version"; exit 1 }
+
+  if $tag_exists {
+    # RECOVERY: tag exists but no Release (a prior run died after `git push --tags`,
+    # before/at `gh release create`). Don't re-commit/re-tag — just finish publishing.
+    print $"• tag ($t) exists without a Release — completing publish \(recovery)"
+    if $tag_local and (not $tag_remote) { ^git push origin $t }
+    ^mise run release:publish -- $t ...$assets
+    print $"✓ recovered + released ($t)"
+    return
+  }
+
+  # FRESH release — needs a branch + clean tree so the changelog commit is the only change.
+  let branch = (^git rev-parse --abbrev-ref HEAD | str trim)
+  if ($branch == "HEAD") { print -e "✗ detached HEAD — checkout a branch first"; exit 1 }
+  if (^git status --porcelain | str trim | is-not-empty) { print -e "✗ working tree dirty — commit your work first (build artifacts must be gitignored)"; exit 1 }
+
   ^git-cliff --tag $t -o CHANGELOG.md
   ^git add CHANGELOG.md
   ^git commit -m $"chore\(release\): ($t)"
-
   ^git tag $t
   ^git push origin HEAD
   ^git push origin $t
 
-  let notes = (^git-cliff --tag $t --latest --strip all)
-  $notes | ^gh release create $t --repo $repo --title $t --notes-file -
-
-  if ($assets | is-not-empty) {
-    ^gh release upload $t ...$assets --repo $repo --clobber
-    let want = ($assets | length)
-    let got = (^gh release view $t --repo $repo --json assets | from json | get assets | length)
-    if ($got < $want) { print -e $"✗ asset upload incomplete: ($got)/($want) attached to ($t)"; exit 1 }
-    print $"✓ uploaded + verified ($got) asset\(s\) to ($repo)"
-  }
+  # Create the Release + upload assets via the idempotent publisher (retry-safe:
+  # if THIS step hiccups, just re-run `release:github` — it recovers via the path above).
+  ^mise run release:publish -- $t ...$assets
   print $"✓ released ($t): changelog + tag + GitHub release"
 }
 '''
