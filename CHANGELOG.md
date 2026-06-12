@@ -1,3 +1,8 @@
+## [0.50.0] - 2026-06-12
+
+### 🚀 Features
+
+- *(bootstrap)* Add CI_RELEASE_OS_MATRIX (which OSes publish binaries; flag --release-os-matrix); README documents all defaults incl release-OS (ubuntu+macos, no windows)
 ## [0.49.0] - 2026-06-12
 
 ### 🐛 Bug Fixes
@@ -7,6 +12,10 @@
 ### 📚 Documentation
 
 - *(README §2)* Add zero-config default + per-knob default-if-unset table — a dev gets the full data model + defaults from the README
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.49.0
 ## [0.48.0] - 2026-06-12
 
 ### 🚀 Features
