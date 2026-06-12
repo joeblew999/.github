@@ -130,6 +130,7 @@ def main [
   --sccache: string = ""     # override sccache: "true"/"false" (reusable default: true)
   --release                  # ALSO write mise-release.yml (tag-push binary release; opt-in)
   --build-task: string = ""  # with --release: the build task (reusable default: dist)
+  --ref: string = ""         # @ref for the reusable workflows (default: this repo's own ?ref=)
 ] {
   let root = ($env.MISE_PROJECT_ROOT? | default (pwd))
   let dir = ($root | path join ".github" "workflows")
@@ -145,6 +146,26 @@ def main [
   let eff_sccache = (if ($sccache   | is-not-empty) { $sccache }   else { $env.CI_SCCACHE?   | default "" })
   let eff_release = ($release or (($env.CI_RELEASE? | default "" | str downcase) == "true"))
   let eff_build   = (if ($build_task | is-not-empty) { $build_task } else { $env.CI_BUILD_TASK? | default "" })
+
+  # PIN the reusable workflows to the SAME ref this repo pins its task includes to —
+  # so a repo on ?ref=v0.48.0 gets `@v0.48.0` in its CI workflow, not a floating
+  # `@main`. Order: --ref > $CI_REF > the ?ref= parsed from mise.toml > "main"
+  # (the example pins ?ref=main, so it correctly stays @main).
+  let mt = ($root | path join "mise.toml")
+  let parsed_ref = (
+    if ($mt | path exists) {
+      (open --raw $mt | lines
+       | where ($it =~ 'joeblew999/\.github\.git//') | where ($it =~ '\?ref=')
+       | each {|l| $l | str replace --regex '.*\?ref=([^"]+).*' '${1}' }
+       | get 0? | default "")
+    } else { "" }
+  )
+  let eff_ref = (
+    if ($ref | is-not-empty) { $ref }
+    else if (($env.CI_REF? | default "") | is-not-empty) { ($env.CI_REF | str trim) }
+    else if ($parsed_ref | is-not-empty) { $parsed_ref }
+    else { "main" }
+  )
 
   # The stub OVERRIDES only what's set — by default emits no `with:` and inherits
   # the reusable workflow's defaults (task=ci, all 3 OSes, sccache).
@@ -164,7 +185,7 @@ def main [
     ""
     "jobs:"
     "  ci:"
-    "    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@main"
+    $"    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@($eff_ref)"
   ]
   if ($with | is-not-empty) { $ci_lines = ($ci_lines | append "    with:" | append $with) }
   let ci = (($ci_lines | append "") | str join "\n")
@@ -183,7 +204,7 @@ def main [
     ""
     "jobs:"
     "  upgrade:"
-    "    uses: joeblew999/.github/.github/workflows/reusable-mise-upgrade.yml@main"
+    $"    uses: joeblew999/.github/.github/workflows/reusable-mise-upgrade.yml@($eff_ref)"
     ""
   ] | str join "\n")
 
@@ -212,7 +233,7 @@ def main [
       "    # GITHUB_TOKEN; without this the publish job startup_failures."
       "    permissions:"
       "      contents: write"
-      "    uses: joeblew999/.github/.github/workflows/reusable-mise-release.yml@main"
+      $"    uses: joeblew999/.github/.github/workflows/reusable-mise-release.yml@($eff_ref)"
     ]
     let rel = (if ($eff_build | is-not-empty) {
       $rel_base | append "    with:" | append $"      build-task: ($eff_build)"
@@ -220,7 +241,7 @@ def main [
     (($rel | append "") | str join "\n") | save --force ($dir | path join "mise-release.yml")
     $wrote = "mise.yml + mise-upgrade.yml + mise-release.yml"
   }
-  print $"✓ wrote ($dir)/ → ($wrote) → reusable workflows @main"
+  print $"✓ wrote ($dir)/ → ($wrote) → reusable workflows @($eff_ref)"
 }
 '''
 
