@@ -4,8 +4,10 @@ Shared **mise task library** + Claude plugin marketplace + GitHub org config for
 the fleet. Every capability is a **mise task**, shared **by reference** (`?ref=` /
 `@ref`, never copied), and **runs the same locally as in CI**.
 
-Agent guide: [AGENTS.md](./AGENTS.md) · history: [CHANGELOG.md](./CHANGELOG.md) ·
-example consumer: [.github-example](https://github.com/joeblew999/.github-example).
+Platform systems map: **[SYSTEMS.md](./SYSTEMS.md)** (auth → `iam`, deploy →
+`vm-uncloud`, …) · Agent guide: [AGENTS.md](./AGENTS.md) · history:
+[CHANGELOG.md](./CHANGELOG.md) · example consumer:
+[.github-example](https://github.com/joeblew999/.github-example).
 
 **New repo?** Start at §1 below. **Upgrading an existing repo?** → [MIGRATION.md](./MIGRATION.md).
 
