@@ -11,13 +11,14 @@ own repos (linked from the system's home README — not duplicated here).
 
 | System | Home repo | What it is |
 | --- | --- | --- |
-| **Auth** | **[`iam`](https://github.com/joeblew999/iam)** | Rauthy (OIDC IdP — AuthN) + Cedar (policy AuthZ) + Cloudflare email. Reused on **every** project. Start here to add auth to a project. |
+| **Auth** | **[`cf-connectrpc-middleware`](https://github.com/joeblew999/cf-connectrpc-middleware)** | Rauthy (OIDC IdP — AuthN) + Cedar (policy AuthZ) + Cloudflare email. The shared foundation: the `connectrpc-oidc` + `connectrpc-cedar` crates, the Kumo client kit, the examples, `mise run stack:local` to run it all locally, and `docs/NEW-PROJECT.md` to add auth to a project. |
 | **Deploy** | **[`vm-uncloud`](https://github.com/joeblew999/vm-uncloud)** | The single home for Hetzner deployments via uncloud — recipes (Rauthy, Moltis, WordPress, Windows VMs…), one cost ledger. |
 | **Tooling** | **[`.github`](https://github.com/joeblew999/.github)** (this repo) | Shared mise task library (by-reference, same locally + CI) + Claude plugin marketplace + org config. |
 
-Each home README links its components. For example, **`iam`** composes the Rauthy
-recipe (in `vm-uncloud`), the `connectrpc-oidc` + `connectrpc-cedar` crates (in
-`cf-connectrpc-middleware`), and the email handler (in `saasmail`).
+Each home README links its components. For example, **`cf-connectrpc-middleware`**
+holds the `connectrpc-oidc` + `connectrpc-cedar` crates + the client kit + the
+examples, and orchestrates the Rauthy recipe (in `vm-uncloud`) and the email
+handler (in `saasmail`) via `mise run stack:local` / `deploy:stack`.
 
 ---
 
