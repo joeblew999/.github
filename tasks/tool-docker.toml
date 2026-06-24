@@ -148,9 +148,9 @@ def main [
 
   # buildx with the docker-container driver (the default 'docker' driver can't
   # --push a manifest). Multi-arch (arm64) additionally needs QEMU on the runner.
-  let has = ((do { ^docker buildx inspect jb-multiarch } | complete | get exit_code) == 0)
-  if not $has { ^docker buildx create --name jb-multiarch --driver docker-container | ignore }
-  ^docker buildx use jb-multiarch
+  let has = ((do { ^docker buildx inspect multiarch } | complete | get exit_code) == 0)
+  if not $has { ^docker buildx create --name multiarch --driver docker-container | ignore }
+  ^docker buildx use multiarch
   ^docker buildx build --platform $plats --push -t $ref -f $df $ctx
 
   let got = (^docker manifest inspect $ref | from json | get manifests.platform.architecture | sort | uniq)
