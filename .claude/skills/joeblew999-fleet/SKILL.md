@@ -73,7 +73,31 @@ Owned by **rustup + `rust-toolchain.toml`, never mise** (mise exports
 mise run release:pack -- --dir <staging>      # if shipping binaries
 mise run release:github -- vX.Y.Z [archives]  # changelog + tag + push + release + upload
 ```
-Fork version scheme: `vX.Y.Z-jb.N`.
+
+### Fork version scheme: own version line (NO suffix)
+
+A fork releases on its **own clean semver line** — `vX.Y.Z`, no pre-release
+suffix (NOT `-jb.N`, NOT `-relay-url.N`). The fork's numbers are **independent**
+of upstream's; record the upstream base in the CHANGELOG (and an `UPSTREAM` file),
+e.g. *"based on upstream v0.20.0"*.
+
+Why no suffix: a `-suffix` is a semver PRE-RELEASE, which sorts BELOW the bare
+version (SemVer §11: `1.0.0-jb.1 < 1.0.0`). That made `latest` / `mise --bump` /
+unpinned `gh release download` pick a bare upstream tag over the newer fork build
+(it bit us: `mise latest joeblew999/http-nu` returned `0.17.0`, not the installed
+`0.16.0-relay-url.3`). A clean own-line version sorts correctly → `latest` works.
+
+Rules:
+- **One independent line per fork.** Bump it on every fork release; don't reset
+  to mirror upstream's number. (Old `-jb.N` tags are deprecated — supersede on
+  the next release; see each fork's CHANGELOG for the cutover.)
+- **Never publish a bare upstream-mirror tag** in a fork repo (e.g. tagging a
+  plain `v0.17.0` straight from a rebase). Only tag the fork's own line — a
+  stray mirror tag outranks/clashes with it.
+- **Docker-image forks** (corrosion) follow the same line; image tags are pinned
+  by exact string.
+- Consumers still **pin** an explicit version for reproducibility (now `latest`
+  is at least correct as a fallback).
 
 ## Always RUN tasks, don't just parse
 

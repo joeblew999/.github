@@ -55,8 +55,11 @@ run = '''
 #!/usr/bin/env nu
 def main [tag?: string, ...assets: string] {
   let t = ($tag | default "")
-  # vX.Y.Z, with an optional fork-distinct suffix (e.g. v1.0.0-jb.1).
-  if not ($t =~ '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$') { print -e "✗ usage: mise run release:github -- vX.Y.Z[-suffix] [assets...]"; exit 1 }
+  # vX.Y.Z — forks release on their OWN clean version line, NO pre-release suffix
+  # (a `-suffix` sorts BELOW the bare version and breaks `latest`; see the fleet
+  # skill's "Fork version scheme"). The regex still tolerates a suffix for the odd
+  # genuine pre-release, but fork builds must be clean `vX.Y.Z`.
+  if not ($t =~ '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$') { print -e "✗ usage: mise run release:github -- vX.Y.Z [assets...]"; exit 1 }
 
   # Target OUR repo explicitly so a fork releases to itself, not its parent.
   let repo = (^git remote get-url origin | str trim | str replace -r '.*github\.com[:/]' '' | str replace -r '\.git$' '')
