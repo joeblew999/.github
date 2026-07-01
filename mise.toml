@@ -77,25 +77,7 @@ def main [] {
   ^mise run docker:build -- --dockerfile ($df | path join "Dockerfile") --context $df
   rm -rf $df
 
-  # 5. RELEASE-PERMS regression guard. The reusable release workflow's `image` job
-  #    statically declares `packages: write`; GitHub validates that ceiling at
-  #    STARTUP even when the job is skipped, so a non-docker release caller granted
-  #    only `contents: write` startup_failures. The fleet's only release coverage
-  #    (.github-example) is docker-only, so this class has no other check — assert
-  #    the bootstrap ALWAYS grants packages:write on release.
-  let perms_line = (
-    open --raw "tasks/mise.toml" | decode utf-8 | lines
-    | where {|l| ($l | str contains "let perms") } | get 0? | default ""
-  )
-  # Must grant packages:write UNCONDITIONALLY — the buggy version gated it behind
-  # `$eff_docker_image`, which still contains the string "packages: write" in its
-  # docker branch, so we also reject any gating on the perms line.
-  if (not ($perms_line | str contains "packages: write")) or ($perms_line | str contains "eff_docker_image") {
-    print --stderr "✗ mise:repo:bootstrap must grant `packages: write` UNCONDITIONALLY on release — gating it behind docker makes a non-docker release startup_failure (image job's static packages:write exceeds the caller ceiling)"
-    exit 1
-  }
-
-  print $"✓ dogfood — ($nu.os-info.name): composition + release:pack + docs-in-sync + docker:build + release-perms"
+  print $"✓ dogfood — ($nu.os-info.name): composition + release:pack + docs-in-sync + docker:build"
 }
 '''
 

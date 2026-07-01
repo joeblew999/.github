@@ -14,7 +14,7 @@ name: Reusable Mise Release
 #     release:
 #       permissions:
 #         contents: write                # REQUIRED on the CALLER — see below.
-#         packages: write                # ALSO required — the image job forces it.
+#         packages: write                # ONLY when docker-image: true (image push).
 #       uses: joeblew999/.github/.github/workflows/reusable-mise-release.yml@vX.Y.Z
 #       with:
 #         build-task: dist                 # mise task that stages dist/<name>/<bin>
@@ -23,13 +23,12 @@ name: Reusable Mise Release
 # PERMISSIONS: the publish job creates a GitHub release, which needs a
 # `contents: write` token. A reusable workflow CANNOT elevate the caller's token —
 # it can only narrow it — so the publish job's own `permissions:` block (below) is
-# a CEILING, not a grant. The caller MUST grant BOTH `contents: write` AND
-# `packages: write`: the `image` job below statically declares `packages: write`,
-# and GitHub validates that ceiling at STARTUP even when the job is skipped
-# (`if: docker-image` false) — so a caller with only `contents: write` hits
-# `startup_failure` on a non-docker release. `mise:repo:bootstrap --release` bakes
-# both in. No PAT or secret is needed — the default `GITHUB_TOKEN` suffices once granted
-# it. (`mise run mise:repo:bootstrap --release` writes a stub with this baked in.)
+# a CEILING, not a grant. The caller MUST grant `contents: write`. For a docker
+# image push (`docker-image: true`) it ALSO grants `packages: write`; the `image`
+# job declares NO permissions of its own and inherits the caller's, so a non-docker
+# caller needs only `contents: write` and never startup_failures. No PAT or secret
+# is needed — the default `GITHUB_TOKEN` suffices. `mise:repo:bootstrap --release`
+# writes a stub with the right grant for each mode.
 #
 # The repo defines `build-task` (default `dist`) to build for the HOST arch into
 # the pack dir; `release:pack` + `release:publish` come from tasks/release.toml.
@@ -126,9 +125,12 @@ jobs:
     name: image (ghcr)
     if: ${{ inputs.docker-image }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    # NO permissions block on purpose. A reusable job that declares one is validated
+    # against the caller's grant at STARTUP even when skipped — so declaring
+    # `packages: write` here would make every NON-docker caller (which grants only
+    # contents:write) startup_failure. With no block, this job inherits the caller's
+    # token: a docker caller grants contents+packages:write (so the push works);
+    # a non-docker caller grants only contents:write and this job is skipped anyway.
     steps:
       - uses: actions/checkout@v5
 
