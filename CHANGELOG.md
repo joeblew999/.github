@@ -1,8 +1,14 @@
+## [0.64.0] - 2026-07-01
+
+### 💼 Other
+
+- Guard the non-docker release path (regression test for the packages:write bug)
 ## [0.63.0] - 2026-07-01
 
 ### ⚙️ Miscellaneous Tasks
 
 - *(reusable)* Clean-tree check is WARN not fail — don't break codegen repos
+- *(release)* V0.63.0
 ## [0.62.0] - 2026-07-01
 
 ### ⚙️ Miscellaneous Tasks
