@@ -1,3 +1,13 @@
+## [0.58.0] - 2026-07-01
+
+### 📚 Documentation
+
+- *(readme)* CI_SCCACHE knob now drives Swatinem/rust-cache
+- Consolidate all docs into a single README
+
+### ⚙️ Miscellaneous Tasks
+
+- *(reusable)* MISE_JOBS=1 — serialize task graph to fix cold-cache cargo lock contention
 ## [0.57.0] - 2026-07-01
 
 ### 💼 Other
@@ -13,6 +23,7 @@
 
 - De-jb naming — buildx builder jb-multiarch → multiarch
 - *(reusable)* Cache Rust builds via Swatinem/rust-cache
+- *(release)* V0.57.0
 ## [0.56.0] - 2026-06-12
 
 ### 🚀 Features
