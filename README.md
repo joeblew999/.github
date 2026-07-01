@@ -30,6 +30,13 @@ own repos, linked from that home, never duplicated here.
 Add a row when a new *shared system* gets a home repo. Product repos that merely
 consume the platform live on their own.
 
+> **[`.github-example`](https://github.com/joeblew999/.github-example) is the fleet's
+> one safety net.** It's the canonical consumer, pinned to `@main`, exercising the
+> full feature set (Rust + docker + binary/image publish). Any change to `.github`
+> **MUST be verified against it — green on all three OSes — before you tag a
+> release.** Its CI is the only thing that proves a change won't break the repos
+> consuming `.github`. Skipping this is how breakage ships (see §Developing).
+
 ---
 
 ## Quickstart — add it to a repo
