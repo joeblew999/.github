@@ -101,3 +101,17 @@ jobs:
       - run: mise run ${{ inputs.task }}
         env:
           MISE_JOBS: 1
+
+      # A CI task must not modify tracked files. One that rewrites a committed
+      # fixture / generated file races other tasks and hides drift (e.g. a task
+      # that regenerates a file a test reads via include_str!). Fail if the task
+      # left tracked changes behind — untracked / gitignored build output is fine.
+      # (bootstrap-check does this for .github/workflows/; this covers everything.)
+      - name: Verify the working tree is clean
+        shell: bash
+        run: |
+          if ! git diff --quiet; then
+            echo "::error::a CI task modified a tracked file — CI tasks must not mutate committed files (write to a temp path, or commit the up-to-date output)"
+            git --no-pager diff --stat
+            exit 1
+          fi
