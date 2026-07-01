@@ -1,3 +1,8 @@
+## [0.59.0] - 2026-07-01
+
+### ⚙️ Miscellaneous Tasks
+
+- *(reusable)* Rust-cache cache-on-failure=true
 ## [0.58.0] - 2026-07-01
 
 ### 📚 Documentation
@@ -8,6 +13,7 @@
 ### ⚙️ Miscellaneous Tasks
 
 - *(reusable)* MISE_JOBS=1 — serialize task graph to fix cold-cache cargo lock contention
+- *(release)* V0.58.0
 ## [0.57.0] - 2026-07-01
 
 ### 💼 Other
