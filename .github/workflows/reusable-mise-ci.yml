@@ -75,6 +75,12 @@ jobs:
           # clobber each other's target dir; os + rustc + Cargo.lock are keyed in
           # automatically by the action.
           key: ${{ inputs.task }}
+          # Save the compiled target/ even when the job FAILS. Without this a
+          # red (or first-time-flaky) run never reaches the save step, so its
+          # cache stays empty and every retry re-compiles cold — the exact trap
+          # that kept a cold windows runner cold for hours. With it, a failed
+          # run still leaves a warm cache for the next attempt.
+          cache-on-failure: "true"
 
       # Seed the runner's global toolset — the SAME mise task you run locally.
       # (Consumer must include tasks/mise.toml for mise:global:bootstrap.)
