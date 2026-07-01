@@ -1,8 +1,14 @@
+## [0.61.0] - 2026-07-01
+
+### 🐛 Bug Fixes
+
+- *(release)* Grant packages:write on ALL releases, not just docker
 ## [0.60.0] - 2026-07-01
 
 ### ⚙️ Miscellaneous Tasks
 
 - *(reusable)* Add timeout-minutes input (default 60)
+- *(release)* V0.60.0
 ## [0.59.0] - 2026-07-01
 
 ### ⚙️ Miscellaneous Tasks
