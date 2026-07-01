@@ -40,11 +40,16 @@ on:
         description: 'Deprecated/no-op — rust-cache auto-detects Cargo.lock. Kept for backward compat with callers that still pass it.'
         type: string
         default: 'Cargo.lock'
+      timeout-minutes:
+        description: 'Per-job timeout. Caps a hung task (a bad test can otherwise run to GitHub''s 6h default). Default 60 is generous enough for a legit cold windows compile; a timed-out run still saves its cache (cache-on-failure), so the retry is warmer. Lower it for fast repos.'
+        type: number
+        default: 60
 
 jobs:
   run:
     name: ${{ inputs.task }} (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
     strategy:
       fail-fast: false
       matrix:
