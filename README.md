@@ -87,7 +87,7 @@ obvious default-if-unset:
 | **what runs** | `[tasks.ci].depends` | the two guards only | immediately |
 | docker **local vs remote** | `[env] DOCKER_BUILD` | `auto` — wherever a linux daemon exists | immediately |
 | **which OSes CI runs** | `[env] CI_OS_MATRIX` | all 3 (ubuntu + macOS + windows) | re-bootstrap |
-| CI task · sccache | `[env] CI_TASK · CI_SCCACHE` | `ci` · `true` | re-bootstrap |
+| CI task · Rust build cache | `[env] CI_TASK · CI_SCCACHE` | `ci` · `true` (Swatinem/rust-cache: `~/.cargo` + `target/`; `CI_SCCACHE` name kept for compat) | re-bootstrap |
 | **publish binaries on tag** | `[env] CI_RELEASE` | off | re-bootstrap |
 | **which OSes publish** | `[env] CI_RELEASE_OS_MATRIX` | ubuntu + macOS (no windows) | re-bootstrap |
 | **publish a runnable GHCR image** | `[env] CI_DOCKER_IMAGE` | off | re-bootstrap |
