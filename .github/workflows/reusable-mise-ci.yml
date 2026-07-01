@@ -80,4 +80,13 @@ jobs:
       # (Consumer must include tasks/mise.toml for mise:global:bootstrap.)
       - run: mise run mise:global:bootstrap
 
+      # MISE_JOBS=1: run the task's `depends` graph serially. A `ci` task fans
+      # out several cargo invocations (build / clippy / test); on a COLD cache
+      # (e.g. a fresh windows runner) those parallel cargo processes fight the
+      # package-cache + build-directory locks and effectively deadlock for
+      # hours. Serial = only cargo's own internal parallelism, no
+      # cross-invocation lock contention. Warm runs hit rust-cache (no compile)
+      # so serialising costs ~0. CI-only — local `mise run` stays parallel.
       - run: mise run ${{ inputs.task }}
+        env:
+          MISE_JOBS: 1
