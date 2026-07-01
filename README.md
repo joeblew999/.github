@@ -83,7 +83,7 @@ The generated `.github/workflows/mise.yml` does nothing but run that same
 that breaks CI.
 
 **The lever is `[tasks.ci].depends`.** It lists what `mise run ci` runs. The shared
-library also runs its guards (`ci:check-global`, `ci:check-nu`, `ci:check-mise`); add
+library also runs its guards (`ci:check-global`, `ci:check-nu`); add
 your own tasks and they run alongside — locally and on the matrix. Add a task to check
 it, remove it to stop. Set nothing and you still get the guards on all three OSes,
 green out of the box; nothing compiles until you add it.
