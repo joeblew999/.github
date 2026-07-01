@@ -6,7 +6,7 @@ description: How to work in any joeblew999 fleet repo — the joeblew999/.github
 # joeblew999 fleet conventions
 
 Every repo shares tooling + agent conventions from **joeblew999/.github** (whose
-`AGENTS.md` is the full SSOT). Work *with* the flows below; never reinvent them.
+root `README.md` is the full SSOT). Work *with* the flows below; never reinvent them.
 
 ## Distribution is BY REFERENCE + versioned — never copy/stamp files
 
