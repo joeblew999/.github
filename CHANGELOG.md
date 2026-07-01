@@ -1,8 +1,17 @@
+## [0.65.0] - 2026-07-01
+
+### 🐛 Bug Fixes
+
+- *(release)* Image job inherits caller perms — remove packages:write coupling
 ## [0.64.0] - 2026-07-01
 
 ### 💼 Other
 
 - Guard the non-docker release path (regression test for the packages:write bug)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.64.0
 ## [0.63.0] - 2026-07-01
 
 ### ⚙️ Miscellaneous Tasks
