@@ -33,11 +33,11 @@ on:
         type: string
         default: '2026.5.1'
       sccache:
-        description: 'Cache ~/.cache/sccache between runs (only useful for Rust)'
+        description: 'Enable the Rust build cache (Swatinem/rust-cache: ~/.cargo + target/). Set false for non-Rust repos. (Name kept for backward compat.)'
         type: boolean
         default: true
       cargo-lock-path:
-        description: 'Path to the Cargo.lock used for cache key (when sccache=true)'
+        description: 'Deprecated/no-op — rust-cache auto-detects Cargo.lock. Kept for backward compat with callers that still pass it.'
         type: string
         default: 'Cargo.lock'
 
@@ -61,13 +61,20 @@ jobs:
           # prefix-match collisions. Custom key on (job, os, mise.toml hash).
           cache_key: mise-${{ inputs.task }}-${{ matrix.os }}-${{ hashFiles('mise.toml') }}
 
-      - name: Cache sccache
+      # Rust build cache: caches ~/.cargo/{registry,git} + target/ keyed on
+      # Cargo.lock + rustc + job. The old ~/.cache/sccache cache was a no-op —
+      # nothing ever wired RUSTC_WRAPPER=sccache, so the dir stayed empty and
+      # every run did a full cold compile. rust-cache needs no wrapper and
+      # caches the incremental target dir directly. Gated by the `sccache` input
+      # (kept as the name for backward compat = "enable the Rust build cache").
+      - name: Rust build cache
         if: ${{ inputs.sccache }}
-        uses: actions/cache@v4
+        uses: Swatinem/rust-cache@v2
         with:
-          path: ~/.cache/sccache
-          key: sccache-${{ matrix.os }}-${{ hashFiles(inputs.cargo-lock-path) }}
-          restore-keys: sccache-${{ matrix.os }}-
+          # Distinct cache per task so e.g. a lint-only job and a test job don't
+          # clobber each other's target dir; os + rustc + Cargo.lock are keyed in
+          # automatically by the action.
+          key: ${{ inputs.task }}
 
       # Seed the runner's global toolset — the SAME mise task you run locally.
       # (Consumer must include tasks/mise.toml for mise:global:bootstrap.)
