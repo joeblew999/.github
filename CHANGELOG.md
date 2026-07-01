@@ -1,8 +1,22 @@
+## [0.66.0] - 2026-07-01
+
+### 📚 Documentation
+
+- Rewrite README — cleaner, less redundant (389 -> 265 lines)
+- Drop ci:check-mise mention (task deleted)
+
+### ⚙️ Miscellaneous Tasks
+
+- Delete ci:check-mise — a warning with no working fix is noise
 ## [0.65.0] - 2026-07-01
 
 ### 🐛 Bug Fixes
 
 - *(release)* Image job inherits caller perms — remove packages:write coupling
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.65.0
 ## [0.64.0] - 2026-07-01
 
 ### 💼 Other
