@@ -1,8 +1,14 @@
+## [0.63.0] - 2026-07-01
+
+### ⚙️ Miscellaneous Tasks
+
+- *(reusable)* Clean-tree check is WARN not fail — don't break codegen repos
 ## [0.62.0] - 2026-07-01
 
 ### ⚙️ Miscellaneous Tasks
 
 - Two guards against local-green != CI-green (recs B + C)
+- *(release)* V0.62.0
 ## [0.61.0] - 2026-07-01
 
 ### 🐛 Bug Fixes
