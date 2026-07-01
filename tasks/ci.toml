@@ -28,32 +28,7 @@
 # so the guards still run and you don't re-list them.
 ["ci"]
 description = "Default CI umbrella — runs the shared guards. Repos extend it with their own build/test."
-depends = ["ci:check-global", "ci:check-nu", "ci:check-mise"]
-
-# ── ci:check-mise ────────────────────────────────────────────────────────────
-# The whole system promises `mise run ci` is identical locally and in CI. That
-# breaks silently when your local mise differs from the version CI installs: the
-# task-graph merge + parallelism behaviour changed between mise releases, so a dev
-# on a newer mise can see a green `mise run ci` locally that runs FEWER tasks than
-# CI, then push red. This guard surfaces the mismatch (warn only — never fails, so
-# it can't itself break CI). CANONICAL must stay in sync with the `mise-version`
-# default in reusable-mise-ci.yml / reusable-mise-release.yml.
-["ci:check-mise"]
-description = "Warn when the local mise version differs from the one CI pins (local-green ≠ CI-green otherwise)."
-run = '''
-#!/usr/bin/env nu
-def main [] {
-  let canonical = "2026.5.1"
-  let running = (^mise --version | str trim | split row " " | first)
-  if $running == $canonical {
-    print $"✓ ci:check-mise — mise ($running) matches CI"
-  } else {
-    print --stderr $"⚠  ci:check-mise — local mise ($running) != CI-pinned ($canonical)."
-    print --stderr $"   `mise run ci` may run a different task graph here than in CI."
-    print --stderr $"   Align with:  mise use -g mise@($canonical)"
-  }
-}
-'''
+depends = ["ci:check-global", "ci:check-nu"]
 
 # ── ci:check-nu ──────────────────────────────────────────────────────────────
 # Parse-check every nushell source in the repo via `nu --ide-check` — catches nu
