@@ -1,3 +1,18 @@
+## [0.57.0] - 2026-07-01
+
+### 💼 Other
+
+- Auth home is cf-connectrpc-middleware now (iam folded in)
+
+### 📚 Documentation
+
+- Add platform SYSTEMS.md map (auth → iam, deploy → vm-uncloud)
+- *(release)* Fork version scheme → own clean version line (drop -jb.N suffix)
+
+### ⚙️ Miscellaneous Tasks
+
+- De-jb naming — buildx builder jb-multiarch → multiarch
+- *(reusable)* Cache Rust builds via Swatinem/rust-cache
 ## [0.56.0] - 2026-06-12
 
 ### 🚀 Features
@@ -7,6 +22,10 @@
 ### 📚 Documentation
 
 - Clarify .github-example is the full feature SHOWCASE (CI-tested proof), not a starter template — real repos take the subset they need
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.56.0
 ## [0.55.0] - 2026-06-12
 
 ### 🚀 Features
