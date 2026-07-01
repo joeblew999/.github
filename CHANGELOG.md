@@ -1,8 +1,14 @@
+## [0.60.0] - 2026-07-01
+
+### ⚙️ Miscellaneous Tasks
+
+- *(reusable)* Add timeout-minutes input (default 60)
 ## [0.59.0] - 2026-07-01
 
 ### ⚙️ Miscellaneous Tasks
 
 - *(reusable)* Rust-cache cache-on-failure=true
+- *(release)* V0.59.0
 ## [0.58.0] - 2026-07-01
 
 ### 📚 Documentation
