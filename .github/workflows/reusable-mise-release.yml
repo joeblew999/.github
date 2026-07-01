@@ -14,6 +14,7 @@ name: Reusable Mise Release
 #     release:
 #       permissions:
 #         contents: write                # REQUIRED on the CALLER — see below.
+#         packages: write                # ALSO required — the image job forces it.
 #       uses: joeblew999/.github/.github/workflows/reusable-mise-release.yml@vX.Y.Z
 #       with:
 #         build-task: dist                 # mise task that stages dist/<name>/<bin>
@@ -22,9 +23,12 @@ name: Reusable Mise Release
 # PERMISSIONS: the publish job creates a GitHub release, which needs a
 # `contents: write` token. A reusable workflow CANNOT elevate the caller's token —
 # it can only narrow it — so the publish job's own `permissions:` block (below) is
-# a CEILING, not a grant. The caller's `release:` job MUST set
-# `permissions: contents: write` itself, or publish hits `startup_failure`. No PAT
-# or secret is needed — the default `GITHUB_TOKEN` suffices once the caller grants
+# a CEILING, not a grant. The caller MUST grant BOTH `contents: write` AND
+# `packages: write`: the `image` job below statically declares `packages: write`,
+# and GitHub validates that ceiling at STARTUP even when the job is skipped
+# (`if: docker-image` false) — so a caller with only `contents: write` hits
+# `startup_failure` on a non-docker release. `mise:repo:bootstrap --release` bakes
+# both in. No PAT or secret is needed — the default `GITHUB_TOKEN` suffices once granted
 # it. (`mise run mise:repo:bootstrap --release` writes a stub with this baked in.)
 #
 # The repo defines `build-task` (default `dist`) to build for the HOST arch into
