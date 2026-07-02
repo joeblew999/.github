@@ -1,0 +1,50 @@
+name: mise setup
+description: >
+  Single owner of runner setup for every joeblew999 reusable workflow: install
+  mise (with its tool cache), optionally the Rust build cache, then seed the
+  global toolset. The three reusable workflows (ci / release / upgrade) all call
+  THIS instead of hand-rolling the same steps -- so caching is defined once and
+  cannot drift between them (it did: rust-cache used to live only in ci).
+  Assumes the repo is already checked out.
+
+inputs:
+  mise-version:
+    description: 'mise binary version to install'
+    default: '2026.5.1'
+  install:
+    description: 'Run `mise install` for the consumer''s tools. Set false for jobs that only need mise itself (e.g. the upgrade PR job).'
+    default: 'true'
+  cache-key:
+    description: 'jdx/mise-action cache_key. Workaround for mise-action#382 (prefix-match collisions) -- pass a key unique to (job, os, mise.toml hash).'
+    required: true
+  rust-cache:
+    description: 'Enable the Rust build cache (Swatinem/rust-cache: ~/.cargo + target/). Set false for non-Rust jobs.'
+    default: 'false'
+  rust-cache-key:
+    description: 'Swatinem/rust-cache `key` -- distinct per task so e.g. a lint job and a release build don''t clobber each other''s target/. os + rustc + Cargo.lock are keyed automatically.'
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - uses: jdx/mise-action@v4
+      with:
+        version: ${{ inputs.mise-version }}
+        install: ${{ inputs.install }}
+        cache: true
+        cache_key: ${{ inputs.cache-key }}
+
+    # Rust build cache: caches ~/.cargo/{registry,git} + target/ keyed on
+    # Cargo.lock + rustc + rust-cache-key. cache-on-failure saves the compiled
+    # target/ even on a red run, so the next attempt is warm (a cold windows
+    # runner otherwise recompiles from scratch every retry).
+    - if: ${{ inputs.rust-cache == 'true' }}
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ inputs.rust-cache-key }}
+        cache-on-failure: "true"
+
+    # Seed the runner's global toolset -- the SAME mise task run locally.
+    # (Consumer must include tasks/mise.toml for mise:global:bootstrap.)
+    - shell: bash
+      run: mise run mise:global:bootstrap

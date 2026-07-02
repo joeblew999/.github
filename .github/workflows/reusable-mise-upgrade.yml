@@ -37,16 +37,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: jdx/mise-action@v4
+      # Shared setup. install: false = just mise + the global toolset (nu, gh,
+      # git-cliff) that the NUSHELL tasks mise:upgrade / ci:audit-lib-refs need
+      # (they exit 127 without nu); no consumer tools, no Rust build. bootstrap
+      # runs inside the action.
+      - uses: joeblew999/.github/.github/actions/mise-setup@main
         with:
-          version: ${{ inputs.mise-version }}
-          install: false   # we don't need the consumer's tools, just mise itself
-
-      # mise:upgrade (and ci:audit-lib-refs) are NUSHELL tasks — install nu +
-      # the global toolset first, or they exit 127 (nu not found). Plain
-      # `mise use -g`, so it runs before nu exists.
-      - name: mise run mise:global:bootstrap
-        run: mise run mise:global:bootstrap
+          install: false
+          cache-key: mise-upgrade-${{ hashFiles('mise.toml') }}
 
       - name: mise run mise:upgrade
         run: mise run mise:upgrade

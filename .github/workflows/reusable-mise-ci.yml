@@ -57,39 +57,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: jdx/mise-action@v4
+      # Shared setup (mise + tool cache + rust build cache + global bootstrap).
+      # Owned by ONE composite action so ci/release/upgrade can't drift on caching.
+      - uses: joeblew999/.github/.github/actions/mise-setup@main
         with:
-          version: ${{ inputs.mise-version }}
-          install: true
-          cache: true
-          # Workaround for jdx/mise-action#382 — default cache key has
-          # prefix-match collisions. Custom key on (job, os, mise.toml hash).
-          cache_key: mise-${{ inputs.task }}-${{ matrix.os }}-${{ hashFiles('mise.toml') }}
-
-      # Rust build cache: caches ~/.cargo/{registry,git} + target/ keyed on
-      # Cargo.lock + rustc + job. The old ~/.cache/sccache cache was a no-op —
-      # nothing ever wired RUSTC_WRAPPER=sccache, so the dir stayed empty and
-      # every run did a full cold compile. rust-cache needs no wrapper and
-      # caches the incremental target dir directly. Gated by the `sccache` input
-      # (kept as the name for backward compat = "enable the Rust build cache").
-      - name: Rust build cache
-        if: ${{ inputs.sccache }}
-        uses: Swatinem/rust-cache@v2
-        with:
-          # Distinct cache per task so e.g. a lint-only job and a test job don't
-          # clobber each other's target dir; os + rustc + Cargo.lock are keyed in
-          # automatically by the action.
-          key: ${{ inputs.task }}
-          # Save the compiled target/ even when the job FAILS. Without this a
-          # red (or first-time-flaky) run never reaches the save step, so its
-          # cache stays empty and every retry re-compiles cold — the exact trap
-          # that kept a cold windows runner cold for hours. With it, a failed
-          # run still leaves a warm cache for the next attempt.
-          cache-on-failure: "true"
-
-      # Seed the runner's global toolset — the SAME mise task you run locally.
-      # (Consumer must include tasks/mise.toml for mise:global:bootstrap.)
-      - run: mise run mise:global:bootstrap
+          cache-key: mise-${{ inputs.task }}-${{ matrix.os }}-${{ hashFiles('mise.toml') }}
+          # `sccache` input kept for backward compat = "enable the Rust build cache".
+          rust-cache: ${{ inputs.sccache }}
+          rust-cache-key: ${{ inputs.task }}
 
       # MISE_JOBS=1: run the task's `depends` graph serially. A `ci` task fans
       # out several cargo invocations (build / clippy / test); on a COLD cache

@@ -68,15 +68,16 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: jdx/mise-action@v4
+      # Shared setup. rust-cache: true here is the whole point -- the release
+      # build compiles the binary, so it must reuse ~/.cargo + target/ (it used
+      # to compile cold every tag because this workflow hand-rolled setup and
+      # never got the rust-cache that ci had).
+      - uses: joeblew999/.github/.github/actions/mise-setup@main
         with:
-          version: ${{ inputs.mise-version }}
-          install: true
-          cache: true
-          cache_key: mise-release-${{ matrix.os }}-${{ hashFiles('mise.toml') }}
+          cache-key: mise-release-${{ matrix.os }}-${{ hashFiles('mise.toml') }}
+          rust-cache: true
+          rust-cache-key: release
 
-      # Same global toolset + build task you run locally.
-      - run: mise run mise:global:bootstrap
       - run: mise run ${{ inputs.build-task }}
       - run: mise run release:pack -- --dir ${{ inputs.pack-dir }}
 
@@ -97,14 +98,11 @@ jobs:
         with:
           fetch-depth: 0   # git-cliff needs full history for release notes
 
-      - uses: jdx/mise-action@v4
+      # Shared setup. No rust-cache: this job only packs/publishes (git-cliff +
+      # gh from the global toolset), it doesn't compile.
+      - uses: joeblew999/.github/.github/actions/mise-setup@main
         with:
-          version: ${{ inputs.mise-version }}
-          install: true
-          cache: true
-          cache_key: mise-release-publish-${{ hashFiles('mise.toml') }}
-
-      - run: mise run mise:global:bootstrap
+          cache-key: mise-release-publish-${{ hashFiles('mise.toml') }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -138,14 +136,10 @@ jobs:
       # harmless for the single-arch default.
       - uses: docker/setup-qemu-action@v3
 
-      - uses: jdx/mise-action@v4
+      # Shared setup. No rust-cache: the build happens inside docker, not here.
+      - uses: joeblew999/.github/.github/actions/mise-setup@main
         with:
-          version: ${{ inputs.mise-version }}
-          install: true
-          cache: true
-          cache_key: mise-release-image-${{ hashFiles('mise.toml') }}
-
-      - run: mise run mise:global:bootstrap
+          cache-key: mise-release-image-${{ hashFiles('mise.toml') }}
 
       # docker:image reads $CI_DOCKERFILE / $CI_DOCKER_CONTEXT / $CI_DOCKER_PLATFORMS
       # from the repo's mise.toml [env] (default Dockerfile / . / linux/amd64).
