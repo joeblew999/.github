@@ -104,7 +104,7 @@ jobs:
         with:
           cache-key: mise-release-publish-${{ hashFiles('mise.toml') }}
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: ${{ inputs.pack-dir }}
           pattern: release-assets-*
