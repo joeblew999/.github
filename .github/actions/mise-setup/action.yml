@@ -45,6 +45,13 @@ runs:
         cache-on-failure: "true"
 
     # Seed the runner's global toolset -- the SAME mise task run locally.
-    # (Consumer must include tasks/mise.toml for mise:global:bootstrap.)
+    # Guard first: the reusable CI hard-requires tasks/mise.toml (it defines
+    # mise:global:bootstrap). Without it mise errors "no task found" -- cryptic for
+    # a repo adopting the reusable CI (this bit vm-uncloud). Fail with a fix instead.
     - shell: bash
-      run: mise run mise:global:bootstrap
+      run: |
+        if ! mise tasks 2>/dev/null | grep -q 'mise:global:bootstrap'; then
+          echo "::error title=Missing .github include::To run on the reusable CI this repo must include tasks/mise.toml (it provides mise:global:bootstrap). Add to [task_config].includes: \"git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref=<tag>\""
+          exit 1
+        fi
+        mise run mise:global:bootstrap
