@@ -36,14 +36,16 @@ on:
         description: 'Enable the Rust build cache (Swatinem/rust-cache: ~/.cargo + target/). Set false for non-Rust repos. (Name kept for backward compat.)'
         type: boolean
         default: true
-      cargo-lock-path:
-        description: 'Deprecated/no-op — rust-cache auto-detects Cargo.lock. Kept for backward compat with callers that still pass it.'
-        type: string
-        default: 'Cargo.lock'
       timeout-minutes:
         description: 'Per-job timeout. Caps a hung task (a bad test can otherwise run to GitHub''s 6h default). Default 60 is generous enough for a legit cold windows compile; a timed-out run still saves its cache (cache-on-failure), so the retry is warmer. Lower it for fast repos.'
         type: number
         default: 60
+
+# Silence the DEP0040 punycode deprecation warning that mise-action / rust-cache
+# emit from their bundled Node deps (not our code, harmless, upstream's to drop).
+# Workflow-level so it reaches post-steps too (rust-cache warns on cache-save).
+env:
+  NODE_OPTIONS: --no-deprecation
 
 jobs:
   run:

@@ -57,6 +57,11 @@ on:
         type: boolean
         default: false
 
+# Silence the DEP0040 punycode deprecation warning from mise-action / rust-cache
+# bundled Node deps (harmless, upstream's to drop). Workflow-level → post-steps too.
+env:
+  NODE_OPTIONS: --no-deprecation
+
 jobs:
   build:
     name: build (${{ matrix.os }})

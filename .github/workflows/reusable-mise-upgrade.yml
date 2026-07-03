@@ -30,6 +30,11 @@ on:
         type: string
         default: 'mise-upgrade'
 
+# Silence the DEP0040 punycode deprecation warning from mise-action's bundled Node
+# deps (harmless, upstream's to drop). Workflow-level → post-steps too.
+env:
+  NODE_OPTIONS: --no-deprecation
+
 jobs:
   upgrade:
     name: Upgrade pinned tools
