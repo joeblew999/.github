@@ -228,13 +228,17 @@ NodeWarden; CI reads GitHub Actions secrets and **never** runs fnox.
 Version pins protect consumers (an old `?ref=` is immutable), so **refactor deeply** —
 rename, merge, move, delete. Timidity is the bug; the pin is the safety net.
 
-**But the consumer *surface* is append-only.** Two things are hardcoded in every
-consumer and are NOT internal: the include **paths** (`tasks/<file>.toml`) and the
-**shared task names** they call (`ci`, `cf:token-check`, …). Renaming or deleting those
-is a migration cliff — the v0.40 `cf`→`tool-cf` / `prove`→`cfapp` / `env`-deletion split
-is *still* why old repos can't just bump. Rules: never rename an include path (add a new
-file, leave the old one); never delete a shared task consumers call without leaving a
-tombstone stub that errors "moved to X". Break internals freely; freeze the surface.
+**But the consumer *surface* is append-only.** Three things are hardcoded in every
+consumer and are NOT internal: the include **paths** (`tasks/<file>.toml`), the **shared
+task names** they call (`ci`, `cf:token-check`, …), and the **reusable-workflow inputs**
+their `.github/workflows/*` stubs pass (`task:`, `rust-cache:`, …). Renaming or deleting
+any of them is a migration cliff — the v0.40 `cf`→`tool-cf` / `prove`→`cfapp` split is
+*still* why old repos can't just bump, and removing the `sccache`/`cargo-lock-path` inputs
+in v0.67 `startup_failure`d an old stub the moment it bumped its `@ref`. Rules: never
+rename an include path (add a new file, leave the old one); never delete a shared task
+without a tombstone stub that errors "moved to X"; never remove a workflow input — keep it
+as a tolerated/deprecated no-op (a removed input hard-fails at *startup*, before any log).
+Break internals freely; freeze the surface.
 
 **Always in this order:**
 

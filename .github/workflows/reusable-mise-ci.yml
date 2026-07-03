@@ -40,6 +40,19 @@ on:
         description: 'Per-job timeout. Caps a hung task (a bad test can otherwise run to GitHub''s 6h default). Default 60 is generous enough for a legit cold windows compile; a timed-out run still saves its cache (cache-on-failure), so the retry is warmer. Lower it for fast repos.'
         type: number
         default: 60
+      # ── DEPRECATED, tolerated for old stubs (append-only-surface: inputs are surface) ──
+      # Workflow inputs are hardcoded in every bootstrapped stub, so removing one
+      # startup_fails any consumer still on an old stub the moment they bump the @ref
+      # (this bit jackdaw). Keep the retired inputs as tolerated no-ops so an @ref bump
+      # NEVER breaks — regenerate the stub (`mise run mise:repo:bootstrap`) to drop them.
+      sccache:
+        description: 'DEPRECATED — old name for rust-cache. AND-merged below (either can disable). Regenerate the stub to drop.'
+        type: boolean
+        default: true
+      cargo-lock-path:
+        description: 'DEPRECATED no-op — rust-cache auto-detects Cargo.lock. Kept so old stubs do not startup_fail.'
+        type: string
+        default: ''
 
 # Silence the DEP0040 punycode deprecation warning that mise-action / rust-cache
 # emit from their bundled Node deps (not our code, harmless, upstream's to drop).
@@ -64,7 +77,9 @@ jobs:
       - uses: joeblew999/.github/.github/actions/mise-setup@main
         with:
           cache-key: mise-${{ inputs.task }}-${{ matrix.os }}-${{ hashFiles('mise.toml') }}
-          rust-cache: ${{ inputs.rust-cache }}
+          # AND-merge the deprecated `sccache` alias: cache runs only if BOTH are true,
+          # so a stub setting EITHER `rust-cache: false` or `sccache: false` disables it.
+          rust-cache: ${{ inputs.rust-cache && inputs.sccache }}
           rust-cache-key: ${{ inputs.task }}
 
       # MISE_JOBS=1: run the task's `depends` graph serially. A `ci` task fans
