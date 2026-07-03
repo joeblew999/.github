@@ -1,8 +1,21 @@
+## [0.70.0] - 2026-07-03
+
+### 🚀 Features
+
+- Ci:doctor — audit a repo's conformance to .github
+
+### 🐛 Bug Fixes
+
+- Mise-setup guards for the required tasks/mise.toml include
 ## [0.69.0] - 2026-07-03
 
 ### 🚀 Features
 
 - Tool-gitleaks — secret scanning as a mise task (consolidates secrets-scanning.yml)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.69.0
 ## [0.68.1] - 2026-07-03
 
 ### 🐛 Bug Fixes
