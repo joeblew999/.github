@@ -10,18 +10,11 @@ green in CI for that OS.
 
 - **This file is the source of truth**, for humans and agents. `AGENTS.md` /
   `CLAUDE.md` just point here.
-- **Canonical consumer:** [.github-example](https://github.com/joeblew999/.github-example) —
-  every change here is validated against it before release.
+- **Canonical consumer & safety net:** [.github-example](https://github.com/joeblew999/.github-example)
+  pins `@main` and exercises the full feature set (Rust + docker + binary/image publish).
+  Every change here **must go green on its three-OS matrix before you tag a release** — it's
+  the only proof a change won't break consumers. (§ Developing this repo has the procedure.)
 - **History:** [CHANGELOG.md](./CHANGELOG.md) (git-cliff generated).
-
----
-
-> **[`.github-example`](https://github.com/joeblew999/.github-example) is the fleet's
-> one safety net.** It's the canonical consumer, pinned to `@main`, exercising the
-> full feature set (Rust + docker + binary/image publish). Any change to `.github`
-> **MUST be verified against it — green on all three OSes — before you tag a
-> release.** Its CI is the only thing that proves a change won't break the repos
-> consuming `.github`. Skipping this is how breakage ships (see §Developing).
 
 ---
 
@@ -112,59 +105,36 @@ for non-Rust repos).
 
 ## Docker
 
-Two separate, opt-in things. Add the `tool-docker` include for either:
+Two independent opt-ins; add the `tool-docker` include for either:
 
 ```toml
 includes = [ "git::…/tasks/tool-docker.toml?ref=<tag>", … ]
 ```
 
-**1. Build-check on every push** — verify your `Dockerfile` still builds. No push, no
-secrets. Add `docker:build` to your CI list:
+**Build-check on every push** — put `docker:build` in your `ci` `depends`. No push, no
+secrets. It builds where a linux daemon exists (the ubuntu runner, or your machine) and
+**skips** where none does (macOS/Windows), so `ci` stays green on every OS. Tune with
+`[env]`: `DOCKER_BUILD` (`auto`·`ci`·`local`·`never`), `CI_DOCKERFILE`, `CI_DOCKER_CONTEXT`
+(defaults `Dockerfile` / `.`).
 
-```toml
-[tasks.ci]
-depends = ["docker:build", …]
-```
-
-It builds wherever a linux daemon exists (the ubuntu runner, or your machine if Docker
-is running) and **skips** where none does (macOS/Windows runners), so one `ci` stays
-green on every OS. Pick where with `[env] DOCKER_BUILD = auto` (default) `| ci | local
-| never`, and what with `CI_DOCKERFILE` / `CI_DOCKER_CONTEXT` (default `Dockerfile` /
-`.`).
-
-**2. Publish a runnable image on a tag** — build and push to GitHub Container Registry.
-Turn it on in `[env]`:
+**Publish a runnable image on a tag** — set the knobs, then re-bootstrap:
 
 ```toml
 [env]
-CI_DOCKER_IMAGE     = "true"                     # publish an image on a git TAG
+CI_DOCKER_IMAGE     = "true"                     # push a GHCR image on a v* TAG
 CI_DOCKERFILE       = ".docker/Dockerfile"       # if not ./Dockerfile
 CI_DOCKER_PLATFORMS = "linux/amd64,linux/arm64"  # multi-arch (default linux/amd64)
 GHCR_USER           = "joeblew999"               # your GH user/org (public)
 ```
 
-then `mise run mise:repo:bootstrap --release` (it's a `CI_*` knob, so it needs a
-re-bootstrap — which also grants the release workflow `packages: write`). On a `v*` tag
-the release workflow builds and pushes:
+`mise run mise:repo:bootstrap --release` projects these into the release workflow (and
+grants it `packages: write`). On a `v*` tag it runs `docker:image -- <tag>` — the same
+task you run locally — pushing `ghcr.io/<owner>/<repo>:<tag>`. Auth is the built-in
+`GITHUB_TOKEN` in CI (no PAT), your **fnox** keychain locally (`fnox set -p keychain
+GHCR_TOKEN …`).
 
-```
-ghcr.io/<owner>/<repo>:<tag>
-```
-
-Auth in CI is the built-in `GITHUB_TOKEN` — no PAT. Under the hood it runs
-`mise run docker:image -- <tag>`, the same task you can run locally.
-
-**3. Run the published image** — it's **private** by default:
-
-```sh
-fnox exec -- mise run run-image            # latest release  (a repo task wrapping docker:pull)
-fnox exec -- mise run run-image -- v0.5.0  # a specific tag
-mise run docker:settings -- <package>      # open ghcr visibility settings to make it public
-```
-
-Locally the GHCR token comes from your **fnox** keychain (`fnox set -p keychain
-GHCR_TOKEN …`); in CI it's the `GITHUB_TOKEN`. The tasks — `docker:build`,
-`docker:image`, `docker:pull`, `docker:login`, `docker:settings` — all live in
+The image is **private** by default; `mise run docker:settings -- <package>` opens its
+GHCR visibility. All docker tasks (`build`, `image`, `pull`, `login`, `settings`) live in
 `tool-docker`.
 
 ---
@@ -290,28 +260,6 @@ version:
 Re-running bootstrap is always safe and idempotent. A scheduled
 `reusable-mise-upgrade` PR also does this for you — bumping tool versions
 (`mise:upgrade`) and the `?ref=`/`@ref` pins (`ci:audit-lib-refs --write`) in one PR.
-Per-version detail is in [CHANGELOG.md](./CHANGELOG.md); almost everything is additive.
-The one breaking layout change is below.
-
-<details>
-<summary><b>Breaking → v0.40.0</b> (two-layer restructure — file/task renames)</summary>
-
-`tasks/` split into pure `tool-*` primitives + 5 orchestration namespaces
-(`ci · secrets · cfapp · release · mobile`). Bump every `?ref=` to ≥ v0.40.0, then:
-
-**Include filenames:** `cf`→`tool-cf`, `gh`→`tool-gh`, `docker`→`tool-docker`,
-`cliff`→`tool-cliff`, `rust`→`tool-rust`, `wrangler`→`tool-wrangler`,
-`fnox`→`tool-fnox`, `bw`→`secrets-bw`, `provision`+`prove`→`cfapp`; `env` removed.
-(`ci`, `mise`, `release`, `secrets`, `mobile` keep their names.)
-
-**Task names:** `mise:global`→`mise:global:bootstrap`; `ci:watch`/`ci:clean`→
-`gh:run-watch`/`gh:run-clean`; `ci:check-toml-tasks`/`ci:check-workflow-nu`/
-`ci:parse-check`→`ci:check-nu`; `bw:<x>`→`secrets:bw-<x>`; `cf:provision-*`/
-`provision:*`→`cfapp:provision-*`; `cf:access-*`/`cf:service-token-*`→`cfapp:access-*`/
-`cfapp:service-token-*`; `cf:secrets-put-mapped`→`cfapp:provision-secrets`;
-`prove:*`→`cfapp:verify-*`. The `cf:*` primitives (`d1-create`, `r2-create`,
-`queue-create`, `secret-put`, `token-check`) are now pure wrangler/curl driven via
-`cfapp:*`.
-
-Then re-bootstrap and verify locally + on the matrix.
-</details>
+Per-version detail is in [CHANGELOG.md](./CHANGELOG.md) — almost everything is additive,
+and old renames (the two-layer `tool-*` restructure, `sccache`→`rust-cache`) only bite
+when you bump, one version's changelog at a time.
