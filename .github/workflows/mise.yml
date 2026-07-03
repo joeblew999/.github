@@ -17,5 +17,3 @@ jobs:
       task: ci
       os-matrix: '["ubuntu-latest", "macos-latest", "windows-latest"]'
       rust-cache: false
-      sccache: true               # TEMP dogfood: prove deprecated inputs don't startup_fail
-      cargo-lock-path: Cargo.lock  # TEMP dogfood
