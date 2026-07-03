@@ -86,7 +86,7 @@ jobs:
       - run: mise run ${{ inputs.build-task }}
       - run: mise run release:pack -- --dir ${{ inputs.pack-dir }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-assets-${{ matrix.os }}
           path: ${{ inputs.pack-dir }}/*.tar.gz
@@ -109,7 +109,7 @@ jobs:
         with:
           cache-key: mise-release-publish-${{ hashFiles('mise.toml') }}
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: ${{ inputs.pack-dir }}
           pattern: release-assets-*
