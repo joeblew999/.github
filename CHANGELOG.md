@@ -1,3 +1,8 @@
+## [0.67.1] - 2026-07-03
+
+### 📚 Documentation
+
+- *(readme)* Tighten to essentials — condense Docker, drop stale v0.40 block, dedup safety-net
 ## [0.67.0] - 2026-07-03
 
 ### 🚜 Refactor
@@ -15,6 +20,7 @@
 - Bump actions/checkout v5 → v7
 - Silence DEP0040 punycode warning; drop dead cargo-lock-path input
 - Bump artifact actions to the current coordinated pair (upload v4→v7, download v4→v8)
+- *(release)* V0.67.0
 ## [0.66.0] - 2026-07-01
 
 ### 📚 Documentation
