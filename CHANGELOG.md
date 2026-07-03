@@ -1,3 +1,8 @@
+## [0.69.0] - 2026-07-03
+
+### 🚀 Features
+
+- Tool-gitleaks — secret scanning as a mise task (consolidates secrets-scanning.yml)
 ## [0.68.1] - 2026-07-03
 
 ### 🐛 Bug Fixes
@@ -7,6 +12,7 @@
 ### ⚙️ Miscellaneous Tasks
 
 - Revert the temp dogfood stub inputs (compat proven green)
+- *(release)* V0.68.1
 ## [0.68.0] - 2026-07-03
 
 ### 🚀 Features
