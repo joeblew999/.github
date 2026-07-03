@@ -1,8 +1,17 @@
+## [0.68.0] - 2026-07-03
+
+### 🚀 Features
+
+- One-ref pin pattern (env GITHUB_REF template) + append-only-surface policy
 ## [0.67.1] - 2026-07-03
 
 ### 📚 Documentation
 
 - *(readme)* Tighten to essentials — condense Docker, drop stale v0.40 block, dedup safety-net
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.67.1
 ## [0.67.0] - 2026-07-03
 
 ### 🚜 Refactor
