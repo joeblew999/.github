@@ -242,6 +242,62 @@ def main [
 }
 '''
 
+# ── ci:doctor ────────────────────────────────────────────────────────────────
+# Audit THIS repo's conformance to the joeblew999/.github flows and print a
+# checklist of what to change so it runs on the reusable CI. Advisory (exit 0) by
+# default; `--strict` exits non-zero on any gap (use it as an onboarding gate).
+# The scalable answer to "what does this repo need to adopt .github?" — run it in
+# each repo instead of hand-inspecting.
+["ci:doctor"]
+description = "Audit this repo's conformance to .github (includes, ci task, reusable workflow, action versions). --strict fails on gaps."
+run = '''
+#!/usr/bin/env nu
+def main [--strict] {
+  let root = ($env.MISE_PROJECT_ROOT? | default (pwd))
+  let mt = ($root | path join "mise.toml")
+  let m = (if ($mt | path exists) { open --raw $mt } else { "" })
+  mut gaps = []
+
+  # 1. tasks/mise.toml include — the reusable CI runs mise:global:bootstrap from it.
+  #    Accept the git-URL include (consumers) OR a local "tasks/mise.toml" (.github self-hosts).
+  if not (($m =~ 'joeblew999/\.github\.git//tasks/mise\.toml') or ($m =~ '(?m)^\s*"tasks/mise\.toml"')) {
+    $gaps = ($gaps | append "include tasks/mise.toml (provides mise:global:bootstrap — the reusable CI requires it)")
+  }
+  # 2. a `ci` task — via tasks/ci.toml include OR a local definition.
+  let has_ci = (($m =~ 'joeblew999/\.github\.git//tasks/ci\.toml') or ($m =~ '(?m)^\[tasks\.ci\]') or ($m =~ '(?m)^\["ci"\]'))
+  if not $has_ci {
+    $gaps = ($gaps | append "add a `ci` task — include tasks/ci.toml or define [tasks.ci] (the reusable CI runs `mise run ci`)")
+  }
+  # 3. workflows use the reusable, not hand-rolled steps; and no stale action majors.
+  let wf = ($root | path join ".github" "workflows")
+  if ($wf | path exists) {
+    mut hand = []
+    for f in (glob ($"($wf)/*.y*ml" | str replace --all "\\" "/")) {
+      let raw = (open --raw $f)
+      let nm = ($f | path basename)
+      if (($raw =~ 'jdx/mise-action') and (not ($raw =~ 'reusable-mise'))) { $hand = ($hand | append $nm) }
+      if ($raw =~ 'actions/checkout@v[1-6]([^0-9]|$)') { $gaps = ($gaps | append $"($nm): actions/checkout on an old major — adopt the reusable workflow or bump to v7") }
+    }
+    if ($hand | is-not-empty) { $gaps = ($gaps | append $"swap hand-rolled CI to the reusable workflow: (($hand | str join ', '))") }
+  }
+  # 4. Rust is owned by rustup, not mise.
+  if ((($root | path join "Cargo.toml") | path exists) and (not (($root | path join "rust-toolchain.toml") | path exists))) {
+    $gaps = ($gaps | append "Cargo.toml present but no rust-toolchain.toml — pin Rust via rustup, never mise")
+  }
+
+  print "── ci:doctor — conformance to joeblew999/.github ──"
+  if ($gaps | is-empty) {
+    print "✓ conformant — wired to run on the reusable CI."
+    return
+  }
+  print $"✗ ($gaps | length) gap\(s\):"
+  for g in $gaps { print $"  • ($g)" }
+  print ""
+  print "Fix per the .github README Quickstart, then re-run `mise run ci:doctor`."
+  if $strict { exit 1 }
+}
+'''
+
 # ── ci:check-global ──────────────────────────────────────────────────────────
 # Guard the mise configuration. Two invariants:
 #   1. The canonical common toolset is present in the global config.

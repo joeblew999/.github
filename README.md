@@ -55,6 +55,11 @@ releases). **Copy nothing** — the [.github-example](https://github.com/joeblew
 shows every feature, but it's a showcase to keep them CI-tested, not a template to
 clone.
 
+**Onboarding an existing repo?** Run `mise run ci:doctor` — it audits the repo and
+prints exactly what it needs to conform (missing `tasks/mise.toml`/`ci.toml`
+includes, hand-rolled CI to swap for the reusable workflow, stale action versions,
+Rust not pinned via `rust-toolchain.toml`). `--strict` fails on any gap.
+
 Rust? Pin it in `rust-toolchain.toml` (rustup), **never** in mise — `ci:check-global`
 enforces this. Agents/skills? `claude plugin marketplace add joeblew999/.github` and
 install `fleet`.
@@ -262,8 +267,8 @@ tag **after** the OS matrix is green — local green is one cell, not the matrix
 
 **Key tasks:** `mise:global:bootstrap`, `mise:repo:bootstrap [--release]`,
 `release:github -- vX.Y.Z [assets]`, `release:pack`, `docker:image -- vX.Y.Z`,
-`cliff:unreleased`, `ci:check-global`, `ci:check-nu`, `docs:gen` (regenerates the
-tables above).
+`cliff:unreleased`, `ci:check-global`, `ci:check-nu`, `ci:doctor` (conformance
+audit), `docs:gen` (regenerates the tables above).
 
 ---
 
