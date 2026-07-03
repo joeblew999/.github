@@ -1,8 +1,21 @@
+## [0.68.1] - 2026-07-03
+
+### 🐛 Bug Fixes
+
+- Tolerate deprecated workflow inputs (sccache/cargo-lock-path) — append-only surface
+
+### ⚙️ Miscellaneous Tasks
+
+- Revert the temp dogfood stub inputs (compat proven green)
 ## [0.68.0] - 2026-07-03
 
 ### 🚀 Features
 
 - One-ref pin pattern (env GITHUB_REF template) + append-only-surface policy
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.68.0
 ## [0.67.1] - 2026-07-03
 
 ### 📚 Documentation
