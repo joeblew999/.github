@@ -24,24 +24,21 @@ Point `mise.toml` at the task files you need and list your CI tasks:
 
 ```toml
 # mise.toml
-[env]
-GITHUB_REF = "v0.68.0"    # the fleet version — the ONE knob; bump it to upgrade
-
 [task_config]
 includes = [
-  "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref={{env.GITHUB_REF}}",
-  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref={{env.GITHUB_REF}}",
+  "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref=v0.68.0",
+  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.68.0",
 ]
 
 [tasks.ci]
 depends = ["rust:test"]   # your build/test tasks — THIS LIST is your CI
 ```
 
-**One ref, one bump.** Every include reads the tag from `[env] GITHUB_REF`, so the
-version lives in exactly one place. `mise run mise:repo:bootstrap` resolves it into the
-workflow `@ref` too, and `mise run ci:audit-lib-refs --write` bumps that one line to the
-latest tag. (A literal `?ref=v0.68.0` per line still works — the template is just the
-low-drift default.)
+**Pin explicitly; bump with one command.** Every include (and the workflow `@ref`) pins
+a concrete tag — explicit and greppable. To upgrade, don't hand-edit each line: run
+`mise run ci:audit-lib-refs --write`, which rewrites every `?ref=` / `@ref` across
+`mise.toml` and `.github/workflows/` to the latest tag in one shot (the weekly
+`reusable-mise-upgrade` PR runs it for you). Rolling `?ref=main` pins are left alone.
 
 Then, once:
 

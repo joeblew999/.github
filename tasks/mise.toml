@@ -156,24 +156,13 @@ def main [
   # `@main`. Order: --ref > $CI_REF > the ?ref= parsed from mise.toml > "main"
   # (the example pins ?ref=main, so it correctly stays @main).
   let mt = ($root | path join "mise.toml")
-  let raw_ref = (
+  let parsed_ref = (
     if ($mt | path exists) {
       (open --raw $mt | lines
        | where ($it =~ 'joeblew999/\.github\.git//') | where ($it =~ '\?ref=')
        | each {|l| $l | str replace --regex '.*\?ref=([^"]+).*' '${1}' }
        | get 0? | default "")
     } else { "" }
-  )
-  # ONE-REF pattern: a consumer pins every include with a Tera env template on the
-  # ref (see README's one-ref section) and sets the tag ONCE in `[env] GITHUB_REF`.
-  # GitHub Actions can't template a `uses:@ref`, so resolve it here to the concrete
-  # tag (mise has loaded [env], so $env holds it) -> the workflow gets a literal @vX.
-  # NB: no literal double-brace in this body — mise renders task bodies via Tera.
-  let parsed_ref = (
-    if ($raw_ref =~ '\{\{') {
-      let var = ($raw_ref | str replace --regex '(?s).*env\.([A-Za-z_][A-Za-z0-9_]*).*' '${1}')
-      (try { $env | get $var } catch { "" } | str trim)
-    } else { $raw_ref }
   )
   let eff_ref = (
     if ($ref | is-not-empty) { $ref }
