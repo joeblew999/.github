@@ -35,7 +35,7 @@ jobs:
     name: Upgrade pinned tools
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Shared setup. install: false = just mise + the global toolset (nu, gh,
       # git-cliff) that the NUSHELL tasks mise:upgrade / ci:audit-lib-refs need

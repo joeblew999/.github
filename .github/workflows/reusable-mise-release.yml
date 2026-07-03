@@ -66,7 +66,7 @@ jobs:
       matrix:
         os: ${{ fromJSON(inputs.os-matrix) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Shared setup. rust-cache: true here is the whole point -- the release
       # build compiles the binary, so it must reuse ~/.cargo + target/ (it used
@@ -94,7 +94,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # git-cliff needs full history for release notes
 
@@ -130,7 +130,7 @@ jobs:
     # token: a docker caller grants contents+packages:write (so the push works);
     # a non-docker caller grants only contents:write and this job is skipped anyway.
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Enables multi-arch (arm64) builds when the repo sets CI_DOCKER_PLATFORMS;
       # harmless for the single-arch default.

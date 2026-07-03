@@ -12,12 +12,12 @@ jobs:
     steps:
       - uses: actions/first-interaction@v3
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: |
-            🎉 Thanks for opening your first issue! 
-            
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          issue_message: |
+            🎉 Thanks for opening your first issue!
+
             We appreciate your contribution to the project. A maintainer will review this soon.
-          pr-message: |
+          pr_message: |
             🚀 Thanks for your first contribution! 
             
             We appreciate your pull request. Please make sure:

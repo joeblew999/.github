@@ -55,7 +55,7 @@ jobs:
       matrix:
         os: ${{ fromJSON(inputs.os-matrix) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Shared setup (mise + tool cache + rust build cache + global bootstrap).
       # Owned by ONE composite action so ci/release/upgrade can't drift on caching.
