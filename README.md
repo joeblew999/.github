@@ -26,8 +26,8 @@ Point `mise.toml` at the task files you need and list your CI tasks:
 # mise.toml
 [task_config]
 includes = [
-  "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref=v0.68.0",
-  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.68.0",
+  "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref=v0.69.0",
+  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.69.0",
 ]
 
 [tasks.ci]
@@ -165,6 +165,7 @@ The tables below are **generated** from each task file's `# role:` header by
 | `tool-docker` | Docker / ghcr — `docker` |
 | `tool-fnox` | Secrets CLI — `fnox` |
 | `tool-gh` | GitHub CLI — `gh` |
+| `tool-gitleaks` | Secret scanning — `gitleaks` |
 | `tool-rust` | Rust toolchain — `cargo` / `wasm-pack` |
 | `tool-wrangler` | Wrangler CLI — `wrangler` |
 

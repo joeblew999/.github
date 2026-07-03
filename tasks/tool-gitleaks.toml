@@ -1,0 +1,30 @@
+# tasks/tool-gitleaks.toml — the gitleaks:* namespace: secret scanning via gitleaks only.
+# role: Secret scanning — `gitleaks`
+#
+# gitleaks (gitleaks/gitleaks) scans a repo for committed secrets. It's niche, so
+# it's pinned PER-TASK (not in the global toolset). The point: secret scanning is a
+# CHECK, so it belongs in `mise run ci` — add `gitleaks:scan` to your
+# `[tasks.ci].depends` and it runs on every push via the reusable CI, cross-OS,
+# replacing a bespoke `secrets-scanning.yml` with one shared mise task. Tune with a
+# repo-local `.gitleaks.toml` (allowlist) if a value trips a false positive.
+#
+# Consumer wiring:
+#   [task_config]
+#   includes = ["git::https://github.com/joeblew999/.github.git//tasks/tool-gitleaks.toml?ref=<tag>"]
+#   [tasks.ci]
+#   depends = ["gitleaks:scan", ...]   # merges with the shared guards
+
+# ── gitleaks:scan ────────────────────────────────────────────────────────────
+["gitleaks:scan"]
+description = "Scan the working tree for committed secrets (gitleaks dir). Non-zero on any finding — add to ci depends."
+tools = { gitleaks = "latest" }
+run = '''
+#!/usr/bin/env nu
+def main [] {
+  # `dir` scans the checked-out tree (no git-history dependency → works on a shallow
+  # CI checkout, unlike `git`). gitleaks exits non-zero on any leak, which nushell
+  # propagates → the task (and CI) fails loudly. A repo tunes findings via .gitleaks.toml.
+  ^gitleaks dir . --no-banner
+  print $"✓ gitleaks: no secrets found (($nu.os-info.name))"
+}
+'''

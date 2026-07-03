@@ -14,6 +14,7 @@ includes = [
   "tasks/tool-docker.toml",
   "tasks/tool-fnox.toml",
   "tasks/tool-gh.toml",
+  "tasks/tool-gitleaks.toml",
   "tasks/mise.toml",
   "tasks/mobile.toml",
   "tasks/cfapp.toml",
@@ -39,7 +40,7 @@ git-cliff                = "latest"  # cliff:* changelog/release-intel tasks
 # EXERCISES credential-free lib tasks cross-OS — not just parses them. Runs on
 # the matrix via .github/workflows/mise.yml.
 [tasks.ci]
-depends = ["dogfood"]
+depends = ["dogfood", "gitleaks:scan"]   # dogfoods gitleaks:scan cross-OS on the matrix
 
 [tasks.dogfood]
 run = '''
