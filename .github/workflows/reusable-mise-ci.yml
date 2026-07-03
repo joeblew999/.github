@@ -11,7 +11,7 @@ name: Reusable Mise CI
 #         task: ci                         # (default) name of the mise task to run
 #         os-matrix: '["ubuntu-latest", "macos-latest", "windows-latest"]'
 #         mise-version: 2026.5.1
-#         sccache: true                    # set false if no Rust crate
+#         rust-cache: true                 # set false if no Rust crate
 #
 # The task itself (e.g. `mise run ci`) is defined in the consuming repo,
 # either inline in mise.toml or in mise-tasks/. SSOT: workflow runs ONE
@@ -32,8 +32,8 @@ on:
         description: 'mise binary version to install'
         type: string
         default: '2026.5.1'
-      sccache:
-        description: 'Enable the Rust build cache (Swatinem/rust-cache: ~/.cargo + target/). Set false for non-Rust repos. (Name kept for backward compat.)'
+      rust-cache:
+        description: 'Enable the Rust build cache (Swatinem/rust-cache: ~/.cargo + target/). Set false for non-Rust repos.'
         type: boolean
         default: true
       timeout-minutes:
@@ -64,8 +64,7 @@ jobs:
       - uses: joeblew999/.github/.github/actions/mise-setup@main
         with:
           cache-key: mise-${{ inputs.task }}-${{ matrix.os }}-${{ hashFiles('mise.toml') }}
-          # `sccache` input kept for backward compat = "enable the Rust build cache".
-          rust-cache: ${{ inputs.sccache }}
+          rust-cache: ${{ inputs.rust-cache }}
           rust-cache-key: ${{ inputs.task }}
 
       # MISE_JOBS=1: run the task's `depends` graph serially. A `ci` task fans

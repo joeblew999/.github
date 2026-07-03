@@ -117,17 +117,17 @@ run = "mise use -g github:nushell/nushell@latest fnox@latest gh@latest jq@latest
 # THIS repo's GitHub workflow stubs. ALL behaviour lives in the reusable workflows
 # (reusable-mise-ci / reusable-mise-upgrade) — these stubs are thin glue that just
 # `uses:` them and pass the per-repo inputs. The CI matrix is a stub knob: pass
-# --os-matrix / --task / --sccache, or edit the generated file. Built line-by-line
+# --os-matrix / --task / --rust-cache, or edit the generated file. Built line-by-line
 # (no ${{ }}) so there's nothing for mise's Tera engine to choke on. Idempotent.
 ["mise:repo:bootstrap"]
-description = "Generate .github/workflows/* stubs calling the joeblew999/.github reusable workflows. Settings persist in mise.toml [env] (CI_OS_MATRIX/CI_TASK/CI_SCCACHE/CI_RELEASE/CI_BUILD_TASK) so re-bootstrap keeps your overrides; flags win for one-off. Never writes mise.toml. Idempotent."
+description = "Generate .github/workflows/* stubs calling the joeblew999/.github reusable workflows. Settings persist in mise.toml [env] (CI_OS_MATRIX/CI_TASK/CI_RUST_CACHE/CI_RELEASE/CI_BUILD_TASK) so re-bootstrap keeps your overrides; flags win for one-off. Never writes mise.toml. Idempotent."
 run = '''
 #!/usr/bin/env nu
 
 def main [
   --task: string = ""        # override the mise task (reusable default: ci)
   --os-matrix: string = ""   # override runners, e.g. '["ubuntu-latest"]' (reusable default: all 3 OSes)
-  --sccache: string = ""     # override sccache: "true"/"false" (reusable default: true)
+  --rust-cache: string = ""  # override rust-cache: "true"/"false" (reusable default: true)
   --release                       # ALSO write mise-release.yml (tag-push binary release; opt-in)
   --build-task: string = ""       # with --release: the build task (reusable default: dist)
   --release-os-matrix: string = "" # with --release: which OSes publish binaries (reusable default: ubuntu+macos)
@@ -139,13 +139,13 @@ def main [
   mkdir $dir
 
   # OVERRIDES PERSIST. Settings are read from mise.toml [env] (CI_TASK /
-  # CI_OS_MATRIX / CI_SCCACHE / CI_RELEASE / CI_BUILD_TASK); a flag wins for a
+  # CI_OS_MATRIX / CI_RUST_CACHE / CI_RELEASE / CI_BUILD_TASK); a flag wins for a
   # one-off. So RE-bootstrap REPRODUCES a dev's choices instead of clobbering them.
   # And bootstrap ONLY ever writes .github/workflows/ — it NEVER touches mise.toml,
   # so [tasks.*] / [env] / depends overrides are always safe.
   let eff_task    = (if ($task      | is-not-empty) { $task }      else { $env.CI_TASK?      | default "" })
   let eff_os      = (if ($os_matrix | is-not-empty) { $os_matrix } else { $env.CI_OS_MATRIX? | default "" })
-  let eff_sccache = (if ($sccache   | is-not-empty) { $sccache }   else { $env.CI_SCCACHE?   | default "" })
+  let eff_rust_cache = (if ($rust_cache | is-not-empty) { $rust_cache } else { $env.CI_RUST_CACHE? | default "" })
   let eff_release = ($release or (($env.CI_RELEASE? | default "" | str downcase) == "true"))
   let eff_build   = (if ($build_task | is-not-empty) { $build_task } else { $env.CI_BUILD_TASK? | default "" })
   let eff_rel_os  = (if ($release_os_matrix | is-not-empty) { $release_os_matrix } else { $env.CI_RELEASE_OS_MATRIX? | default "" })
@@ -172,11 +172,11 @@ def main [
   )
 
   # The stub OVERRIDES only what's set — by default emits no `with:` and inherits
-  # the reusable workflow's defaults (task=ci, all 3 OSes, sccache).
+  # the reusable workflow's defaults (task=ci, all 3 OSes, rust-cache).
   mut with = []
   if ($eff_task    | is-not-empty) { $with = ($with | append $"      task: ($eff_task)") }
   if ($eff_os      | is-not-empty) { $with = ($with | append $"      os-matrix: '($eff_os)'") }
-  if ($eff_sccache | is-not-empty) { $with = ($with | append $"      sccache: ($eff_sccache)") }
+  if ($eff_rust_cache | is-not-empty) { $with = ($with | append $"      rust-cache: ($eff_rust_cache)") }
 
   mut ci_lines = [
     "name: mise CI"

@@ -16,20 +16,6 @@ green in CI for that OS.
 
 ---
 
-## The fleet map
-
-Each shared system has one **home repo** — start there. Its components live in their
-own repos, linked from that home, never duplicated here.
-
-| System | Home repo | What it is |
-|---|---|---|
-| **Auth** | [`cf-connectrpc-middleware`](https://github.com/joeblew999/cf-connectrpc-middleware) | Rauthy (OIDC — AuthN) + Cedar (AuthZ) + Cloudflare email. The `connectrpc-oidc` / `connectrpc-cedar` crates, Kumo client kit, `mise run stack:local`, and `docs/NEW-PROJECT.md`. |
-| **Deploy** | [`vm-uncloud`](https://github.com/joeblew999/vm-uncloud) | Hetzner deployments via uncloud — recipes (Rauthy, Moltis, WordPress, Windows VMs…) and one cost ledger. |
-| **Tooling** | [`.github`](https://github.com/joeblew999/.github) (this repo) | The mise task library, Claude plugin marketplace, org config. |
-
-Add a row when a new *shared system* gets a home repo. Product repos that merely
-consume the platform live on their own.
-
 > **[`.github-example`](https://github.com/joeblew999/.github-example) is the fleet's
 > one safety net.** It's the canonical consumer, pinned to `@main`, exercising the
 > full feature set (Rust + docker + binary/image publish). Any change to `.github`
@@ -104,7 +90,7 @@ workflow, and never writes `mise.toml`).
 | `[tasks.ci].depends` | what `ci` runs | guards only | immediately |
 | `DOCKER_BUILD` | docker local vs remote | `auto` (where a linux daemon exists) | immediately |
 | `CI_OS_MATRIX` | which OSes CI verifies on | all 3 | re-bootstrap |
-| `CI_TASK` · `CI_SCCACHE` | CI task name · Rust build cache | `ci` · `true` | re-bootstrap |
+| `CI_TASK` · `CI_RUST_CACHE` | CI task name · Rust build cache | `ci` · `true` | re-bootstrap |
 | `CI_RELEASE` | publish binaries on a git **tag** | off | re-bootstrap |
 | `CI_RELEASE_OS_MATRIX` | which OSes publish | ubuntu + macOS | re-bootstrap |
 | `CI_DOCKER_IMAGE` | also push a GHCR image on a tag | off | re-bootstrap |
@@ -119,7 +105,7 @@ before mise starts, so bootstrap projects them there. (One-off flags like
 compiles a native binary per OS. *Publishing* downloadable binaries/images is a
 separate opt-in (`mise run mise:repo:bootstrap --release`) that runs on a **tag**, not
 every push. The reusable CI caches `~/.cargo` + `target/` via
-[`Swatinem/rust-cache`](https://github.com/Swatinem/rust-cache) (set `CI_SCCACHE=false`
+[`Swatinem/rust-cache`](https://github.com/Swatinem/rust-cache) (set `CI_RUST_CACHE=false`
 for non-Rust repos).
 
 ---

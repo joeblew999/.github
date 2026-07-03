@@ -16,4 +16,4 @@ jobs:
     with:
       task: ci
       os-matrix: '["ubuntu-latest", "macos-latest", "windows-latest"]'
-      sccache: false
+      rust-cache: false
