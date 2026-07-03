@@ -1,3 +1,20 @@
+## [0.67.0] - 2026-07-03
+
+### 🚜 Refactor
+
+- Extract shared runner setup into a composite mise-setup action
+- Rename sccache input → rust-cache; drop fleet map from README
+
+### 📚 Documentation
+
+- Add a Docker section — build-check, publish-image, run-image
+- Fleet map — .github-example verification is MANDATORY before tagging
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump actions/checkout v5 → v7
+- Silence DEP0040 punycode warning; drop dead cargo-lock-path input
+- Bump artifact actions to the current coordinated pair (upload v4→v7, download v4→v8)
 ## [0.66.0] - 2026-07-01
 
 ### 📚 Documentation
@@ -8,6 +25,7 @@
 ### ⚙️ Miscellaneous Tasks
 
 - Delete ci:check-mise — a warning with no working fix is noise
+- *(release)* V0.66.0
 ## [0.65.0] - 2026-07-01
 
 ### 🐛 Bug Fixes
