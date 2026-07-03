@@ -24,15 +24,24 @@ Point `mise.toml` at the task files you need and list your CI tasks:
 
 ```toml
 # mise.toml
+[env]
+GITHUB_REF = "v0.68.0"    # the fleet version — the ONE knob; bump it to upgrade
+
 [task_config]
 includes = [
-  "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref=<tag>",
-  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=<tag>",
+  "git::https://github.com/joeblew999/.github.git//tasks/mise.toml?ref={{env.GITHUB_REF}}",
+  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref={{env.GITHUB_REF}}",
 ]
 
 [tasks.ci]
 depends = ["rust:test"]   # your build/test tasks — THIS LIST is your CI
 ```
+
+**One ref, one bump.** Every include reads the tag from `[env] GITHUB_REF`, so the
+version lives in exactly one place. `mise run mise:repo:bootstrap` resolves it into the
+workflow `@ref` too, and `mise run ci:audit-lib-refs --write` bumps that one line to the
+latest tag. (A literal `?ref=v0.68.0` per line still works — the template is just the
+low-drift default.)
 
 Then, once:
 
@@ -221,6 +230,14 @@ NodeWarden; CI reads GitHub Actions secrets and **never** runs fnox.
 
 Version pins protect consumers (an old `?ref=` is immutable), so **refactor deeply** —
 rename, merge, move, delete. Timidity is the bug; the pin is the safety net.
+
+**But the consumer *surface* is append-only.** Two things are hardcoded in every
+consumer and are NOT internal: the include **paths** (`tasks/<file>.toml`) and the
+**shared task names** they call (`ci`, `cf:token-check`, …). Renaming or deleting those
+is a migration cliff — the v0.40 `cf`→`tool-cf` / `prove`→`cfapp` / `env`-deletion split
+is *still* why old repos can't just bump. Rules: never rename an include path (add a new
+file, leave the old one); never delete a shared task consumers call without leaving a
+tombstone stub that errors "moved to X". Break internals freely; freeze the surface.
 
 **Always in this order:**
 

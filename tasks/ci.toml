@@ -178,6 +178,10 @@ def main [
   let uses_sub  = '(' + $lib_esc + '/[^@\s]+@)v[0-9]+\.[0-9]+\.[0-9]+'
   let ref_find  = '\?ref=(v[0-9]+\.[0-9]+\.[0-9]+)'
   let ref_sub   = '(\?ref=)v[0-9]+\.[0-9]+\.[0-9]+'
+  # One-ref pattern: `[env] GITHUB_REF = "vX"` is the single knob when includes use
+  # ?ref={{env.GITHUB_REF}}. Bump it too so ONE command upgrades templated repos.
+  let ghref_find = 'GITHUB_REF\s*=\s*"(v[0-9]+\.[0-9]+\.[0-9]+)"'
+  let ghref_sub  = '(GITHUB_REF\s*=\s*")v[0-9]+\.[0-9]+\.[0-9]+'
 
   # This repo's own pins: root mise.toml + workflow stubs.
   let root = ($env.MISE_PROJECT_ROOT? | default (pwd))
@@ -206,6 +210,7 @@ def main [
     let pins = (
       ($raw | parse --regex $ref_find  | get -o capture0 | default [])
       | append ($raw | parse --regex $uses_find | get -o capture0 | default [])
+      | append ($raw | parse --regex $ghref_find | get -o capture0 | default [])
       | uniq
     )
     for p in ($pins | where { |p| $p != $latest }) {
@@ -233,6 +238,7 @@ def main [
       $before
       | str replace --all --regex $ref_sub  $"${1}($latest)"
       | str replace --all --regex $uses_sub $"${1}($latest)"
+      | str replace --all --regex $ghref_sub $"${1}($latest)"
     )
     if $before != $after {
       $after | save --force $f
