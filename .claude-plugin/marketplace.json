@@ -5,7 +5,7 @@
     "email": "gedw99@gmail.com"
   },
   "metadata": {
-    "description": "joeblew999 fleet — shared Claude skills, distributed by reference and versioned (the 4th channel alongside mise task includes, reusable CI, and mise:global).",
+    "description": "joeblew999 fleet \u2014 shared Claude skills, distributed by reference and versioned (the 4th channel alongside mise task includes, reusable CI, and mise:global).",
     "version": "0.1.0"
   },
   "plugins": [
@@ -20,8 +20,37 @@
       },
       "license": "MIT",
       "category": "meta",
-      "keywords": ["joeblew999", "mise", "fleet", "conventions"],
-      "skills": ["./.claude/skills/joeblew999-fleet"]
+      "keywords": [
+        "joeblew999",
+        "mise",
+        "fleet",
+        "conventions"
+      ],
+      "skills": [
+        "./.claude/skills/joeblew999-fleet"
+      ]
+    },
+    {
+      "name": "dioxus",
+      "source": "./",
+      "strict": false,
+      "description": "Build, serve and bundle Dioxus apps with dx: platforms, renderers, package types, Dioxus.toml, mobile signing and icons.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Gerard Webb"
+      },
+      "license": "MIT",
+      "category": "language",
+      "keywords": [
+        "dioxus",
+        "dx",
+        "rust",
+        "wasm",
+        "mobile"
+      ],
+      "skills": [
+        "./.claude/skills/dioxus-dx"
+      ]
     }
   ]
 }
