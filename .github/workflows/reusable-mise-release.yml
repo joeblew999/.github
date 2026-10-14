@@ -139,7 +139,7 @@ jobs:
 
       # Enables multi-arch (arm64) builds when the repo sets CI_DOCKER_PLATFORMS;
       # harmless for the single-arch default.
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v4
 
       # Shared setup. No rust-cache: the build happens inside docker, not here.
       - uses: joeblew999/.github/.github/actions/mise-setup@main
