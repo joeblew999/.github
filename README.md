@@ -219,6 +219,9 @@ pin, nothing else:
 **Tools.** A repo's `[tools]` lists only what's unique to it. Runtime-free binaries
 (nushell, fnox, gh, jq, usage, git-cliff) come from the global config; tools needing
 node/ruby live per-task. Rust = rustup + `rust-toolchain.toml`, never mise.
+Shared tasks need **nushell ≥ 0.114** (they use `str lowercase`, which older nu
+can't even parse) — a repo that pins its own older nu must bump it when it bumps
+its `?ref=`.
 
 **Secrets.** `fnox` = local keychain (`fnox set -p keychain`); `secrets:bw-*` syncs to
 NodeWarden; CI reads GitHub Actions secrets and **never** runs fnox.

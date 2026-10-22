@@ -146,10 +146,10 @@ def main [
   let eff_task    = (if ($task      | is-not-empty) { $task }      else { $env.CI_TASK?      | default "" })
   let eff_os      = (if ($os_matrix | is-not-empty) { $os_matrix } else { $env.CI_OS_MATRIX? | default "" })
   let eff_rust_cache = (if ($rust_cache | is-not-empty) { $rust_cache } else { $env.CI_RUST_CACHE? | default "" })
-  let eff_release = ($release or (($env.CI_RELEASE? | default "" | str downcase) == "true"))
+  let eff_release = ($release or (($env.CI_RELEASE? | default "" | str lowercase) == "true"))
   let eff_build   = (if ($build_task | is-not-empty) { $build_task } else { $env.CI_BUILD_TASK? | default "" })
   let eff_rel_os  = (if ($release_os_matrix | is-not-empty) { $release_os_matrix } else { $env.CI_RELEASE_OS_MATRIX? | default "" })
-  let eff_docker_image = ($docker_image or (($env.CI_DOCKER_IMAGE? | default "" | str downcase) == "true"))
+  let eff_docker_image = ($docker_image or (($env.CI_DOCKER_IMAGE? | default "" | str lowercase) == "true"))
 
   # PIN the reusable workflows to the SAME ref this repo pins its task includes to —
   # so a repo on ?ref=v0.48.0 gets `@v0.48.0` in its CI workflow, not a floating

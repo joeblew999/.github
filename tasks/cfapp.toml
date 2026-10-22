@@ -842,7 +842,7 @@ def main [] {
   let status = ($lines | first)
   let loc = (
     $lines
-    | where { |l| ($l | str downcase | str starts-with "location:") }
+    | where { |l| ($l | str lowercase | str starts-with "location:") }
     | first
     | default ""
     | str replace --regex '(?i)^location:\s*' ''

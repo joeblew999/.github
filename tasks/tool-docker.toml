@@ -35,7 +35,7 @@ def main [
   # so a repo that sets nothing just works:
   #   auto / unset → build wherever capable (local AND remote)
   #   ci    → remote only (CI=true) · local → local only · never → never
-  let policy = ($env.DOCKER_BUILD? | default "auto" | str downcase)
+  let policy = ($env.DOCKER_BUILD? | default "auto" | str lowercase)
   let in_ci = ((($env.CI? | default "") == "true") or (($env.GITHUB_ACTIONS? | default "") == "true"))
   if not (match $policy { "never" => false, "ci" => $in_ci, "local" => (not $in_ci), _ => true }) {
     print $"· DOCKER_BUILD=($policy), in-CI=($in_ci) — build skipped by policy"
@@ -52,7 +52,7 @@ def main [
     return
   }
   let info = (do { ^docker info } | complete)
-  if ($info.exit_code != 0) or (not ($info.stdout | str downcase | str contains "ostype: linux")) {
+  if ($info.exit_code != 0) or (not ($info.stdout | str lowercase | str contains "ostype: linux")) {
     print $"· no linux docker daemon on ($nu.os-info.name) — build skipped, fine in CI"
     return
   }
@@ -99,7 +99,7 @@ def main [
   let img = (if ($image | is-not-empty) { $image } else {
     let slug = (^git remote get-url origin | str trim
       | str replace -r '.*github\.com[:/]' '' | str replace -r '\.git$' ''
-      | str downcase | split row "/" | each {|p| $p | str replace -r '^[._-]+' '' } | str join "/")
+      | str lowercase | split row "/" | each {|p| $p | str replace -r '^[._-]+' '' } | str join "/")
     $"ghcr.io/($slug)"
   })
   let ref = $"($img):($tag)"
@@ -141,7 +141,7 @@ def main [
     # name; pass --image explicitly to override.
     let slug = (^git remote get-url origin | str trim
       | str replace -r '.*github\.com[:/]' '' | str replace -r '\.git$' ''
-      | str downcase | split row "/" | each {|p| $p | str replace -r '^[._-]+' '' } | str join "/")
+      | str lowercase | split row "/" | each {|p| $p | str replace -r '^[._-]+' '' } | str join "/")
     $"ghcr.io/($slug)"
   } else { $image })
   let ref = $"($img):($tag)"

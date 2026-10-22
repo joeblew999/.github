@@ -129,8 +129,8 @@ def main [tag?: string, ...assets: string] {
     if ($assets | is-not-empty) {
       $foot = ($foot | append "" | append "**Binaries** — download for your OS from the **Assets** below.")
     }
-    if (($env.CI_DOCKER_IMAGE? | default "" | str downcase) == "true") {
-      let slug  = ($repo | str downcase | split row "/" | each {|p| $p | str replace -r '^[._-]+' '' } | str join "/")
+    if (($env.CI_DOCKER_IMAGE? | default "" | str lowercase) == "true") {
+      let slug  = ($repo | str lowercase | split row "/" | each {|p| $p | str replace -r '^[._-]+' '' } | str join "/")
       let image = $"ghcr.io/($slug)"
       let pkg   = ($slug | split row "/" | last)
       $foot = ($foot | append "" | append "**Docker image:**" | append "```sh"
