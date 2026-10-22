@@ -1,9 +1,22 @@
+## [0.72.0] - 2026-10-22
+
+### 🚀 Features
+
+- *(cf)* One-command Worker profiling for any repo
+
+### 🐛 Bug Fixes
+
+- *(nu)* Str downcase → str lowercase (deprecated in nushell 0.114)
 ## [0.71.0] - 2026-10-22
 
 ### 🚀 Features
 
 - *(skills)* Add dioxus-dx skill as a marketplace plugin
 - *(cf)* Cf:profile — production CPU/heap pprof via the profiling API (curl only)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.71.0
 ## [0.70.0] - 2026-07-03
 
 ### 🚀 Features
