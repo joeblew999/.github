@@ -48,6 +48,84 @@ def main [] {
 }
 '''
 
+# ── cf:profile ───────────────────────────────────────────────────────────────
+# PRIMITIVE: capture a CPU or heap profile of a deployed Worker (or one Durable
+# Object instance) via the profiling API — curl only, no wrangler/node. Writes
+# the gzipped pprof and prints its path to stdout. The API attaches to an
+# already-running isolate and never invokes the Worker, so send traffic during
+# the capture. Token needs Workers Scripts Read.
+["cf:profile"]
+description = "PRIMITIVE: capture a production CPU/heap pprof of Worker <name> (or one Durable Object) via the CF API; curl only."
+run = '''
+#!/usr/bin/env nu
+
+def main [
+  worker: string                  # Worker name or ID (for a DO: the Worker that owns the namespace)
+  --profile-type: string = "cpu"  # cpu | heap
+  --duration-ms: int = 10000      # capture window, 1000–50000
+  --version-id: string = "latest" # "latest" = newest UPLOADED version, not necessarily the deployed one
+  --namespace-id: string = ""     # Durable Object namespace ID (with --actor-id)
+  --actor-id: string = ""         # Durable Object instance ID (64 hex chars)
+  --out: string = ""              # default: <worker>-<type>-<timestamp>.pb.gz
+] {
+  # token + account come from env (orchestration/dev provides them from fnox).
+  let token = ($env.CLOUDFLARE_API_TOKEN? | default "" | str trim)
+  let account = ($env.CLOUDFLARE_ACCOUNT_ID? | default "" | str trim)
+  if ($token | is-empty) or ($account | is-empty) {
+    print --stderr "✗ CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID must be set in env"
+    exit 1
+  }
+  if $profile_type not-in ["cpu" "heap"] {
+    print --stderr $"✗ --profile-type must be cpu or heap, got ($profile_type)"
+    exit 1
+  }
+  if $duration_ms < 1000 or $duration_ms > 50000 {
+    print --stderr $"✗ --duration-ms must be 1000–50000, got ($duration_ms)"
+    exit 1
+  }
+  if ($namespace_id | is-empty) != ($actor_id | is-empty) {
+    print --stderr "✗ a Durable Object capture needs both --namespace-id and --actor-id"
+    exit 1
+  }
+
+  let is_do = not ($actor_id | is-empty)
+  let body = (
+    {duration_ms: $duration_ms, profile_type: $profile_type}
+    | merge (if $is_do { {namespace_id: $namespace_id, actor_id: $actor_id} } else { {} })
+  )
+  let stamp = (date now | format date "%Y%m%dT%H%M%S")
+  let out = (if ($out | is-empty) { $"($worker)-($profile_type)-($stamp).pb.gz" } else { $out })
+  let url = $"https://api.cloudflare.com/client/v4/accounts/($account)/workers/workers/($worker)/versions/($version_id)/profile"
+  let target = (if $is_do { $"($worker) DO ($actor_id | str substring 0..7)…" } else { $worker })
+
+  print --stderr $"→ capturing ($duration_ms) ms ($profile_type) profile of ($target) — send traffic now"
+  # The auth header goes in on stdin (-H @-) so the token never shows in the process table.
+  let code = (
+    $"Authorization: Bearer ($token)"
+    | ^curl -sS -X POST -H @- -H "Content-Type: application/json"
+        --data ($body | to json --raw) --max-time ($duration_ms // 1000 + 60)
+        -o $out -w "%{http_code}" $url
+    | str trim
+  )
+  if $code != "200" {
+    print --stderr $"✗ HTTP ($code)"
+    if ($out | path exists) {
+      let err = (open --raw $out | decode utf-8)
+      print --stderr $err
+      rm $out
+      # 10393 / "no loaded isolate": the API only finds an isolate after sustained
+      # traffic — a few seconds of warm-up was not enough in testing, ~20 s was.
+      if ($err | str contains "10393") or ($err | str contains "no loaded isolate") {
+        print --stderr "hint: keep traffic flowing for ~20 s BEFORE starting the capture (and during it), then retry"
+      }
+    }
+    exit 1
+  }
+  print --stderr $"✓ ($out) — view with: go tool pprof -http=: ($out)"
+  print $out
+}
+'''
+
 # ── cf:d1-migrate ────────────────────────────────────────────────────────────
 # Apply D1 migrations via wrangler. Pass-through wrapper.
 ["cf:d1-migrate"]
