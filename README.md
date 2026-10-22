@@ -171,6 +171,7 @@ The tables below are **generated** from each task file's `# role:` header by
 | `tool-fnox` | Secrets CLI — `fnox` |
 | `tool-gh` | GitHub CLI — `gh` |
 | `tool-gitleaks` | Secret scanning — `gitleaks` |
+| `tool-pprof` | pprof profiles — `go tool pprof` |
 | `tool-rust` | Rust toolchain — `cargo` / `wasm-pack` |
 | `tool-wrangler` | Wrangler CLI — `wrangler` |
 
@@ -193,6 +194,51 @@ Runner: **`mise`** — machine + repo bootstrap, sweep, upgrade.
 drives another tool's binary or reaches into `fnox` is misplaced — move it up to an
 orchestration file. Secrets flow **down**: orchestration reads `fnox`, sets `$env`, then
 `mise run`s the pure primitive (which inherits the env).
+
+---
+
+## Profiling a deployed Worker
+
+Cloudflare's [on-demand Workers profiling](https://blog.cloudflare.com/workers-on-demand-profiling)
+as one command, from any repo that includes `cfapp.toml`, `tool-cf.toml` and `tool-pprof.toml`
+(no wrangler or node needed):
+
+```bash
+mise run cfapp:profile -- <worker> --url https://<worker>.<sub>.workers.dev/<path> [--data '{}']
+```
+
+It checks the URL answers 2xx (profiling a 415/404 measures the error path), drives traffic
+(`cf:load`), captures a 10 s CPU profile once the isolate is hot (`cf:profile`, retried while
+the API says "No recent executions"), and prints the sample-count summary (`pprof:top`). With
+no args it uses `WORKER_NAME` / `CF_SUBDOMAIN` from `config/<env>.env`. Creds come from fnox:
+`CLOUDFLARE_API_TOKEN` (Workers Scripts Read + Account Analytics Read) and `CLOUDFLARE_ACCOUNT_ID`.
+
+- **Any Worker, any language.** JS/TS, Rust (workers-rs), Go (TinyGo / Go → wasm), Python.
+  The API samples the V8 isolate, wasm frames included. Source function names show up only
+  if the build keeps the wasm name section (workers-rs `worker-build --release` does; TinyGo
+  `-no-debug` strips it). Durable Objects: `cf:profile --namespace-id … --actor-id …`.
+  **Not** Cloudflare Containers (they are not isolates).
+- **`go` is only the reader.** `pprof:top` runs `go tool pprof` (go from your global mise config).
+  It has nothing to do with the Worker's language.
+- **Read CPU captures by sample count, not `pprof -top`.** Each sample's value is the
+  wall-clock gap since the previous one, and an idle isolate takes no samples, so idle time
+  between requests lands on whatever runs first after an `await`. In one capture,
+  `reader.releaseLock()` showed 4.3 s from just 2 samples. `pprof:top` prints how much
+  of the reported time is such gaps, then ranks by samples.
+- **Confirm a fix with `cf:cpu-stats <worker>`.** It gives per-version CPU/wall quantiles from
+  GraphQL Analytics, the ground truth. Each deployed version is its own row; data lands about
+  1–2 min after traffic.
+
+| task | file | does |
+|---|---|---|
+| `cfapp:profile` | `cfapp.toml` | the whole flow above, fnox → env bridge included |
+| `cf:load` | `tool-cf.toml` | N parallel curl loops for S seconds; warns on non-2xx |
+| `cf:profile` | `tool-cf.toml` | capture CPU/heap pprof of the **deployed** version (`--version-id` to override) |
+| `cf:cpu-stats` | `tool-cf.toml` | per-version CPU/wall quantiles (µs) |
+| `pprof:top` | `tool-pprof.toml` | sample-count read of a CPU pprof + gap share |
+
+Run on their own, the `cf:*` primitives read `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`
+from `$env` (e.g. `fnox exec -- mise run cf:cpu-stats -- <worker>`). `cfapp:profile` does that bridge for you.
 
 ---
 

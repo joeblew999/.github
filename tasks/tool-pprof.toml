@@ -1,0 +1,110 @@
+# tasks/tool-pprof.toml — pprof:* namespace: PURE pprof PRIMITIVES.
+# role: pprof profiles — `go tool pprof`
+#
+# Each task drives ONLY `go tool pprof` (go comes from the global mise config —
+# never pinned per-task). No credentials.
+#
+# Consumer wiring:
+#   [task_config]
+#   includes = [
+#     "git::https://github.com/joeblew999/.github.git//tasks/tool-pprof.toml?ref=<tag>",
+#   ]
+
+# ── pprof:top ────────────────────────────────────────────────────────────────
+# PRIMITIVE: read a CPU pprof by SAMPLE COUNT. Built for Cloudflare Workers
+# captures (cf:profile): the API stores each sample's value as the V8 timeDelta
+# since the previous sample (wall clock), and an idle isolate takes no samples,
+# so every idle gap between requests is charged to the first stack sampled
+# after it — code right after an `await` resumes (reader.releaseLock(),
+# request.cf, …). Plain `pprof -top` then ranks "who woke up after a gap" (in
+# one capture 2 samples showed as 4.3 s). One sample = one period of real
+# execution, so counts have no such bias. Prints how much of the reported time
+# the gap samples carry, then flat + cumulative tables by sample count.
+["pprof:top"]
+description = "PRIMITIVE: sample-count (not time-weighted) top of a CPU pprof, e.g. from cf:profile; shows how much reported time is idle-gap artifact."
+run = '''
+#!/usr/bin/env nu
+
+def main [
+  file: string            # CPU .pb.gz (e.g. written by cf:profile)
+  --top: int = 25         # rows per table
+  --gap-factor: int = 5   # a sample > gap-factor × period counts as a gap sample
+] {
+  if (which go | is-empty) {
+    print --stderr "✗ go not found — add it to your global mise config (mise use -g go)"
+    exit 1
+  }
+  if not ($file | path exists) {
+    print --stderr $"✗ no such file: ($file)"
+    exit 1
+  }
+  let res = (^go tool pprof -raw $file | complete)
+  if $res.exit_code != 0 {
+    print --stderr $"✗ go tool pprof failed: ($res.stderr | str trim)"
+    exit 1
+  }
+  let raw = ($res.stdout | lines)
+  let ptype = ($raw | where {|l| $l starts-with "PeriodType:" } | first | default "")
+  if not ($ptype | str contains "cpu") {
+    print --stderr $"✗ not a CPU profile \(($ptype)\) — use go tool pprof directly for heap"
+    exit 1
+  }
+  let period = ($raw | where {|l| $l starts-with "Period:" } | first | split row " " | last | into int)
+  let idx = {|name| $raw | enumerate | where item == $name | first | get index }
+  let si = (do $idx "Samples:")
+  let li = (do $idx "Locations")
+  let mi = (do $idx "Mappings")
+
+  let labels = (
+    $raw | slice ($li + 1)..($mi - 1)
+    | parse --regex '^\s*(?<id>\d+): 0x\S+ M=\d+ (?<rest>.*)$'
+    | reduce --fold {} {|r, acc|
+        let m = ($r.rest | parse --regex '^(?<func>.*?)\s*(?<file>[^\s]*):(?<line>\d+):\d+ s=.*$')
+        let label = if ($m | is-empty) { $r.rest | str trim } else {
+          let f = ($m.0.func | str trim)
+          if ($m.0.file | str contains "wasm") { $f } else if ($f | is-empty) {
+            $"($m.0.file | path basename):($m.0.line)"
+          } else { $"($f) ($m.0.file | path basename):($m.0.line)" }
+        }
+        $acc | upsert $r.id (if ($label | is-empty) { "(anon)" } else { $label })
+      }
+  )
+
+  let rows = (
+    $raw | slice ($si + 2)..($li - 1)
+    | parse --regex '^\s*(?<v>\d+):\s+(?<stack>.*?)\s*$'
+    | each {|s|
+        let ids = ($s.stack | split row ' ' | where {|x| $x != '' })
+        { v: ($s.v | into int), leaf: ($labels | get ($ids | first)), all: ($ids | each {|i| $labels | get $i } | uniq) }
+      }
+  )
+  let n = ($rows | length)
+  if $n == 0 {
+    print --stderr "✗ profile has no samples — was there traffic during the capture?"
+    exit 1
+  }
+  let reported = ($rows | get v | math sum)
+  let gaps = ($rows | where v > ($period * $gap_factor))
+  let gap_ns = ($gaps | get v | math sum | default 0)
+
+  print $"samples: ($n) × period ($period / 1_000_000)ms ≈ ($n * $period / 1_000_000) ms actually sampled"
+  print $"reported total: ($reported / 1_000_000 | math round) ms — ($gaps | length) gap samples \(> ($gap_factor)× period\) carry ($gap_ns / 1_000_000 | math round) ms = ((100 * $gap_ns / $reported) | math round --precision 1)%"
+  print $"largest single samples \(ms\): ($rows | get v | sort --reverse | first 5 | each {|x| $x / 1_000_000 | math round } | str join ', ')"
+
+  let cum = ($rows | get all | flatten | uniq --count | reduce --fold {} {|r, acc| $acc | upsert $r.value $r.count })
+  print "\nflat (by samples):"
+  $rows | group-by leaf | items {|k, g| {
+      fn: $k
+      flat_n: ($g | length)
+      flat_pct: (100 * ($g | length) / $n | math round --precision 1)
+      cum_n: ($cum | get $k)
+      reported_ms: (($g | get v | math sum) / 1_000_000 | math round)
+    } }
+  | sort-by flat_n --reverse | first $top | to md | print
+  print "\ncumulative (by samples; runtime glue hidden):"
+  $cum | transpose fn cum_n
+  | where {|r| $r.fn !~ '^(\(root\)|\(program\)|\(idle\)|:0$|<unknown>|wasm-to-js|js-to-wasm|wasm_bindgen.*::convert::closures|js_sys.*::futures)' }
+  | insert cum_pct {|r| 100 * $r.cum_n / $n | math round --precision 1 }
+  | sort-by cum_n --reverse | first $top | to md | print
+}
+'''

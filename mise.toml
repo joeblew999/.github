@@ -9,6 +9,7 @@
 includes = [
   "tasks/secrets-bw.toml",
   "tasks/tool-cf.toml",
+  "tasks/tool-pprof.toml",
   "tasks/ci.toml",
   "tasks/tool-cliff.toml",
   "tasks/tool-docker.toml",

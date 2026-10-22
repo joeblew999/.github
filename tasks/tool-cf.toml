@@ -1,15 +1,19 @@
-# tasks/cf.toml — cf:* (Cloudflare) namespace: PURE cloudflare PRIMITIVES.
+# tasks/tool-cf.toml — cf:* (Cloudflare) namespace: PURE cloudflare PRIMITIVES.
 # role: Cloudflare CLI — `wrangler` + `curl` (HTTP)
 #
 # Each task drives ONLY wrangler (+ curl as HTTP plumbing). Tokens come from
 # $env — the orchestration layer (cfapp:*) sets CLOUDFLARE_API_TOKEN from
 # fnox; wrangler reads it automatically. NO fnox/gh here. The cross-tool CF
-# Access flows moved to provision.toml (orchestration).
+# Access flows moved to cfapp.toml (orchestration).
+#
+# Profiling any Worker: cf:load (traffic) + cf:profile (capture) + cf:cpu-stats
+# (per-version CPU) here; pprof:top (tool-pprof.toml) reads the capture; and
+# cfapp:profile runs the whole flow in one command.
 #
 # Consumer wiring:
 #   [task_config]
 #   includes = [
-#     "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=<tag>",
+#     "git::https://github.com/joeblew999/.github.git//tasks/tool-cf.toml?ref=<tag>",
 #   ]
 
 # ── cf:token-check ───────────────────────────────────────────────────────────
@@ -53,17 +57,21 @@ def main [] {
 # Object instance) via the profiling API — curl only, no wrangler/node. Writes
 # the gzipped pprof and prints its path to stdout. The API attaches to an
 # already-running isolate and never invokes the Worker, so send traffic during
-# the capture. Token needs Workers Scripts Read.
+# the capture (cf:load). Token needs Workers Scripts Read.
+#
+# READ CPU CAPTURES BY SAMPLE COUNT (pprof:top), NOT `pprof -top`: each sample's
+# value is the wall-clock gap since the previous one, and an idle isolate takes
+# no samples, so idle time lands on whatever runs first after an `await`.
 ["cf:profile"]
 description = "PRIMITIVE: capture a production CPU/heap pprof of Worker <name> (or one Durable Object) via the CF API; curl only."
 run = '''
 #!/usr/bin/env nu
 
 def main [
-  worker: string                  # Worker name or ID (for a DO: the Worker that owns the namespace)
+  worker: string                  # Worker script name (for a DO: the Worker that owns the namespace)
   --profile-type: string = "cpu"  # cpu | heap
   --duration-ms: int = 10000      # capture window, 1000–50000
-  --version-id: string = "latest" # "latest" = newest UPLOADED version, not necessarily the deployed one
+  --version-id: string = "deployed" # "deployed" = version taking most traffic now; "latest" = newest UPLOADED; or a version ID
   --namespace-id: string = ""     # Durable Object namespace ID (with --actor-id)
   --actor-id: string = ""         # Durable Object instance ID (64 hex chars)
   --out: string = ""              # default: <worker>-<type>-<timestamp>.pb.gz
@@ -88,6 +96,19 @@ def main [
     exit 1
   }
 
+  let version = if $version_id != "deployed" { $version_id } else {
+    let d = (
+      $"Authorization: Bearer ($token)"
+      | ^curl -sS -H @- $"https://api.cloudflare.com/client/v4/accounts/($account)/workers/scripts/($worker)/deployments"
+      | from json
+    )
+    if not ($d.success? | default false) or ($d.result.deployments? | default [] | is-empty) {
+      print --stderr $"✗ cannot resolve the deployed version of ($worker): ($d.errors? | default [] | to json --raw)"
+      exit 1
+    }
+    $d.result.deployments | first | get versions | sort-by percentage --reverse | first | get version_id
+  }
+
   let is_do = not ($actor_id | is-empty)
   let body = (
     {duration_ms: $duration_ms, profile_type: $profile_type}
@@ -95,8 +116,8 @@ def main [
   )
   let stamp = (date now | format date "%Y%m%dT%H%M%S")
   let out = (if ($out | is-empty) { $"($worker)-($profile_type)-($stamp).pb.gz" } else { $out })
-  let url = $"https://api.cloudflare.com/client/v4/accounts/($account)/workers/workers/($worker)/versions/($version_id)/profile"
-  let target = (if $is_do { $"($worker) DO ($actor_id | str substring 0..7)…" } else { $worker })
+  let url = $"https://api.cloudflare.com/client/v4/accounts/($account)/workers/workers/($worker)/versions/($version)/profile"
+  let target = (if $is_do { $"($worker)@($version | str substring 0..7) DO ($actor_id | str substring 0..7)…" } else { $"($worker)@($version | str substring 0..7)" })
 
   print --stderr $"→ capturing ($duration_ms) ms ($profile_type) profile of ($target) — send traffic now"
   # The auth header goes in on stdin (-H @-) so the token never shows in the process table.
@@ -121,8 +142,108 @@ def main [
     }
     exit 1
   }
-  print --stderr $"✓ ($out) — view with: go tool pprof -http=: ($out)"
+  print --stderr $"✓ ($out) — read with: mise run pprof:top -- ($out)   \(not plain `pprof -top`, see header\)"
   print $out
+}
+'''
+
+# ── cf:cpu-stats ─────────────────────────────────────────────────────────────
+# PRIMITIVE: per-version CPU + wall-time quantiles of a Worker from the GraphQL
+# Analytics API (workersInvocationsAdaptive) — the ground truth for "what does
+# a request cost", independent of profiler sampling. Use it for before/after:
+# each deployed version gets its own row. curl only. Token needs Account
+# Analytics Read. Values in microseconds; data lands ~1–2 min after traffic.
+["cf:cpu-stats"]
+description = "PRIMITIVE: per-version CPU/wall-time quantiles (µs) of Worker <name> from GraphQL Analytics; curl only. Before/after ground truth."
+run = '''
+#!/usr/bin/env nu
+
+def main [
+  worker: string                    # Worker script name
+  --since: string = "1hr"           # look-back window (nu duration, e.g. 30min, 6hr, 1day)
+  --by: string = "datetimeHour"     # time bucket: datetimeMinute | datetimeFifteenMinutes | datetimeHour
+  --json                            # emit JSON instead of a table
+] {
+  let token = ($env.CLOUDFLARE_API_TOKEN? | default "" | str trim)
+  let account = ($env.CLOUDFLARE_ACCOUNT_ID? | default "" | str trim)
+  if ($token | is-empty) or ($account | is-empty) {
+    print --stderr "✗ CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID must be set in env"
+    exit 1
+  }
+  let fmt = "%Y-%m-%dT%H:%M:%SZ"
+  let end = (date now | date to-timezone UTC | format date $fmt)
+  let start = ((date now) - ($since | into duration) | date to-timezone UTC | format date $fmt)
+  let q = $"query{viewer{accounts\(filter:{accountTag:\"($account)\"}\){workersInvocationsAdaptive\(limit:500,filter:{scriptName:\"($worker)\",datetime_geq:\"($start)\",datetime_leq:\"($end)\"},orderBy:[($by)_ASC]\){sum{requests errors}quantiles{cpuTimeP50 cpuTimeP75 cpuTimeP90 cpuTimeP99 wallTimeP50 wallTimeP99}dimensions{($by) scriptVersion status}}}}}"
+  # The auth header goes in on stdin (-H @-) so the token never shows in the process table.
+  let resp = (
+    $"Authorization: Bearer ($token)"
+    | ^curl -sS -X POST -H @- -H "Content-Type: application/json"
+        --data ({query: $q} | to json --raw) "https://api.cloudflare.com/client/v4/graphql"
+    | from json
+  )
+  if ($resp.errors? | default [] | is-not-empty) {
+    print --stderr $"✗ ($resp.errors | to json --raw)"
+    exit 1
+  }
+  let rows = ($resp.data.viewer.accounts.0.workersInvocationsAdaptive | each {|r| {
+      t: ($r.dimensions | get $by)
+      version: ($r.dimensions.scriptVersion | str substring 0..7)
+      status: $r.dimensions.status
+      requests: $r.sum.requests
+      cpu_p50_us: $r.quantiles.cpuTimeP50
+      cpu_p75_us: $r.quantiles.cpuTimeP75
+      cpu_p90_us: $r.quantiles.cpuTimeP90
+      cpu_p99_us: $r.quantiles.cpuTimeP99
+      wall_p50_us: $r.quantiles.wallTimeP50
+      wall_p99_us: $r.quantiles.wallTimeP99
+    } })
+  if $json { $rows | to json } else { $rows | to md }
+}
+'''
+
+# ── cf:load ──────────────────────────────────────────────────────────────────
+# PRIMITIVE: sustained HTTP traffic at one URL — N parallel curl loops for S
+# seconds. cf:profile only attaches to an isolate that is already busy
+# (~20–30 s of traffic first, and during the capture), and cf:cpu-stats needs
+# enough requests per version for stable quantiles. Prints request count,
+# rate and status-code breakdown. --data switches the default method to POST.
+["cf:load"]
+description = "PRIMITIVE: drive sustained traffic at <url> (N parallel curl loops for S seconds); prints count, rps, status codes."
+run = '''
+#!/usr/bin/env nu
+
+def main [
+  url: string
+  --seconds: int = 60             # how long to keep the traffic up
+  --parallel: int = 6             # concurrent request loops
+  --method: string = ""           # default GET, or POST when --data is given
+  --data: string = ""             # request body (e.g. '{}' for a ConnectRPC unary call)
+  --content-type: string = "application/json"
+] {
+  let m = if ($method | is-not-empty) { $method } else if ($data | is-not-empty) { "POST" } else { "GET" }
+  let body_args = if ($data | is-empty) { [] } else { [--data $data -H $"Content-Type: ($content_type)"] }
+  let deadline = ((date now) + ($seconds * 1sec))
+  print --stderr $"→ curl -X ($m) ($body_args | str join ' ') ($url) × ($parallel) for ($seconds)s"
+  let codes = (
+    1..$parallel | par-each {|_|
+      mut counts = {}
+      while (date now) < $deadline {
+        # complete: a failed connection is status 000, not a task error.
+        let code = (^curl -s -o /dev/null -w "%{http_code}" -X $m ...$body_args $url | complete | get stdout | str trim)
+        $counts = ($counts | upsert $code (($counts | get -o $code | default 0) + 1))
+      }
+      $counts
+    }
+    | reduce --fold {} {|c, acc| $c | items {|k, v| {k: $k, v: $v} } | reduce --fold $acc {|kv, a| $a | upsert $kv.k (($a | get -o $kv.k | default 0) + $kv.v) } }
+  )
+  let total = ($codes | values | math sum | default 0)
+  print $"($total) requests, ($total / $seconds | math round --precision 1) rps, status: ($codes | to json --raw)"
+  # Error responses are cheap, so a profile or cpu-stats run over them measures
+  # the error path (e.g. a 415 from a missing codec), not the real handler.
+  let bad = ($codes | items {|k, v| {k: $k, v: $v} } | where {|r| not ($r.k | str starts-with "2") } | get v | math sum | default 0)
+  if $bad > 0 {
+    print --stderr $"⚠ ($bad)/($total) responses were not 2xx — profiles/cpu-stats of this run measure the error path"
+  }
 }
 '''
 

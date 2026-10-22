@@ -929,3 +929,132 @@ def main [] {
   }
 }
 '''
+
+# ── cfapp:profile ─────────────────────────────────────────────────────────────────
+# Profile a DEPLOYED Worker in one command: fnox→$env token bridge, a 2xx
+# preflight, traffic (cf:load) + capture once the isolate is hot (cf:profile,
+# retried on 10393 "No recent executions"), then the sample-count read
+# (pprof:top). Confirm a fix afterwards with cf:cpu-stats (per-version CPU
+# quantiles; data lands ~1–2 min after traffic).
+#
+# What it covers: ANY Worker — JS/TS, Rust (workers-rs), Go (TinyGo/Go → wasm),
+# Python — because the profiling API samples the V8 isolate, wasm frames
+# included. Source-language function names appear only if the build keeps the
+# wasm name section (workers-rs `worker-build --release` does; TinyGo
+# `-no-debug` strips it). Durable Objects: use cf:profile --namespace-id
+# --actor-id directly. NOT covered: Cloudflare Containers (not isolates).
+# `go` is needed only as the pprof READER (pprof:top), not for the Worker.
+#
+# Worker + URL: args, else WORKER_NAME / CF_SUBDOMAIN from config/<env>.env.
+# Needs fnox items CLOUDFLARE_API_TOKEN (Workers Scripts Read + Account
+# Analytics Read) and CLOUDFLARE_ACCOUNT_ID, or the same vars already in $env.
+#
+# Consumer wiring (all three — cfapp:profile composes the primitives):
+#   [task_config]
+#   includes = [
+#     "git::https://github.com/joeblew999/.github.git//tasks/cfapp.toml?ref=<tag>",
+#     "git::https://github.com/joeblew999/.github.git//tasks/tool-cf.toml?ref=<tag>",
+#     "git::https://github.com/joeblew999/.github.git//tasks/tool-pprof.toml?ref=<tag>",
+#   ]
+#
+# e.g. a ConnectRPC unary method:
+#   mise run cfapp:profile -- my-worker --url https://my-worker.me.workers.dev/pkg.v1.Svc/Method --data '{}'
+["cfapp:profile"]
+description = "Profile a deployed Worker (any language, wasm included) in one command: fnox bridge, 2xx preflight, cf:load + cf:profile (retries) + pprof:top. Worker/URL from args or config/<env>.env."
+run = '''
+#!/usr/bin/env nu
+
+def main [
+  worker: string = ""              # Worker script name (default: WORKER_NAME from config/<env>.env)
+  --url: string = ""               # request target (default: https://<worker>.<CF_SUBDOMAIN>.workers.dev/)
+  --data: string = ""              # request body → POST (e.g. '{}' for a ConnectRPC unary call)
+  --method: string = ""            # override the HTTP method
+  --content-type: string = "application/json"
+  --parallel: int = 6              # concurrent request loops
+  --warm: int = 30                 # seconds of traffic before the first capture attempt
+  --duration-ms: int = 10000       # capture window
+  --attempts: int = 4              # capture attempts (the API needs a hot isolate)
+  --out: string = ""               # default: <worker>-cpu-<timestamp>.pb.gz
+  --top: int = 25                  # rows per pprof:top table
+] {
+  # optional config/<env>.env (same loader as the other cfapp:* tasks)
+  let env_name = ($env.MISE_ENV? | default ($env.ENV? | default "production"))
+  let file = $"config/($env_name).env"
+  let cfg = if ($file | path exists) {
+    open --raw $file
+    | lines
+    | where { |l| $l =~ '^[A-Z_][A-Z0-9_]*=' }
+    | reduce -f {} {|line, acc|
+        let parts = ($line | split row -n 2 "=")
+        $acc | upsert ($parts | get 0) (($parts | get 1) | str trim --char '"')
+      }
+  } else { {} }
+
+  let worker = if ($worker | is-not-empty) { $worker } else { $cfg.WORKER_NAME? | default "" }
+  if ($worker | is-empty) {
+    print --stderr $"✗ pass a worker name, or set WORKER_NAME in ($file)"
+    exit 1
+  }
+  let url = if ($url | is-not-empty) { $url } else {
+    let sub = ($cfg.CF_SUBDOMAIN? | default "")
+    if ($sub | is-empty) {
+      print --stderr $"✗ pass --url, or set CF_SUBDOMAIN in ($file)"
+      exit 1
+    }
+    $"https://($worker).($sub).workers.dev/"
+  }
+
+  # orchestration provides the creds from fnox; pure cf:* primitives read them from env.
+  $env.CLOUDFLARE_API_TOKEN = (try { ^fnox get CLOUDFLARE_API_TOKEN | str trim } catch { ($env.CLOUDFLARE_API_TOKEN? | default "") })
+  $env.CLOUDFLARE_ACCOUNT_ID = (try { ^fnox get CLOUDFLARE_ACCOUNT_ID | str trim } catch { ($env.CLOUDFLARE_ACCOUNT_ID? | default "") })
+
+  let m = if ($method | is-not-empty) { $method } else if ($data | is-not-empty) { "POST" } else { "GET" }
+  let body_args = if ($data | is-empty) { [] } else { [--data $data -H $"Content-Type: ($content_type)"] }
+  let load_args = ([--parallel $parallel --method $m] | append (if ($data | is-empty) { [] } else { [--data $data --content-type $content_type] }))
+
+  # preflight: profiling an error path (415, 404, 500…) measures the wrong code.
+  let code = (^curl -s -o /dev/null -w "%{http_code}" -X $m ...$body_args $url | complete | get stdout | str trim)
+  if not ($code | str starts-with "2") {
+    print --stderr $"✗ ($m) ($url) → HTTP ($code); fix the request \(--url/--data/--content-type\) before profiling"
+    exit 1
+  }
+  print $"✓ preflight ($m) ($url) → ($code)"
+
+  let stamp = (date now | format date "%Y%m%dT%H%M%S")
+  let out = (if ($out | is-empty) { $"($worker)-cpu-($stamp).pb.gz" } else { $out })
+  let capture_s = ($duration_ms // 1000)
+
+  mut captured = false
+  for attempt in 1..$attempts {
+    # first attempt warms the isolate; later ones only need a short re-warm
+    let warm_s = (if $attempt == 1 { $warm } else { 10 })
+    print $"→ attempt ($attempt)/($attempts): ($warm_s)s traffic, then a ($duration_ms)ms capture under load"
+    let res = (
+      [
+        {|| ^mise run cf:load -- $url --seconds ($warm_s + $capture_s + 5) ...$load_args | complete }
+        {|| sleep ($warm_s * 1sec); ^mise run cf:profile -- $worker --duration-ms $duration_ms --out $out | complete }
+      ]
+      | par-each --keep-order {|job| do $job }
+    )
+    print ($res.0.stdout | str trim)
+    if ($res.0.stderr | str contains "⚠") { print --stderr ($res.0.stderr | lines | where {|l| $l | str contains "⚠" } | str join "\n") }
+    if $res.1.exit_code == 0 {
+      $captured = true
+      break
+    }
+    let err = ($res.1.stderr | lines | where {|l| ($l | str starts-with "✗") or ($l | str contains "10393") or ($l | str contains "message") } | str join " ")
+    print --stderr $"  capture failed: ($err)"
+    if not (($res.1.stderr | str contains "10393") or ($res.1.stderr | str contains "no loaded isolate")) {
+      exit 1
+    }
+  }
+  if not $captured {
+    print --stderr $"✗ no capture after ($attempts) attempts — a freshly deployed version can take a few minutes before the API finds it; retry with --warm 60"
+    exit 1
+  }
+
+  print $"\n✓ ($out)\n"
+  ^mise run pprof:top -- $out --top $top
+  print $"\nnext: per-version CPU \(ground truth, ~1–2 min lag\): mise run cf:cpu-stats -- ($worker)"
+}
+'''
