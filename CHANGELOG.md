@@ -1,3 +1,9 @@
+## [0.71.0] - 2026-10-22
+
+### 🚀 Features
+
+- *(skills)* Add dioxus-dx skill as a marketplace plugin
+- *(cf)* Cf:profile — production CPU/heap pprof via the profiling API (curl only)
 ## [0.70.0] - 2026-07-03
 
 ### 🚀 Features
@@ -7,6 +13,10 @@
 ### 🐛 Bug Fixes
 
 - Mise-setup guards for the required tasks/mise.toml include
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.70.0
 ## [0.69.0] - 2026-07-03
 
 ### 🚀 Features
@@ -46,15 +56,15 @@
 - *(release)* V0.67.1
 ## [0.67.0] - 2026-07-03
 
-### 🚜 Refactor
-
-- Extract shared runner setup into a composite mise-setup action
-- Rename sccache input → rust-cache; drop fleet map from README
-
 ### 📚 Documentation
 
 - Add a Docker section — build-check, publish-image, run-image
 - Fleet map — .github-example verification is MANDATORY before tagging
+
+### 🚜 Refactor
+
+- Extract shared runner setup into a composite mise-setup action
+- Rename sccache input → rust-cache; drop fleet map from README
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -84,13 +94,13 @@
 - *(release)* V0.65.0
 ## [0.64.0] - 2026-07-01
 
-### 💼 Other
-
-- Guard the non-docker release path (regression test for the packages:write bug)
-
 ### ⚙️ Miscellaneous Tasks
 
 - *(release)* V0.64.0
+
+### 💼 Other
+
+- Guard the non-docker release path (regression test for the packages:write bug)
 ## [0.63.0] - 2026-07-01
 
 ### ⚙️ Miscellaneous Tasks
@@ -137,10 +147,6 @@
 - *(release)* V0.58.0
 ## [0.57.0] - 2026-07-01
 
-### 💼 Other
-
-- Auth home is cf-connectrpc-middleware now (iam folded in)
-
 ### 📚 Documentation
 
 - Add platform SYSTEMS.md map (auth → iam, deploy → vm-uncloud)
@@ -151,6 +157,10 @@
 - De-jb naming — buildx builder jb-multiarch → multiarch
 - *(reusable)* Cache Rust builds via Swatinem/rust-cache
 - *(release)* V0.57.0
+
+### 💼 Other
+
+- Auth home is cf-connectrpc-middleware now (iam folded in)
 ## [0.56.0] - 2026-06-12
 
 ### 🚀 Features
@@ -347,19 +357,6 @@
 - *(reusable-mise-upgrade)* Seed nu via mise:global:bootstrap before the nushell tasks
 - *(release:pack, ci:audit-lib-refs)* Windows glob bug — caught by realistic dogfood
 
-### 🚜 Refactor
-
-- *(mise:repo:bootstrap)* Generate minimal stub, no hardcoded YAML/Tera
-- *(ci:check-global, mise:sweep)* Proper relative-glob nushell
-- *(ci)* Obey our own rules — isomorphic, DRY, namespace=tool
-- *(cf)* Decompose into atomic primitives + provision orchestration
-- *(docker)* Pure namespace — GHCR_USER from env/fnox, drop the ^gh call
-- *(cf)* Strictly single-tool — drives only wrangler+curl, fnox moves up
-- *(docker, gh)* Strict purity — tokens from $env, no fnox
-- Prefix pure-tool files with tool- so the two layers are visible
-- *(orchestration)* 7 namespaces → 5 (one per lifecycle concern)
-- Remove dead env.toml (env:resolve was an orphaned hidden helper)
-
 ### 📚 Documentation
 
 - Cross-ref the .github-example sandbox at top of README
@@ -376,6 +373,19 @@
 - *(README)* Restructure for flow — use → how CI works → what's inside → develop
 - *(README)* Make the consumer CI story clear — one task, local AND remote
 - *(README)* Point repos at .github-example as the canonical, CI-tested reference
+
+### 🚜 Refactor
+
+- *(mise:repo:bootstrap)* Generate minimal stub, no hardcoded YAML/Tera
+- *(ci:check-global, mise:sweep)* Proper relative-glob nushell
+- *(ci)* Obey our own rules — isomorphic, DRY, namespace=tool
+- *(cf)* Decompose into atomic primitives + provision orchestration
+- *(docker)* Pure namespace — GHCR_USER from env/fnox, drop the ^gh call
+- *(cf)* Strictly single-tool — drives only wrangler+curl, fnox moves up
+- *(docker, gh)* Strict purity — tokens from $env, no fnox
+- Prefix pure-tool files with tool- so the two layers are visible
+- *(orchestration)* 7 namespaces → 5 (one per lifecycle concern)
+- Remove dead env.toml (env:resolve was an orphaned hidden helper)
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -854,24 +864,6 @@
 - *(mise-tasks)* Chmod +x existing tasks
 - *(mise-tasks)* Detect repo via git remote, not gh repo view
 
-### 💼 Other
-
-- *(deps)* Bump github.com/nats-io/nats.go from 1.43.0 to 1.47.0 (#15)
-- Bump github.com/nats-io/nats-server/v2 from 2.11.6 to 2.12.2
-- *(deps)* Bump github.com/nats-io/nats-server/v2 from 2.12.2 to 2.12.3 (#18)
-
-### 🚜 Refactor
-
-- Simplify Playwright architecture and clean up JS files
-- Move internal docs to .docs/ directory
-- Move Blog & Updates to About Me section
-- Move Current Focus to About Me section
-- Polish profile content and organization
-- Reorganize profile with About Me at top and update CAD kernel deployment info
-- Update focus to product development with consulting availability
-- Remove redundant Current Focus section from About Me
-- Reframe Archethought Inc. as collaboration partnership
-
 ### 📚 Documentation
 
 - Add snake chasing its tail architecture explanation
@@ -896,6 +888,18 @@
 - Usage guide for mise-tasks
 - Usage guide for Claude Code skills
 
+### 🚜 Refactor
+
+- Simplify Playwright architecture and clean up JS files
+- Move internal docs to .docs/ directory
+- Move Blog & Updates to About Me section
+- Move Current Focus to About Me section
+- Polish profile content and organization
+- Reorganize profile with About Me at top and update CAD kernel deployment info
+- Update focus to product development with consulting availability
+- Remove redundant Current Focus section from About Me
+- Reframe Archethought Inc. as collaboration partnership
+
 ### 🎨 Styling
 
 - Improve profile layout with better spacing and organization
@@ -914,3 +918,9 @@
 - *(deps)* Bump actions/setup-go from 4 to 6 (#9)
 - Add working files and tooling configurations
 - *(deps)* Bump actions/checkout from 5 to 6 (#17)
+
+### 💼 Other
+
+- *(deps)* Bump github.com/nats-io/nats.go from 1.43.0 to 1.47.0 (#15)
+- Bump github.com/nats-io/nats-server/v2 from 2.11.6 to 2.12.2
+- *(deps)* Bump github.com/nats-io/nats-server/v2 from 2.12.2 to 2.12.3 (#18)
